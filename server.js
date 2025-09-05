@@ -40,8 +40,8 @@ const upload = multer({
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure email transporter
-const transporter = nodemailer.createTransporter({
+// Configure email transporter - FIXED LINE
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
