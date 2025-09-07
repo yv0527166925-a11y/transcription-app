@@ -42,12 +42,15 @@ const upload = multer({
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure email transporter
-const transporter = nodemailer.createTransporter({
+// Configure email transporter - FIXED
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
@@ -326,6 +329,7 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     timestamp: new Date().toISOString(),
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
+    emailConfigured: !!process.env.EMAIL_USER,
     users: users.size
   });
 });
@@ -334,7 +338,8 @@ app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
     message: 'API is working!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    users: users.size
   });
 });
 
@@ -351,7 +356,7 @@ app.get('*', (req, res) => {
 // HELPER FUNCTIONS
 async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
   try {
-    console.log(`🎯 Processing job ${jobId}`);
+    console.log(`🎯 Processing job ${jobId} with ${fileInfos.length} files`);
     transcriptionJobs.set(jobId, { status: 'processing', progress: 0 });
     
     const transcriptions = [];
@@ -382,6 +387,8 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
           fs.unlinkSync(convertedPath);
         }
         
+        console.log(`✅ Completed: ${file.originalname}`);
+        
       } catch (error) {
         console.error(`❌ Error processing ${file.originalname}:`, error);
         transcriptions.push({
@@ -395,6 +402,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
     const successfulTranscriptions = transcriptions.filter(t => !t.error);
     
     if (successfulTranscriptions.length > 0) {
+      console.log(`📧 Sending email with ${successfulTranscriptions.length} documents`);
       await sendTranscriptionEmail(user.email, successfulTranscriptions);
     }
     
@@ -412,14 +420,16 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
         duration: trans.duration,
         language: language,
         status: trans.error ? 'failed' : 'completed',
-        jobId: jobId
+        jobId: jobId,
+        error: trans.error
       });
     });
     
     transcriptionJobs.set(jobId, { 
       status: 'completed', 
       progress: 100,
-      successful: successfulTranscriptions.length
+      successful: successfulTranscriptions.length,
+      failed: transcriptions.length - successfulTranscriptions.length
     });
     
     // Cleanup files
@@ -429,7 +439,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       }
     });
     
-    console.log(`🎉 Job ${jobId} completed`);
+    console.log(`🎉 Job ${jobId} completed successfully`);
     
   } catch (error) {
     console.error('Job processing error:', error);
@@ -459,6 +469,7 @@ async function realGeminiTranscription(filePath, filename, language) {
     if (ext === '.mp3') mimeType = 'audio/mpeg';
     else if (ext === '.mp4') mimeType = 'video/mp4';
     else if (ext === '.m4a') mimeType = 'audio/mp4';
+    else if (ext === '.mov') mimeType = 'video/quicktime';
 
     const prompt = `תמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
@@ -469,6 +480,10 @@ async function realGeminiTranscription(filePath, filename, language) {
 4. חלק לפסקאות של 2-3 משפטים
 5. השאר שורה ריקה בין פסקאות
 
+עיצוב הטקסט:
+- כל משפט מסתיים בנקודה
+- אם יש דובר חדש, כתוב "רב:" או "שואל:" רק אם זה ברור
+
 ציטוטים במירכאות:
 - "שנאמר..."
 - "כדאיתא בגמרא..."
@@ -476,10 +491,16 @@ async function realGeminiTranscription(filePath, filename, language) {
 - "כמו שכתוב..."
 - "תניא..."
 - "כדכתיב..."
+- "משנה במסכת..."
+- "וכתוב..."
+- "כמאמר חז״ל..."
+- "דאמר..."
 
-התחל עכשיו ותמלל הכל:`;
+זכור: תמלל הכל! אל תקצר! המשך עד הסוף המוחלט של הקובץ!
 
-    console.log(`🎯 Starting Gemini transcription: ${filename}`);
+התחל עכשיו:`;
+
+    console.log(`🎯 Starting Gemini transcription for: ${filename}`);
 
     const result = await model.generateContent([
       {
@@ -494,27 +515,34 @@ async function realGeminiTranscription(filePath, filename, language) {
     const response = await result.response;
     let transcription = response.text();
     
+    console.log(`🎯 Raw transcription length: ${transcription.length} characters`);
+    
     // Clean up text
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n')
       .replace(/^\s+|\s+$/gm, '')
+      .replace(/([.!?])\s*([א-ת])/g, '$1 $2')
       .trim();
     
     if (!transcription || transcription.length < 50) {
-      throw new Error('התמלול נכשל - טקסט קצר מדי');
+      throw new Error('התמלול נכשל - טקסט קצר מדי או ריק');
     }
     
-    console.log(`✅ Transcription completed: ${transcription.length} chars`);
+    console.log(`✅ Transcription completed: ${transcription.length} characters`);
     return transcription;
     
   } catch (error) {
-    console.error('Gemini error:', error);
+    console.error('🔥 Gemini transcription error:', error);
     
     if (error.message.includes('API key')) {
       throw new Error('שגיאה באימות Gemini API');
     } else if (error.message.includes('quota')) {
       throw new Error('הגעת למגבלת השימוש ב-Gemini API');
+    } else if (error.message.includes('format')) {
+      throw new Error('פורמט הקובץ אינו נתמך');
+    } else if (error.message.includes('SAFETY')) {
+      throw new Error('הקובץ נחסם מסיבות בטיחות - נסה קובץ אחר');
     } else {
       throw new Error(`שגיאה בתמלול: ${error.message}`);
     }
@@ -523,8 +551,20 @@ async function realGeminiTranscription(filePath, filename, language) {
 
 async function createWordDocument(transcription, filename, duration) {
   try {
+    console.log(`📄 Creating Word document for: ${filename}`);
+    
     const doc = new Document({
       sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              right: 1440,
+              bottom: 1440,
+              left: 1440
+            }
+          }
+        },
         children: [
           new Paragraph({
             children: [
@@ -532,11 +572,16 @@ async function createWordDocument(transcription, filename, duration) {
                 text: "תמלול אוטומטי",
                 bold: true,
                 size: 32,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -544,10 +589,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `שם הקובץ: ${filename}`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 200 }
+            spacing: { 
+              after: 200,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -555,10 +605,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `משך זמן: ${duration} דקות`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 200 }
+            spacing: { 
+              after: 200,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -566,10 +621,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -577,11 +637,16 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: "─".repeat(50),
                 size: 20,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           ...processTranscriptionContent(transcription)
@@ -589,10 +654,12 @@ async function createWordDocument(transcription, filename, duration) {
       }]
     });
     
-    return await Packer.toBuffer(doc);
+    const buffer = await Packer.toBuffer(doc);
+    console.log(`✅ Word document created successfully for: ${filename}`);
+    return buffer;
     
   } catch (error) {
-    console.error('Word doc error:', error);
+    console.error('Error creating Word document:', error);
     throw error;
   }
 }
@@ -600,11 +667,14 @@ async function createWordDocument(transcription, filename, duration) {
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
-  const sections = transcription
+  let cleanedText = transcription
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
-    .split(/\n\s*\n/)
-    .filter(section => section.trim().length > 0);
+    .trim();
+  
+  const sections = cleanedText.split(/\n\s*\n/)
+    .map(section => section.trim())
+    .filter(section => section.length > 0);
   
   sections.forEach(section => {
     section = section.replace(/\n+/g, ' ').trim();
@@ -613,15 +683,25 @@ function processTranscriptionContent(transcription) {
       section += '.';
     }
     
+    // Check if this is a speaker line
+    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר)\s*:/.test(section.trim());
+    
     paragraphs.push(new Paragraph({
       children: [
         new TextRun({
           text: section,
           size: 24,
-          font: { name: "David" }
+          font: {
+            name: "David"
+          },
+          bold: isSpeakerLine
         })
       ],
-      spacing: { before: 200, after: 300 }
+      spacing: { 
+        before: isSpeakerLine ? 400 : 200,
+        after: 300,
+        line: 400
+      }
     }));
   });
   
@@ -651,6 +731,7 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
             ${transcriptions.map(t => `<li>📄 ${t.filename}</li>`).join('')}
           </ul>
           <p><strong>💫 תמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית</strong></p>
+          <p>הקבצים נוצרו במיוחד עבורך על ידי מערכת Gemini 2.5 Pro המתקדמת.</p>
           <p>בברכה,<br>מערכת התמלול החכמה</p>
         </div>
       `,
@@ -678,4 +759,3 @@ app.listen(PORT, () => {
   console.log('   👨‍💼 Admin: admin@example.com / admin123');
   console.log('   👤 User: test@example.com / test123');
 });
-
