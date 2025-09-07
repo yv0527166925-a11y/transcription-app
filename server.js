@@ -815,4 +815,76 @@ async function sendTranscriptionEmail(email, transcriptions) {
           <p style="font-size: 16px; margin-bottom: 20px;">שלום,</p>
           
           <p style="font-size: 16px; margin-bottom: 25px;">
-            התמ
+            התמלול שלך הושלם בהצלחה באמצעות <strong>Google Gemini 2.5 Pro</strong>!<br>
+            המערכת מותאמת במיוחד לתמלול עברית עם הגיה ליטאית ומושגי ארמית.
+          </p>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #2E74B5; margin: 0 0 15px 0;">📊 סיכום התמלול:</h3>
+            <ul style="margin: 0; padding-right: 20px;">
+              <li><strong>מספר קבצים:</strong> ${transcriptions.length}</li>
+              <li><strong>זמן כולל:</strong> ${totalMinutes} דקות</li>
+              <li><strong>פורמט פלט:</strong> קבצי Word מעוצבים</li>
+              <li><strong>שפה:</strong> עברית (הגיה ליטאית)</li>
+            </ul>
+          </div>
+          
+          <h3 style="color: #2E74B5; margin: 25px 0 15px 0;">📄 קבצים מצורפים:</h3>
+          <ul style="background: #e3f2fd; padding: 15px 20px; border-radius: 5px; margin: 15px 0;">
+            ${transcriptions.map(trans => 
+              `<li style="margin: 5px 0;"><strong>${trans.filename}</strong> (${trans.duration} דקות) → תמלול מעוצב</li>`
+            ).join('')}
+          </ul>
+          
+          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #ffc107;">
+            <h4 style="color: #856404; margin: 0 0 10px 0;">💡 טיפים לשימוש:</h4>
+            <ul style="color: #856404; margin: 0; padding-right: 20px; font-size: 14px;">
+              <li>הקבצים מעוצבים ומוכנים לעריכה</li>
+              <li>מומלץ לבדוק מושגים מיוחדים בארמית</li>
+              <li>ניתן להדפיס או לערוך ישירות ב-Word</li>
+              <li>שמור את הקבצים לארכיון שלך</li>
+            </ul>
+          </div>
+          
+          <p style="font-size: 16px; margin-top: 25px;">
+            תודה שבחרת במערכת התמלול המתקדמת שלנו!<br>
+            נשמח לשרת אותך שוב בעתיד.
+          </p>
+        </div>
+        
+        <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
+          <p style="margin: 0;">מערכת תמלול חכמה | Powered by Google Gemini 2.5 Pro</p>
+          <p style="margin: 5px 0 0 0;">מותאם במיוחד לעברית, הגיה ליטאית ומושגי ארמית</p>
+        </div>
+      </div>
+    `,
+    attachments: attachments
+  };
+  
+  await transporter.sendMail(mailOptions);
+}
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Access your app at: http://localhost:${PORT}`);
+  console.log(`🤖 Gemini API: ${process.env.GEMINI_API_KEY ? 'Configured' : 'NOT CONFIGURED'}`);
+  console.log(`📧 Email: ${process.env.EMAIL_USER ? 'Configured' : 'NOT CONFIGURED'}`);
+});
+
+// Create admin user on startup
+setTimeout(() => {
+  users.set('admin@example.com', {
+    id: 'admin',
+    name: 'מנהל המערכת',
+    email: 'admin@example.com',
+    password: 'admin123',
+    phone: '',
+    remainingMinutes: 9999,
+    totalTranscribed: 0,
+    isAdmin: true,
+    history: [],
+    createdAt: new Date()
+  });
+  console.log('👑 Admin user created: admin@example.com / admin123');
+}, 1000);
