@@ -33,10 +33,7 @@ const upload = multer({ storage });
 
 // --- Services Configuration ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-// =========================================================
-//  THE FIX IS HERE
-// =========================================================
-const transporter = nodemailer.createTransport({ // Corrected from createTransporter
+const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
@@ -176,4 +173,31 @@ async function createWordDocument(transcription, filename) {
     sections: [{
       children: [
         new Paragraph({ text: `תמלול הקובץ: ${filename}`, alignment: AlignmentType.CENTER, heading: "Heading1" }),
-        new Paragraph({ text: `תאריך: ${new
+        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+        ...paragraphs
+      ]
+    }]
+  });
+  return Packer.toBuffer(doc);
+}
+
+async function sendTranscriptionEmail(userEmail, transcriptions) {
+  const attachments = transcriptions.map(trans => ({
+    filename: `תמלול - ${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
+    content: trans.wordDoc,
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  }));
+  await transporter.sendMail({
+    from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
+    to: userEmail,
+    subject: '✅ התמלול שלך מוכן!',
+    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
+    attachments
+  });
+  console.log(`📧 Email sent to ${userEmail}`);
+}
+
+// --- Server Start ---
+app.listen(PORT, () => {
+  console.log(`🚀 Server is live on port ${PORT}`);
+});
