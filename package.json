@@ -16,7 +16,20 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "keywords": [
+    "transcription",
+    "hebrew",
+    "gemini",
+    "word",
+    "audio",
+    "aramaic"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
 }
