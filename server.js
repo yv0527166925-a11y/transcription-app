@@ -54,23 +54,14 @@ async function getMediaDuration(filePath) {
     const ffprobe = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath]);
     let output = '';
     ffprobe.stdout.on('data', (data) => { output += data.toString(); });
-    ffprobe.on('close', (code) => {
-      if (code === 0 && output) {
-        resolve(Math.ceil(parseFloat(output.trim()) / 60));
-      } else {
-        const stats = fs.statSync(filePath);
-        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 2)))); // Fallback
-      }
+    ffprobe.on('close', () => {
+        resolve(Math.ceil(parseFloat(output.trim() || '60') / 60)); // Default to 1 min if fails
     });
-    ffprobe.on('error', () => resolve(1)); // Error fallback
+    ffprobe.on('error', () => resolve(1));
   });
 }
 
 // --- API Routes ---
-
-// =========================================================
-//  NEW: Health Check Route for Render
-// =========================================================
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -90,22 +81,29 @@ app.post('/api/login', (req, res) => {
 });
 
 app.post('/api/admin/add-minutes', (req, res) => {
-    const { adminEmail, userEmail, minutes } = req.body;
-    const adminUser = users.get(adminEmail);
-    if (!adminUser || !adminUser.isAdmin) {
-        return res.status(403).json({ success: false, error: 'Forbidden: User is not an admin.' });
-    }
-    const targetUser = users.get(userEmail);
-    if (!targetUser) {
-        return res.status(404).json({ success: false, error: 'User to add minutes to was not found.' });
-    }
-    const minutesToAdd = parseInt(minutes);
-    if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
-        return res.status(400).json({ success: false, error: 'Invalid number of minutes.' });
-    }
-    targetUser.remainingMinutes += minutesToAdd;
-    res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
+  const { adminEmail, userEmail, minutes } = req.body;
+
+  // Security check
+  const adminUser = users.get(adminEmail);
+  if (!adminUser || !adminUser.isAdmin) {
+    return res.status(403).json({ success: false, error: 'Forbidden: User is not an admin.' });
+  }
+  
+  const targetUser = users.get(userEmail);
+  if (!targetUser) {
+    return res.status(404).json({ success: false, error: 'User to add minutes to was not found.' });
+  }
+
+  const minutesToAdd = parseInt(minutes);
+  if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
+    return res.status(400).json({ success: false, error: 'Invalid number of minutes.' });
+  }
+  
+  targetUser.remainingMinutes += minutesToAdd;
+  console.log(`✅ Admin ${adminEmail} added ${minutesToAdd} minutes to ${userEmail}.`);
+  res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
 });
+
 
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   const { email } = req.body;
@@ -129,11 +127,12 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   res.json({ success: true, message: 'התמלול התחיל', estimatedMinutes: totalMinutes });
 });
 
-// --- Background Processing (Full function code included for completeness) ---
+// The rest of the server.js file...
+// ... (All other functions like processTranscriptionJob, transcribeWithGemini, etc. are here)
+
 async function processTranscriptionJob(files, user, totalMinutes) {
   console.log(`🚀 Starting transcription job for ${user.email}`);
   const successfulTranscriptions = [];
-
   for (const file of files) {
     const originalFileName = file.originalname; 
     try {
@@ -149,7 +148,6 @@ async function processTranscriptionJob(files, user, totalMinutes) {
       if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck);
     }
   }
-
   if (successfulTranscriptions.length > 0) {
     await sendTranscriptionEmail(user.email, successfulTranscriptions);
     user.remainingMinutes -= totalMinutes;
@@ -175,16 +173,12 @@ async function transcribeWithGemini(filePath) {
   const audioData = fs.readFileSync(filePath);
   const base64Audio = audioData.toString('base64');
   const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
-  
   const prompt = `תמלל את קובץ האודיו הבא במלואו, מהשנייה הראשונה ועד השנייה האחרונה. זהו קובץ ארוך. חשוב ביותר שתמשיך לעבד עד שתגיע לסוף המוחלט של הקובץ. אל תעצור באמצע ואל תסכם דבר. חובה לתמלל כל מילה ומילה.`;
-  
   const result = await model.generateContent([prompt, audioPart]);
   const response = result.response;
-
   if (response.promptFeedback?.blockReason) {
     throw new Error(`Transcription blocked: ${response.promptFeedback.blockReason}`);
   }
-  
   const transcription = response.text().trim();
   if (!transcription) throw new Error('Transcription result was empty');
   return transcription;
@@ -234,7 +228,6 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
   console.log(`📧 Email sent to ${userEmail}`);
 }
 
-// --- Server Start ---
 app.listen(PORT, () => {
   console.log(`🚀 Server is live on port ${PORT}`);
 });
