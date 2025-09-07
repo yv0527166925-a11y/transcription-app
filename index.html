@@ -233,17 +233,4 @@
     async function apiCall(endpoint, method, body) {
         const headers = { 'Content-Type': 'application/json' };
         const options = { method, headers, body: JSON.stringify(body) };
-        const response = await fetch(`/api/${endpoint}`, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'אירעה שגיאה');
-        return data;
-    }
-
-    function logout() {
-        currentUser = null;
-        authSection.style.display = 'block';
-        appSection.style.display = 'none';
-    }
-</script>
-</body>
-</html>
+        const response = await fetch(`/
