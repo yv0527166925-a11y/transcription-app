@@ -10,7 +10,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// --- Environment Variable Check (for core services) ---
+// --- Environment Variable Check ---
 const requiredEnvVars = ['GEMINI_API_KEY', 'EMAIL_USER', 'EMAIL_PASS'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
@@ -26,7 +26,7 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
 
-// --- Services Configuration & Data ---
+// --- Services & Data ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -65,7 +65,7 @@ async function getMediaDuration(filePath) {
         resolve(Math.ceil(parseFloat(output.trim()) / 60));
       } else {
         const stats = fs.statSync(filePath);
-        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 5)))); // Adjusted for video files
+        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 5))));
       }
     });
     ffprobe.on('error', () => resolve(1));
@@ -79,9 +79,7 @@ app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); }
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const user = users.get(email);
-  if (!user || user.password !== password) {
-    return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
-  }
+  if (!user || user.password !== password) { return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' }); }
   const { password: _, ...userToReturn } = user;
   res.json({ success: true, user: userToReturn });
 });
@@ -95,7 +93,6 @@ app.post('/api/register', (req, res) => {
     const { password: _, ...userToReturn } = newUser;
     res.status(201).json({ success: true, user: userToReturn });
 });
-
 
 app.post('/api/admin/add-minutes', (req, res) => {
     const { adminEmail, userEmail, minutes } = req.body;
@@ -145,7 +142,6 @@ app.get('/api/download/:fileId', (req, res) => {
 
 // --- Background Processing & Helpers ---
 async function processTranscriptionJob(files, user, totalMinutes) {
-  const successfulTranscriptions = [];
   for (const file of files) {
     const originalFileName = file.originalname;
     try {
@@ -160,47 +156,38 @@ async function processTranscriptionJob(files, user, totalMinutes) {
       }
       fs.writeFileSync(savePath, wordDocBuffer);
       
-      // The file name in history is the original video/audio file name
-      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration: totalMinutes, status: 'completed', fileId: fileId });
-      successfulTranscriptions.push({ filename: originalFileName, wordDoc: wordDocBuffer });
+      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, status: 'completed', fileId: fileId });
+      await sendTranscriptionEmail(user.email, [{ filename: originalFileName, wordDoc: wordDocBuffer }]);
+      user.remainingMinutes -= totalMinutes;
+      user.totalTranscribed += totalMinutes;
 
     } catch (error) {
       console.error(`❌ Failed to process ${originalFileName}:`, error.message);
-      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration: totalMinutes, status: 'failed', fileId: null });
+      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, status: 'failed', fileId: null });
     } finally {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       const convertedPathCheck = file.path.replace(/\.[^/.]+$/, '_converted.wav');
       if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck);
     }
   }
-
-  if (successfulTranscriptions.length > 0) {
-    await sendTranscriptionEmail(user.email, successfulTranscriptions);
-    user.remainingMinutes -= totalMinutes;
-    user.totalTranscribed += totalMinutes;
-  }
 }
 
 async function convertAudioForGemini(inputPath) {
     return new Promise((resolve, reject) => {
         const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
-        // The `-vn` flag tells ffmpeg to ignore video and extract only the audio.
         const ffmpeg = spawn('ffmpeg', ['-i', inputPath, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-y', outputPath]);
-        ffmpeg.on('close', (code) => {
-            if (code === 0) resolve(outputPath);
-            else reject(new Error('ffmpeg conversion failed'));
-        });
+        ffmpeg.on('close', (code) => code === 0 ? resolve(outputPath) : reject(new Error('ffmpeg conversion failed')));
         ffmpeg.on('error', (err) => reject(err));
     });
 }
 
 async function transcribeWithGemini(filePath) {
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" }); 
-  const audioData = fs.readFileSync(filePath);
-  const base64Audio = audioData.toString('base64');
-  const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
-  const prompt = `תמלל את קובץ האודיו הבא במלואו, מהשנייה הראשונה ועד השנייה האחרונה. זהו קובץ ארוך. חשוב ביותר שתמשיך לעבד עד שתגיע לסוף המוחלט של הקובץ. אל תעצור באמצע ואל תסכם דבר. חובה לתמלל כל מילה ומילה.`;
-  const result = await model.generateContent([prompt, audioPart]);
+  const fileResponse = await genAI.uploadFile(filePath, { mimeType: 'audio/wav', displayName: path.basename(filePath) });
+  const prompt = `תמלל את קובץ האודיו הבא במלואו, מהשנייה הראשונה ועד השנייה האחרונה.`;
+  const filePart = { fileData: { mimeType: fileResponse.file.mimeType, fileUri: fileResponse.file.uri } };
+  const result = await model.generateContent([prompt, filePart]);
+  await genAI.deleteFile(fileResponse.file.name);
   const response = result.response;
   if (response.promptFeedback?.blockReason) { throw new Error(`Transcription blocked: ${response.promptFeedback.blockReason}`); }
   const transcription = response.text().trim();
@@ -209,30 +196,9 @@ async function transcribeWithGemini(filePath) {
 }
 
 async function createWordDocument(transcription, filename, duration) {
-  const paragraphs = transcription.split(/\n\s*\n/).filter(s => s.trim()).map(section =>
-    new Paragraph({
-      children: [new TextRun({ text: section, size: 24, font: { name: "David" }, rightToLeft: true })],
-      bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 }
-    })
-  );
-  const fileNameParagraph = new Paragraph({
-      alignment: AlignmentType.RIGHT,
-      children: [
-          new TextRun({ text: "שם הקובץ: ", bold: true, rightToLeft: true, size: 24 }),
-          new TextRun({ text: filename, rightToLeft: true, size: 24 })
-      ]
-  });
-  const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({ text: `תמלול אוטומטי`, alignment: AlignmentType.CENTER, heading: "Title" }),
-        fileNameParagraph,
-        new Paragraph({ text: `זמן משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }),
-        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }),
-        ...paragraphs
-      ]
-    }]
-  });
+  const paragraphs = transcription.split(/\n\s*\n/).filter(s => s.trim()).map(section => new Paragraph({ children: [new TextRun({ text: section, size: 24, font: { name: "David" }, rightToLeft: true })], bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 } }));
+  const fileNameParagraph = new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "שם הקובץ: ", bold: true, rightToLeft: true, size: 24 }), new TextRun({ text: filename, rightToLeft: true, size: 24 })] });
+  const doc = new Document({ sections: [{ children: [ new Paragraph({ text: `תמלול אוטומטי`, alignment: AlignmentType.CENTER, heading: "Title" }), fileNameParagraph, new Paragraph({ text: `זמן משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }), new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }), ...paragraphs ] }] });
   return Packer.toBuffer(doc);
 }
 
