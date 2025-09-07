@@ -67,6 +67,14 @@ async function getMediaDuration(filePath) {
 }
 
 // --- API Routes ---
+
+// =========================================================
+//  NEW: Health Check Route for Render
+// =========================================================
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -121,13 +129,12 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   res.json({ success: true, message: 'התמלול התחיל', estimatedMinutes: totalMinutes });
 });
 
-// --- Background Processing ---
+// --- Background Processing (Full function code included for completeness) ---
 async function processTranscriptionJob(files, user, totalMinutes) {
   console.log(`🚀 Starting transcription job for ${user.email}`);
   const successfulTranscriptions = [];
 
   for (const file of files) {
-    // **FILENAME FIX**: Use file.originalname which is already a clean UTF-8 string
     const originalFileName = file.originalname; 
     try {
       const convertedPath = await convertAudioForGemini(file.path);
@@ -164,9 +171,7 @@ async function convertAudioForGemini(inputPath) {
 }
 
 async function transcribeWithGemini(filePath) {
-  // **TRANSCRIPTION FIX**: Use the correct model for long audio files
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" }); 
-  
   const audioData = fs.readFileSync(filePath);
   const base64Audio = audioData.toString('base64');
   const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
@@ -192,8 +197,6 @@ async function createWordDocument(transcription, filename, duration) {
       bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 }
     })
   );
-
-  // **FILENAME FIX**: Use TextRun for the filename to handle RTL characters correctly
   const fileNameParagraph = new Paragraph({
       alignment: AlignmentType.RIGHT,
       children: [
@@ -201,7 +204,6 @@ async function createWordDocument(transcription, filename, duration) {
           new TextRun({ text: filename, rightToLeft: true, size: 24 })
       ]
   });
-
   const doc = new Document({
     sections: [{
       children: [
