@@ -53,6 +53,14 @@ const transporter = nodemailer.createTransport({
 const users = new Map();
 const transcriptionJobs = new Map();
 
+// Debug function to list all users
+function debugListUsers() {
+  console.log('🔧 Current users in system:');
+  users.forEach((user, email) => {
+    console.log(`   📧 ${email}: ${user.name} (${user.remainingMinutes} דקות, Admin: ${user.isAdmin})`);
+  });
+}
+
 // Audio duration extraction utility
 async function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
@@ -230,25 +238,61 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
+// FIXED: Admin add minutes route
 app.post('/api/admin/add-minutes', (req, res) => {
-  const { adminEmail, userEmail, minutes } = req.body;
+  console.log('🔧 Admin add minutes request received');
+  console.log('🔧 Request body:', req.body);
+  console.log('🔧 Request headers:', req.headers);
   
-  const admin = users.get(adminEmail);
-  if (!admin || !admin.isAdmin) {
-    return res.status(403).json({ success: false, error: 'אין הרשאת מנהל' });
+  debugListUsers(); // הדפס רשימת משתמשים
+  
+  const { userEmail, minutes } = req.body;
+  
+  // בדיקות בסיסיות
+  if (!userEmail || !minutes) {
+    console.log('❌ Missing fields:', { userEmail, minutes });
+    return res.status(400).json({ 
+      success: false, 
+      error: 'חסרים פרטים: אימייל משתמש ומספר דקות' 
+    });
   }
   
+  // מציאת המשתמש
   const user = users.get(userEmail);
+  console.log('🔧 Found user:', user ? 'YES' : 'NO');
+  
   if (!user) {
-    return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
+    console.log('❌ User not found:', userEmail);
+    console.log('🔧 Available users:', Array.from(users.keys()));
+    return res.status(404).json({ 
+      success: false, 
+      error: `משתמש עם אימייל ${userEmail} לא נמצא` 
+    });
   }
   
-  user.remainingMinutes += parseInt(minutes);
+  // בדיקת תקינות הדקות
+  const minutesToAdd = parseInt(minutes);
+  if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
+    console.log('❌ Invalid minutes:', minutes);
+    return res.status(400).json({ 
+      success: false, 
+      error: 'מספר הדקות חייב להיות מספר חיובי' 
+    });
+  }
+  
+  // הוספת הדקות
+  const oldBalance = user.remainingMinutes;
+  user.remainingMinutes += minutesToAdd;
+  
+  console.log(`✅ Added ${minutesToAdd} minutes to ${userEmail}`);
+  console.log(`   Old balance: ${oldBalance}, New balance: ${user.remainingMinutes}`);
   
   res.json({
     success: true,
-    message: `נוספו ${minutes} דקות למשתמש ${userEmail}`,
-    newBalance: user.remainingMinutes
+    message: `נוספו ${minutesToAdd} דקות למשתמש ${userEmail}`,
+    oldBalance: oldBalance,
+    newBalance: user.remainingMinutes,
+    userFound: true
   });
 });
 
@@ -374,14 +418,20 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
   }
 }
 
-// Real Gemini 2.5 Pro transcription with IMPROVED prompt for better formatting
+// IMPROVED: Real Gemini 2.5 Pro transcription with better completeness
 async function realGeminiTranscription(filePath, filename, language) {
   try {
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
       throw new Error('Gemini API key לא הוגדר');
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-pro",
+      generationConfig: {
+        temperature: 0.1,  // תמלול יותר מדויק
+        maxOutputTokens: 8192  // יותר טקסט פלט
+      }
+    });
     
     const audioData = fs.readFileSync(filePath);
     const base64Audio = audioData.toString('base64');
@@ -393,26 +443,24 @@ async function realGeminiTranscription(filePath, filename, language) {
     else if (ext === '.m4a') mimeType = 'audio/mp4';
     else if (ext === '.mov') mimeType = 'video/quicktime';
 
-    const prompt = `תמלל את הקובץ האודיו הבא לעברית בלבד. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
+    // פרומפט משופר לתמלול שלם
+    const prompt = `אני רוצה שתמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
-חשוב מאוד - הנחיות מדויקות לתמלול:
+📌 חשוב מאוד - הנחיות חובה:
 
-דרישות יסוד:
-1. תמלל רק בעברית - אל תתרגם לשפות אחרות
-2. שמור על ההגיה הליטאית המיוחדת
-3. כתוב מושגים ארמיים בכתיב המקורי
-4. הוסף סימני פיסוק מדויקים
-5. כתוב בצורה נקייה וברורה
+1. תמלל את כל הקובץ מההתחלה ועד הסוף - אל תקצר כלום!
+2. אל תשמיט אף משפט או רעיון
+3. אל תסכם - תמלל הכל מילה במילה
+4. אם הקובץ ארוך, המשך לתמלל עד הסוף המוחלט
 
-מבנה הטקסט (חשוב מאוד!):
-- חלק את התוכן לפסקאות קצרות (3-5 משפטים בכל פסקה)
-- השאר שורה ריקה בין כל פסקה לפסקה
-- כל משפט צריך להסתיים בנקודה, סימן קריאה או סימן שאלה
-- אל תכתוב משפטים ארוכים מדי - חלק למשפטים קצרים וברורים
+עיצוב הטקסט:
+- חלק לפסקאות של 3-4 משפטים
+- השאר שורה ריקה בין פסקאות
+- כל משפט מסתיים בנקודה
+- אם יש דובר חדש, כתוב "רב:" או "שואל:" רק אם זה ברור
 
-ציטוטים מהמקורות:
-שים במירכאות כל ביטוי שמתחיל ב:
-- "שנאמר..."
+ציטוטים במירכאות:
+- "שנאמר..." 
 - "כדאיתא בגמרא..."
 - "אמרו חכמים..."
 - "כמו שכתוב..."
@@ -423,18 +471,13 @@ async function realGeminiTranscription(filePath, filename, language) {
 - "כמאמר חז״ל..."
 - "דאמר..."
 
-דוגמה לפורמט הנכון:
-רב מסביר את הנושא ואומר "שנאמר בתורה כך וכך". זה הסבר חשוב.
+זכור: תמלל הכל! אל תקצר! המשך עד הסוף המוחלט של הקובץ!
 
-הוא ממשיך ומוסיף שיש לדעת את הדין. "כדאיתא בגמרא במסכת ברכות" יש דיון נוסף בנושא.
+התחל עכשיו:`;
 
-זהו המשך ההסבר בנושא.
-
-זיהוי דוברים:
-- רק אם אתה שומע בבירור "רב אומר" או "שואל שואל" - אז כתוב זאת
-- אחרת פשוט תמלל את התוכן ברציפות ללא זיהוי דוברים
-
-התחל את התמלול בדיוק לפי הפורמט שהראיתי:`;
+    console.log(`🎯 Starting transcription for: ${filename}`);
+    console.log(`🎯 File size: ${audioData.length} bytes`);
+    console.log(`🎯 MIME type: ${mimeType}`);
 
     const result = await model.generateContent([
       {
@@ -449,6 +492,9 @@ async function realGeminiTranscription(filePath, filename, language) {
     const response = await result.response;
     let transcription = response.text();
     
+    console.log(`🎯 Raw transcription length: ${transcription.length} characters`);
+    
+    // עיבוד טקסט משופר
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n')
@@ -459,14 +505,21 @@ async function realGeminiTranscription(filePath, filename, language) {
     transcription = cleanupQuotations(transcription);
     transcription = transcription.replace(/([א-ת])\n\n/g, '$1.\n\n');
     
-    if (!transcription || transcription.length < 10) {
-      throw new Error('התמלול לא הצליח - קובץ ריק או לא זוהה תוכן');
+    console.log(`🎯 Final transcription length: ${transcription.length} characters`);
+    
+    if (!transcription || transcription.length < 50) {
+      throw new Error('התמלול לא הצליח - טקסט קצר מדי או ריק');
+    }
+    
+    // בדיקה שהתמלול לא נקטע
+    if (transcription.length < 100) {
+      console.warn('⚠️ Transcription seems too short, might be incomplete');
     }
     
     return transcription;
     
   } catch (error) {
-    console.error('Gemini transcription error:', error);
+    console.error('🔥 Gemini transcription error:', error);
     
     if (error.message.includes('API key')) {
       throw new Error('שגיאה באימות Gemini API');
@@ -474,6 +527,8 @@ async function realGeminiTranscription(filePath, filename, language) {
       throw new Error('הגעת למגבלת השימוש ב-Gemini API');
     } else if (error.message.includes('format')) {
       throw new Error('פורמט הקובץ אינו נתמך');
+    } else if (error.message.includes('SAFETY')) {
+      throw new Error('הקובץ נחסם מסיבות בטיחות - נסה קובץ אחר');
     } else {
       throw new Error(`שגיאה בתמלול: ${error.message}`);
     }
@@ -778,113 +833,4 @@ function addQuotationMarksImproved(text) {
   
   citationPatterns.forEach(({pattern, addQuotes}) => {
     if (addQuotes) {
-      text = text.replace(pattern, (match) => {
-        const trimmed = match.trim();
-        if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
-          return match;
-        }
-        return `"${trimmed}"`;
-      });
-    }
-  });
-  
-  return text;
-}
-
-// Send transcription email
-async function sendTranscriptionEmail(email, transcriptions) {
-  const attachments = transcriptions.map((trans, index) => ({
-    filename: `${trans.filename.replace(/\.[^/.]+$/, "")}_תמלול.docx`,
-    content: trans.wordDoc
-  }));
-  
-  const totalMinutes = transcriptions.reduce((sum, trans) => sum + trans.duration, 0);
-  
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: '🎯 התמלול שלך מוכן! (Gemini 2.5 Pro)',
-    html: `
-      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">🎯 התמלול הושלם בהצלחה!</h1>
-          <p style="margin: 10px 0 0 0; opacity: 0.9;">מופק על ידי Gemini 2.5 Pro</p>
-        </div>
-        
-        <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <p style="font-size: 16px; margin-bottom: 20px;">שלום,</p>
-          
-          <p style="font-size: 16px; margin-bottom: 25px;">
-            התמלול שלך הושלם בהצלחה באמצעות <strong>Google Gemini 2.5 Pro</strong>!<br>
-            המערכת מותאמת במיוחד לתמלול עברית עם הגיה ליטאית ומושגי ארמית.
-          </p>
-          
-          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #2E74B5; margin: 0 0 15px 0;">📊 סיכום התמלול:</h3>
-            <ul style="margin: 0; padding-right: 20px;">
-              <li><strong>מספר קבצים:</strong> ${transcriptions.length}</li>
-              <li><strong>זמן כולל:</strong> ${totalMinutes} דקות</li>
-              <li><strong>פורמט פלט:</strong> קבצי Word מעוצבים</li>
-              <li><strong>שפה:</strong> עברית (הגיה ליטאית)</li>
-            </ul>
-          </div>
-          
-          <h3 style="color: #2E74B5; margin: 25px 0 15px 0;">📄 קבצים מצורפים:</h3>
-          <ul style="background: #e3f2fd; padding: 15px 20px; border-radius: 5px; margin: 15px 0;">
-            ${transcriptions.map(trans => 
-              `<li style="margin: 5px 0;"><strong>${trans.filename}</strong> (${trans.duration} דקות) → תמלול מעוצב</li>`
-            ).join('')}
-          </ul>
-          
-          <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #ffc107;">
-            <h4 style="color: #856404; margin: 0 0 10px 0;">💡 טיפים לשימוש:</h4>
-            <ul style="color: #856404; margin: 0; padding-right: 20px; font-size: 14px;">
-              <li>הקבצים מעוצבים ומוכנים לעריכה</li>
-              <li>מומלץ לבדוק מושגים מיוחדים בארמית</li>
-              <li>ניתן להדפיס או לערוך ישירות ב-Word</li>
-              <li>שמור את הקבצים לארכיון שלך</li>
-            </ul>
-          </div>
-          
-          <p style="font-size: 16px; margin-top: 25px;">
-            תודה שבחרת במערכת התמלול המתקדמת שלנו!<br>
-            נשמח לשרת אותך שוב בעתיד.
-          </p>
-        </div>
-        
-        <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
-          <p style="margin: 0;">מערכת תמלול חכמה | Powered by Google Gemini 2.5 Pro</p>
-          <p style="margin: 5px 0 0 0;">מותאם במיוחד לעברית, הגיה ליטאית ומושגי ארמית</p>
-        </div>
-      </div>
-    `,
-    attachments: attachments
-  };
-  
-  await transporter.sendMail(mailOptions);
-}
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Access your app at: http://localhost:${PORT}`);
-  console.log(`🤖 Gemini API: ${process.env.GEMINI_API_KEY ? 'Configured' : 'NOT CONFIGURED'}`);
-  console.log(`📧 Email: ${process.env.EMAIL_USER ? 'Configured' : 'NOT CONFIGURED'}`);
-});
-
-// Create admin user on startup
-setTimeout(() => {
-  users.set('admin@example.com', {
-    id: 'admin',
-    name: 'מנהל המערכת',
-    email: 'admin@example.com',
-    password: 'admin123',
-    phone: '',
-    remainingMinutes: 9999,
-    totalTranscribed: 0,
-    isAdmin: true,
-    history: [],
-    createdAt: new Date()
-  });
-  console.log('👑 Admin user created: admin@example.com / admin123');
-}, 1000);
+      text = text.replace
