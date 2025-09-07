@@ -9,47 +9,107 @@ const cors = require('cors');
 const { spawn } = require('child_process');
 require('dotenv').config();
 
-// =========================================================
-//  NEW: Environment Variable Check on Startup
-// =========================================================
-const requiredEnvVars = [
-    'GEMINI_API_KEY',
-    'EMAIL_USER',
-    'EMAIL_PASS',
-    'STRIPE_SECRET_KEY',
-    'STRIPE_WEBHOOK_SECRET'
-];
-
+// --- Environment Variable Check (for core services) ---
+const requiredEnvVars = ['GEMINI_API_KEY', 'EMAIL_USER', 'EMAIL_PASS'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
 if (missingVars.length > 0) {
-    console.error(`❌ FATAL ERROR: Missing required environment variables: ${missingVars.join(', ')}`);
-    process.exit(1); // Stop the server from starting
+    console.error(`❌ FATAL ERROR: Missing core environment variables: ${missingVars.join(', ')}`);
+    process.exit(1);
 }
-
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware (The rest of the file is the same as before)
+// Middleware
 app.use(cors());
-app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), (req, res) => {
-    // ... Stripe webhook logic from previous version
-});
-app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+// --- Conditional Stripe Integration ---
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+let stripe;
+if (stripeSecretKey) {
+    console.log("✅ Stripe keys found. Initializing payment system.");
+    stripe = require('stripe')(stripeSecretKey);
+
+    // The Stripe webhook needs the raw body, so we set it up before express.json()
+    app.post('/api/stripe-webhook', express.raw({type: 'application/json'}), (req, res) => {
+        const sig = req.headers['stripe-signature'];
+        const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+        if (!webhookSecret) {
+            return res.status(400).send('Webhook secret not configured.');
+        }
+        let event;
+        try {
+            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        } catch (err) {
+            return res.status(400).send(`Webhook Error: ${err.message}`);
+        }
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const userEmail = session.metadata.userEmail;
+            const minutesPurchased = parseInt(session.metadata.minutesPurchased);
+            const user = users.get(userEmail);
+            if (user && minutesPurchased > 0) {
+                user.remainingMinutes += minutesPurchased;
+                console.log(`✅ Payment successful for ${userEmail}. Added ${minutesPurchased} minutes.`);
+            }
+        }
+        res.json({received: true});
+    });
+} else {
+    console.log("⚠️ Stripe keys not found. Payment system is disabled.");
+}
+
+app.use(express.json()); // Apply json parsing for all other routes
+
+// --- Services Configuration ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
 
-// ... (All other functions and routes from the previous version of server.js)
-// NOTE: Make sure to paste the rest of your server.js code here if you are doing this manually.
-// For simplicity, the full code is provided below.
+// --- In-memory Data ---
+const users = new Map();
+initializeDemoUsers();
 
+// (The rest of your server.js file remains the same)
+function initializeDemoUsers() {
+    users.set('admin@example.com', { id: 'admin', name: 'מנהל', email: 'admin@example.com', password: 'admin123', remainingMinutes: 9999, totalTranscribed: 0, isAdmin: true, history: [] });
+    users.set('test@example.com', { id: 'test123', name: 'בודק', email: 'test@example.com', password: 'test123', remainingMinutes: 30, totalTranscribed: 0, isAdmin: false, history: [] });
+    console.log('✅ Demo users initialized.');
+}
+
+// --- API Routes ---
+app.get('/health', (req, res) => { res.status(200).send('OK'); });
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
+
+// --- Conditional Stripe API Route ---
+if (stripe) {
+    app.post('/api/create-checkout-session', async (req, res) => {
+        const { email, minutes, price, name } = req.body;
+        try {
+            const session = await stripe.checkout.sessions.create({
+                payment_method_types: ['card'],
+                line_items: [{
+                    price_data: { currency: 'ils', product_data: { name: `${name} (${minutes} דקות)` }, unit_amount: price * 100 },
+                    quantity: 1,
+                }],
+                mode: 'payment',
+                success_url: `${req.headers.origin}?payment_success=true`,
+                cancel_url: `${req.headers.origin}?payment_canceled=true`,
+                metadata: { userEmail: email, minutesPurchased: minutes }
+            });
+            res.json({ id: session.id });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to create payment session.' });
+        }
+    });
+}
+
+
+// (The rest of your existing API routes: /api/login, /api/admin/add-minutes, /api/transcribe)
+// (Make sure they are included here)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'uploads');
@@ -62,13 +122,6 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
-const users = new Map();
-initializeDemoUsers();
-function initializeDemoUsers() {
-    users.set('admin@example.com', { id: 'admin', name: 'מנהל', email: 'admin@example.com', password: 'admin123', remainingMinutes: 9999, totalTranscribed: 0, isAdmin: true, history: [] });
-    users.set('test@example.com', { id: 'test123', name: 'בודק', email: 'test@example.com', password: 'test123', remainingMinutes: 30, totalTranscribed: 0, isAdmin: false, history: [] });
-    console.log('✅ Demo users initialized.');
-}
 async function getMediaDuration(filePath) {
   return new Promise((resolve) => {
     const ffprobe = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath]);
@@ -85,8 +138,6 @@ async function getMediaDuration(filePath) {
     ffprobe.on('error', () => resolve(1));
   });
 }
-app.get('/health', (req, res) => { res.status(200).send('OK'); });
-app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); });
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const user = users.get(email);
@@ -103,17 +154,4 @@ app.post('/api/admin/add-minutes', (req, res) => {
     const targetUser = users.get(userEmail);
     if (!targetUser) { return res.status(404).json({ success: false, error: 'User not found' }); }
     const minutesToAdd = parseInt(minutes);
-    if (isNaN(minutesToAdd) || minutesToAdd <= 0) { return res.status(400).json({ success: false, error: 'Invalid minutes' }); }
-    targetUser.remainingMinutes += minutesToAdd;
-    res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
-});
-app.post('/api/transcribe', async (req, res) => { /* ... transcribe logic ... */ });
-async function processTranscriptionJob(files, user, totalMinutes) { /* ... job logic ... */ }
-async function convertAudioForGemini(inputPath) { /* ... conversion logic ... */ }
-async function transcribeWithGemini(filePath) { /* ... gemini logic ... */ }
-async function createWordDocument(transcription, filename, duration) { /* ... docx logic ... */ }
-async function sendTranscriptionEmail(userEmail, transcriptions) { /* ... email logic ... */ }
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server is live on port ${PORT}`);
-});
+    if (isNaN(minutesToAdd) || minutesToAdd
