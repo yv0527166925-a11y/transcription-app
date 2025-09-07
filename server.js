@@ -12,10 +12,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// Middleware - ORDER MATTERS!
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -126,19 +125,18 @@ async function convertAudioForGemini(inputPath) {
   });
 }
 
-// Routes
-
-// Serve the main page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
+// =================================
+// API ROUTES - MUST BE FIRST!
+// =================================
 
 // User registration
 app.post('/api/register', (req, res) => {
+  console.log('Register request received:', req.body);
+  
   const { name, email, password, phone } = req.body;
   
   if (users.has(email)) {
-    return res.status(400).json({ error: 'משתמש עם אימייל זה כבר קיים' });
+    return res.status(400).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' });
   }
   
   const user = {
@@ -156,6 +154,8 @@ app.post('/api/register', (req, res) => {
   
   users.set(email, user);
   
+  console.log('User registered successfully:', email);
+  
   res.json({
     success: true,
     user: {
@@ -164,19 +164,25 @@ app.post('/api/register', (req, res) => {
       email: user.email,
       remainingMinutes: user.remainingMinutes,
       totalTranscribed: user.totalTranscribed,
-      isAdmin: user.isAdmin
+      isAdmin: user.isAdmin,
+      history: user.history
     }
   });
 });
 
 // User login
 app.post('/api/login', (req, res) => {
+  console.log('Login request received:', req.body);
+  
   const { email, password } = req.body;
   
   const user = users.get(email);
   if (!user || user.password !== password) {
-    return res.status(401).json({ error: 'אימייל או סיסמה שגויים' });
+    console.log('Login failed for:', email);
+    return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
   }
+  
+  console.log('Login successful for:', email);
   
   res.json({
     success: true,
@@ -194,17 +200,19 @@ app.post('/api/login', (req, res) => {
 
 // Process transcription
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
+  console.log('Transcription request received');
+  
   try {
     const { email, language } = req.body;
     const files = req.files;
     
     if (!files || files.length === 0) {
-      return res.status(400).json({ error: 'לא הועלו קבצים' });
+      return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
     }
     
     const user = users.get(email);
     if (!user) {
-      return res.status(404).json({ error: 'משתמש לא נמצא' });
+      return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
     }
     
     // Calculate actual duration for all files
@@ -227,6 +235,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     
     if (totalMinutes > user.remainingMinutes) {
       return res.status(400).json({ 
+        success: false,
         error: 'אין מספיק דקות בחשבון',
         needed: totalMinutes,
         available: user.remainingMinutes
@@ -247,9 +256,84 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     
   } catch (error) {
     console.error('Transcription error:', error);
-    res.status(500).json({ error: 'שגיאה בעיבוד התמלול' });
+    res.status(500).json({ success: false, error: 'שגיאה בעיבוד התמלול' });
   }
 });
+
+// Admin: Add minutes to user
+app.post('/api/admin/add-minutes', (req, res) => {
+  const { adminEmail, userEmail, minutes } = req.body;
+  
+  const admin = users.get(adminEmail);
+  if (!admin || !admin.isAdmin) {
+    return res.status(403).json({ success: false, error: 'אין הרשאת מנהל' });
+  }
+  
+  const user = users.get(userEmail);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
+  }
+  
+  user.remainingMinutes += parseInt(minutes);
+  
+  res.json({
+    success: true,
+    message: `נוספו ${minutes} דקות למשתמש ${userEmail}`,
+    newBalance: user.remainingMinutes
+  });
+});
+
+// Check job status
+app.get('/api/job/:jobId', (req, res) => {
+  const job = transcriptionJobs.get(req.params.jobId);
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'עבודה לא נמצאה' });
+  }
+  
+  res.json(job);
+});
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
+  });
+});
+
+// Test API endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'API is working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// =================================
+// STATIC FILES - AFTER API ROUTES
+// =================================
+
+app.use(express.static('.'));
+
+// =================================
+// CATCH-ALL ROUTE - MUST BE LAST!
+// =================================
+
+app.get('*', (req, res) => {
+  // Don't intercept API calls
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
+  }
+  
+  // Serve the main HTML file for all other routes
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// =================================
+// HELPER FUNCTIONS
+// =================================
 
 // Process transcription job asynchronously
 async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
@@ -697,53 +781,12 @@ async function sendTranscriptionEmail(email, transcriptions) {
   await transporter.sendMail(mailOptions);
 }
 
-// Admin: Add minutes to user
-app.post('/api/admin/add-minutes', (req, res) => {
-  const { adminEmail, userEmail, minutes } = req.body;
-  
-  const admin = users.get(adminEmail);
-  if (!admin || !admin.isAdmin) {
-    return res.status(403).json({ error: 'אין הרשאת מנהל' });
-  }
-  
-  const user = users.get(userEmail);
-  if (!user) {
-    return res.status(404).json({ error: 'משתמש לא נמצא' });
-  }
-  
-  user.remainingMinutes += parseInt(minutes);
-  
-  res.json({
-    success: true,
-    message: `נוספו ${minutes} דקות למשתמש ${userEmail}`,
-    newBalance: user.remainingMinutes
-  });
-});
-
-// Check job status
-app.get('/api/job/:jobId', (req, res) => {
-  const job = transcriptionJobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ error: 'עבודה לא נמצאה' });
-  }
-  
-  res.json(job);
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
-  });
-});
-
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📱 Access your app at: http://localhost:${PORT}`);
   console.log(`🤖 Gemini API: ${process.env.GEMINI_API_KEY ? 'Configured' : 'NOT CONFIGURED'}`);
+  console.log(`📧 Email: ${process.env.EMAIL_USER ? 'Configured' : 'NOT CONFIGURED'}`);
 });
 
 // Create admin user on startup
