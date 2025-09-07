@@ -176,6 +176,9 @@
             authSection.style.display = 'none';
             appSection.style.display = 'block';
             updateDashboard();
+            if (endpoint === 'register') {
+                showStatus('ההרשמה הצליחה! ברוך הבא.', 'success');
+            }
         } catch (error) {
             showStatus(error.message, 'error');
         }
@@ -214,11 +217,6 @@
             
             showStatus('התמלול התחיל! התוצאות יישלחו למייל שלך בקרוב.', 'success');
             currentUser.remainingMinutes -= data.estimatedMinutes;
-            currentUser.history.push({ // Optimistically update UI
-                date: new Date().toISOString(),
-                fileName: filesToUpload.map(f => f.name).join(', '),
-                status: 'processing'
-            });
             updateDashboard();
             filesToUpload = [];
             renderFileList();
