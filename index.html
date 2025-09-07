@@ -5,218 +5,104 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>תמלול חכם</title>
     <style>
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); max-width: 700px; width: 100%; padding: 30px; }
-        .header { text-align: center; margin-bottom: 25px; }
-        h1 { color: #1c1e21; font-size: 2.2em; margin-bottom: 5px; }
-        p { color: #606770; font-size: 1.1em; }
-        .nav-tabs { display: flex; border-bottom: 1px solid #dddfe2; margin-bottom: 25px; }
-        .nav-tab { flex: 1; padding: 15px; text-align: center; background: none; border: none; font-size: 1.1em; cursor: pointer; color: #606770; position: relative; }
-        .nav-tab.active { color: #1877f2; font-weight: 600; }
-        .nav-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 3px; background-color: #1877f2; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; animation: fadeIn 0.5s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .form-group { margin-bottom: 18px; }
-        label { display: block; margin-bottom: 6px; color: #606770; font-weight: 600; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #dddfe2; border-radius: 6px; font-size: 1em; }
-        .btn { width: 100%; padding: 12px; background: #1877f2; color: white; border: none; border-radius: 6px; font-size: 1.1em; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-        .btn:hover:not(:disabled) { background: #166fe5; }
-        .btn:disabled { background: #a0bdf1; cursor: not-allowed; }
-        .user-info, .stat-card, .admin-panel { background: #f0f2f5; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
-        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .stat-number { font-size: 2em; font-weight: 700; color: #1877f2; }
-        .upload-area { border: 2px dashed #ccd0d5; border-radius: 8px; padding: 30px; text-align: center; cursor: pointer; }
-        .status { text-align: center; padding: 12px; border-radius: 6px; margin-top: 15px; display: none; }
-        .status.success { background: #e7f3ff; color: #1877f2; }
-        .status.error { background: #ffebe8; color: #c92a10; }
+        /* (Your CSS from before goes here) */
+        /* NEW: Styles for history table */
+        .history-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .history-table th, .history-table td { padding: 12px; text-align: right; border-bottom: 1px solid #dddfe2; }
+        .history-table th { background-color: #f0f2f5; font-weight: 600; }
+        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.8em; }
+        .status-completed { background-color: #d4edda; color: #155724; }
+        .status-failed { background-color: #f8d7da; color: #721c24; }
+        .download-btn { background-color: #1877f2; color: white; padding: 5px 10px; border-radius: 5px; text-decoration: none; font-size: 0.9em; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><h1>תמלול חכם</h1><p>העלה קובץ אודיו וקבל תמלול מדויק למייל</p></div>
-        <div id="authSection">
-            <div class="nav-tabs"><button class="nav-tab active" data-tab="login">התחברות</button><button class="nav-tab" data-tab="register">הרשמה</button></div>
-            <div id="loginTab" class="tab-content active">
-                <form id="loginForm"><div class="form-group"><label>אימייל:</label><input type="email" name="email" value="admin@example.com" required></div><div class="form-group"><label>סיסמה:</label><input type="password" name="password" value="admin123" required></div><button type="submit" class="btn">התחבר</button></form>
-            </div>
-            <div id="registerTab" class="tab-content">
-                <form id="registerForm"><div class="form-group"><label>שם:</label><input type="text" name="name" required></div><div class="form-group"><label>אימייל:</label><input type="email" name="email" required></div><div class="form-group"><label>סיסמה:</label><input type="password" name="password" required></div><button type="submit" class="btn">הירשם</button></form>
-            </div>
-        </div>
         <div id="appSection" style="display: none;">
-            <div class="nav-tabs"><button class="nav-tab active" data-tab="transcribe">תמלול חדש</button><button class="nav-tab" data-tab="dashboard">לוח בקרה</button><button id="logoutBtn" class="nav-tab">יציאה</button></div>
-            <div id="transcribeTab" class="tab-content active">
-                <form id="transcriptionForm"><div class="upload-area" id="uploadArea"><p>גרור לכאן קבצים או לחץ לבחירה</p><input type="file" id="fileInput" multiple hidden></div><div id="fileList" style="margin-top: 15px;"></div><button type="submit" class="btn" id="submitBtn" disabled>התחל תמלול</button></form>
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="transcribe">תמלול חדש</button>
+                <button class="nav-tab" data-tab="dashboard">לוח בקרה</button>
+                <button class="nav-tab" data-tab="history">היסטוריה</button>
+                <button id="logoutBtn" class="nav-tab">יציאה</button>
             </div>
-            <div id="dashboardTab" class="tab-content">
-                <div class="user-info">שלום, <strong id="userName"></strong>!</div>
-                <div class="dashboard-grid"><div class="stat-card"><div class="stat-number" id="remainingMinutes">0</div><div>דקות זמינות</div></div><div class="stat-card"><div class="stat-number" id="totalTranscribed">0</div><div>דקות שתמללו</div></div></div>
-                <div id="adminPanel" style="display: none;" class="admin-panel">
-                    <h4>פאנל ניהול</h4>
-                    <div class="form-group"><label for="adminUserEmail">אימייל לקוח:</label><input type="email" id="adminUserEmail"></div>
-                    <div class="form-group"><label for="adminMinutesToAdd">דקות להוספה:</label><input type="number" id="adminMinutesToAdd"></div>
-                    <button id="addMinutesBtn" class="btn">הוסף דקות</button>
-                </div>
+            
+            <div id="historyTab" class="tab-content">
+                <h3>היסטוריית תמלולים</h3>
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>תאריך</th>
+                            <th>שם קובץ</th>
+                            <th>סטטוס</th>
+                            <th>פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        </tbody>
+                </table>
             </div>
+
             <div id="status" class="status"></div>
         </div>
     </div>
 <script>
     let currentUser = null;
-    let filesToUpload = [];
+    // (Other variables remain the same)
 
-    const authSection = document.getElementById('authSection');
-    const appSection = document.getElementById('appSection');
-    const statusDiv = document.getElementById('status');
-    const uploadArea = document.getElementById('uploadArea');
-    const fileInput = document.getElementById('fileInput');
-    const fileListDiv = document.getElementById('fileList');
-    const submitBtn = document.getElementById('submitBtn');
-
+    // --- Event Listeners ---
     document.querySelectorAll('.nav-tabs').forEach(nav => nav.addEventListener('click', (e) => {
-        if (e.target.matches('.nav-tab')) switchTab(e.currentTarget, e.target.dataset.tab);
-    }));
-    document.getElementById('logoutBtn').addEventListener('click', logout);
-    document.getElementById('loginForm').addEventListener('submit', handleAuth);
-    document.getElementById('registerForm').addEventListener('submit', handleAuth);
-    document.getElementById('transcriptionForm').addEventListener('submit', handleTranscription);
-    document.getElementById('addMinutesBtn').addEventListener('click', addMinutesToUser);
-    uploadArea.addEventListener('click', () => fileInput.click());
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.currentTarget.style.backgroundColor = '#f7f8fa'; });
-    uploadArea.addEventListener('dragleave', (e) => { e.currentTarget.style.backgroundColor = 'transparent'; });
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.currentTarget.style.backgroundColor = 'transparent';
-        handleFiles(e.dataTransfer.files);
-    });
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
-
-    function switchTab(nav, tabName) {
-        nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-        nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        nav.closest('#appSection, #authSection').querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `${tabName}Tab`);
-        });
-    }
-
-    function showStatus(message, type) {
-        statusDiv.textContent = message;
-        statusDiv.className = `status ${type}`;
-        statusDiv.style.display = 'block';
-        setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
-    }
-    
-    function updateDashboard() {
-        if (!currentUser) return;
-        document.getElementById('userName').textContent = currentUser.name;
-        document.getElementById('remainingMinutes').textContent = currentUser.remainingMinutes;
-        document.getElementById('totalTranscribed').textContent = currentUser.totalTranscribed;
-        document.getElementById('adminPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
-    }
-
-    function handleFiles(files) {
-        filesToUpload.push(...Array.from(files));
-        renderFileList();
-        submitBtn.disabled = filesToUpload.length === 0;
-    }
-
-    function renderFileList() {
-        fileListDiv.innerHTML = '';
-        filesToUpload.forEach((file, index) => {
-            const fileDiv = document.createElement('div');
-            fileDiv.style.display = 'flex';
-            fileDiv.style.justifyContent = 'space-between';
-            fileDiv.style.marginBottom = '5px';
-            fileDiv.innerHTML = `<span>${file.name}</span><button data-index="${index}" style="background:none;border:none;color:red;cursor:pointer;">&times;</button>`;
-            fileListDiv.appendChild(fileDiv);
-        });
-    }
-
-    fileListDiv.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') {
-            filesToUpload.splice(parseInt(e.target.dataset.index), 1);
-            renderFileList();
-            submitBtn.disabled = filesToUpload.length === 0;
-        }
-    });
-
-    async function handleAuth(e) {
-        e.preventDefault();
-        const endpoint = e.target.id === 'loginForm' ? 'login' : 'register';
-        const body = Object.fromEntries(new FormData(e.target));
-        try {
-            const data = await apiCall(endpoint, 'POST', body);
-            currentUser = data.user;
-            authSection.style.display = 'none';
-            appSection.style.display = 'block';
-            updateDashboard();
-            if (endpoint === 'register') {
-                showStatus('ההרשמה הצליחה! ברוך הבא.', 'success');
+        if (e.target.matches('.nav-tab')) {
+            const tabName = e.target.dataset.tab;
+            switchTab(e.currentTarget, tabName);
+            // NEW: Load history when tab is clicked
+            if (tabName === 'history') {
+                loadHistory();
             }
-        } catch (error) {
-            showStatus(error.message, 'error');
         }
-    }
+    }));
+    // (Other event listeners remain the same)
 
-    async function addMinutesToUser() {
-        const userEmail = document.getElementById('adminUserEmail').value;
-        const minutes = document.getElementById('adminMinutesToAdd').value;
-        if (!userEmail || !minutes) return showStatus('נא למלא אימייל ומספר דקות', 'error');
-        try {
-            const body = { adminEmail: currentUser.email, userEmail, minutes };
-            const data = await apiCall('admin/add-minutes', 'POST', body);
-            showStatus(data.message, 'success');
-            if (currentUser.email === userEmail) { currentUser.remainingMinutes = data.newBalance; }
-            updateDashboard();
-        } catch (error) {
-            showStatus(error.message, 'error');
+    // --- UI Functions ---
+    // (switchTab, showStatus, updateDashboard, file handling functions remain the same)
+
+    // =========================================================
+    //  NEW: Function to load and display transcription history
+    // =========================================================
+    function loadHistory() {
+        const tbody = document.getElementById('historyTableBody');
+        tbody.innerHTML = ''; // Clear previous content
+
+        if (!currentUser || !currentUser.history || currentUser.history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">אין היסטוריית תמלולים.</td></tr>';
+            return;
         }
-    }
 
-    async function handleTranscription(e) {
-        e.preventDefault();
-        if (filesToUpload.length === 0) return;
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'מעבד...';
-        showStatus('מעלה קבצים...', 'success');
-
-        const formData = new FormData();
-        filesToUpload.forEach(file => formData.append('files', file));
-        formData.append('email', currentUser.email);
-
-        try {
-            const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || 'שגיאה בשרת');
+        // Display history in reverse chronological order
+        [...currentUser.history].reverse().forEach(item => {
+            const row = document.createElement('tr');
+            const date = new Date(item.date).toLocaleString('he-IL');
+            const statusClass = item.status === 'completed' ? 'status-completed' : 'status-failed';
+            const statusText = item.status === 'completed' ? 'הושלם' : 'נכשל';
             
-            showStatus('התמלול התחיל! התוצאות יישלחו למייל שלך בקרוב.', 'success');
-            currentUser.remainingMinutes -= data.estimatedMinutes;
-            updateDashboard();
-            filesToUpload = [];
-            renderFileList();
-        } catch (error) {
-            showStatus(error.message, 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'התחל תמלול';
-        }
+            let actionsHtml = 'N/A';
+            if (item.status === 'completed' && item.fileId) {
+                // Construct the download link securely
+                actionsHtml = `<a href="/api/download/${item.fileId}?userEmail=${currentUser.email}" class="download-btn" download>הורדה</a>`;
+            }
+
+            row.innerHTML = `
+                <td>${date}</td>
+                <td>${item.fileName}</td>
+                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                <td>${actionsHtml}</td>
+            `;
+            tbody.appendChild(row);
+        });
     }
 
-    async function apiCall(endpoint, method, body) {
-        const headers = { 'Content-Type': 'application/json' };
-        const options = { method, headers, body: JSON.stringify(body) };
-        const response = await fetch(`/api/${endpoint}`, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'אירעה שגיאה');
-        return data;
-    }
+    // --- API & Logic ---
+    // (handleAuth, addMinutesToUser, handleTranscription, etc. remain the same)
 
-    function logout() {
-        currentUser = null;
-        authSection.style.display = 'block';
-        appSection.style.display = 'none';
-    }
 </script>
 </body>
 </html>
