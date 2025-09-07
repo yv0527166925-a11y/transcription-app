@@ -98,10 +98,15 @@
 
     function switchTab(nav, tabName) {
         nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-        nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        nav.closest('#appSection, #authSection').querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `${tabName}Tab`);
-        });
+        const activeTab = nav.querySelector(`[data-tab="${tabName}"]`);
+        if (activeTab) activeTab.classList.add('active');
+        
+        const parentSection = nav.closest('#appSection, #authSection');
+        if (parentSection) {
+            parentSection.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('active', content.id === `${tabName}Tab`);
+            });
+        }
     }
 
     function showStatus(message, type, persistent = false) {
@@ -203,7 +208,7 @@
         if (filesToUpload.length === 0) return;
         submitBtn.disabled = true;
         submitBtn.textContent = 'מעבד...';
-        
+
         const formData = new FormData();
         filesToUpload.forEach(file => formData.append('files', file));
         formData.append('email', currentUser.email);
@@ -213,16 +218,13 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'שגיאה בשרת');
             
-            // NEW: Show a persistent, informative message
-            showStatus('הקבצים הועלו בהצלחה! התמלול מתבצע ברקע והתוצאות יישלחו למייל.', 'success', true);
+            showStatus('הקבצים הועלו! התמלול מתבצע ברקע והתוצאות יישלחו למייל.', 'success', true);
             
-            // Clear the UI for the next upload
             filesToUpload = [];
             renderFileList();
         } catch (error) {
             showStatus(error.message, 'error');
         } finally {
-            // Re-enable the button so the user can start another job
             submitBtn.disabled = false;
             submitBtn.textContent = 'התחל תמלול';
         }
