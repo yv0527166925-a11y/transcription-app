@@ -66,7 +66,6 @@
     let currentUser = null;
     let filesToUpload = [];
 
-    // --- DOM Elements ---
     const authSection = document.getElementById('authSection');
     const appSection = document.getElementById('appSection');
     const statusDiv = document.getElementById('status');
@@ -75,7 +74,6 @@
     const fileListDiv = document.getElementById('fileList');
     const submitBtn = document.getElementById('submitBtn');
 
-    // --- Event Listeners ---
     document.querySelectorAll('.nav-tabs').forEach(nav => nav.addEventListener('click', (e) => {
         if (e.target.matches('.nav-tab')) switchTab(e.currentTarget, e.target.dataset.tab);
     }));
@@ -86,7 +84,6 @@
     document.getElementById('addMinutesBtn').addEventListener('click', addMinutesToUser);
     uploadArea.addEventListener('click', () => fileInput.click());
 
-    // --- UI Functions ---
     function switchTab(nav, tabName) {
         nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
         nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
@@ -99,7 +96,7 @@
         statusDiv.textContent = message;
         statusDiv.className = `status ${type}`;
         statusDiv.style.display = 'block';
-        setTimeout(() => { statusDiv.style.display = 'none'; }, 4000);
+        setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
     }
     
     function updateDashboard() {
@@ -110,7 +107,6 @@
         document.getElementById('adminPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
     }
 
-    // --- API & Logic ---
     async function handleAuth(e) {
         e.preventDefault();
         const endpoint = e.target.id === 'loginForm' ? 'login' : 'register';
@@ -126,9 +122,6 @@
         }
     }
 
-    // =========================================================
-    //  FIX: Corrected function to handle adding minutes
-    // =========================================================
     async function addMinutesToUser() {
         const userEmail = document.getElementById('adminUserEmail').value;
         const minutes = document.getElementById('adminMinutesToAdd').value;
@@ -142,15 +135,18 @@
             };
             const data = await apiCall('admin/add-minutes', 'POST', body);
             showStatus(data.message, 'success');
-            if (currentUser.email === userEmail) { // Update dashboard if admin adds to self
+            if (currentUser.email === userEmail) {
                 currentUser.remainingMinutes = data.newBalance;
-            } else if (userEmail === document.getElementById('adminUserEmail').value) {
-                // To reflect change if admin is viewing another user (future feature)
             }
             updateDashboard();
         } catch (error) {
             showStatus(error.message, 'error');
         }
+    }
+
+    async function handleTranscription(e) {
+        e.preventDefault();
+        // Handle file transcription logic here...
     }
 
     async function apiCall(endpoint, method, body) {
@@ -170,8 +166,6 @@
         authSection.style.display = 'block';
         appSection.style.display = 'none';
     }
-    
-    // Placeholder for other functions like handleTranscription, file handling etc.
 </script>
 </body>
 </html>
