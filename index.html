@@ -104,11 +104,13 @@
         });
     }
 
-    function showStatus(message, type) {
+    function showStatus(message, type, persistent = false) {
         statusDiv.textContent = message;
         statusDiv.className = `status ${type}`;
         statusDiv.style.display = 'block';
-        setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+        if (!persistent) {
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+        }
     }
     
     function updateDashboard() {
@@ -201,8 +203,7 @@
         if (filesToUpload.length === 0) return;
         submitBtn.disabled = true;
         submitBtn.textContent = 'מעבד...';
-        showStatus('מעלה קבצים...', 'success');
-
+        
         const formData = new FormData();
         filesToUpload.forEach(file => formData.append('files', file));
         formData.append('email', currentUser.email);
@@ -212,17 +213,35 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'שגיאה בשרת');
             
-            showStatus('התמלול התחיל! התוצאות יישלחו למייל שלך בקרוב.', 'success');
-            // We no longer update minutes here, server does it after processing.
+            // NEW: Show a persistent, informative message
+            showStatus('הקבצים הועלו בהצלחה! התמלול מתבצע ברקע והתוצאות יישלחו למייל.', 'success', true);
+            
+            // Clear the UI for the next upload
             filesToUpload = [];
             renderFileList();
         } catch (error) {
             showStatus(error.message, 'error');
         } finally {
+            // Re-enable the button so the user can start another job
             submitBtn.disabled = false;
             submitBtn.textContent = 'התחל תמלול';
         }
     }
 
     async function apiCall(endpoint, method, body) {
-        const headers
+        const headers = { 'Content-Type': 'application/json' };
+        const options = { method, headers, body: JSON.stringify(body) };
+        const response = await fetch(`/api/${endpoint}`, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'אירעה שגיאה');
+        return data;
+    }
+
+    function logout() {
+        currentUser = null;
+        authSection.style.display = 'block';
+        appSection.style.display = 'none';
+    }
+</script>
+</body>
+</html>
