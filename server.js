@@ -4,7 +4,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
 const path = require('path');
-const { Document, Paragraph, TextRun, Packer } = require('docx');
+const { Document, Paragraph, TextRun, Packer, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process');
 require('dotenv').config();
@@ -41,7 +41,7 @@ const upload = multer({
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Configure email transporter
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -435,7 +435,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
   }
 }
 
-// Real Gemini 2.5 Pro transcription
+// Real Gemini 2.5 Pro transcription with improved citation handling
 async function realGeminiTranscription(filePath, filename, language) {
   try {
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
@@ -456,27 +456,46 @@ async function realGeminiTranscription(filePath, filename, language) {
     else if (ext === '.m4a') mimeType = 'audio/mp4';
     else if (ext === '.mov') mimeType = 'video/quicktime';
 
-    // Specialized prompt for Hebrew with Lithuanian pronunciation and Aramaic terms
+    // Enhanced prompt for Hebrew with Lithuanian pronunciation and Aramaic terms
     const prompt = `תמלל את הקובץ האודיו הבא לעברית בלבד. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
 הנחיות חשובות לתמלול:
+
+כללי:
 1. תמלל רק בעברית - אל תתרגם לשפות אחרות
 2. שמור על ההגיה הליטאית המיוחדת (למשל: "א" נהגית כמו "אה", "ו" כמו "או")
 3. כתוב מושגים ארמיים בכתיב המקורי (למשל: אבא, אמא, רבנן, תנא קמא)
 4. הוסף סימני פיסוק מדויקים
-5. חלק לפסקאות לוגיות
-6. ציין דוברים שונים אם יש (רב, שואל, וכו')
-7. שמור על טון רשמי ומכובד המתאים לדברי רב
-8. תקן שגיאות דקדוק קלות אך שמור על הסגנון המקורי
-9. אם יש מילים לא ברורות, ציין [לא ברור] במקום לנחש
+5. חלק לפסקאות לוגיות ברורות
+6. תקן שגיאות דקדוק קלות אך שמור על הסגנון המקורי
 
-פורמט הפלט:
-- כותרת: תמלול שיחה/דרשה/שיעור
-- תאריך ושעה אם מוזכרים
-- תוכן מחולק לפסקאות
-- הערות חשובות בסוגריים אם נדרש
+זיהוי דוברים:
+- אל תוסיף זיהוי דוברים אלא אם הם מוזכרים באופן ברור
+- אם יש שינוי דובר ברור, התחל פסקה חדשה
+- אם אין זיהוי ברור של דוברים, פשוט תמלל את התוכן ברציפות
 
-התחל את התמלול:`;
+ציטוטים מהמקורות (חשוב מאוד!):
+- כל ציטוט מהתלמוד, משנה, מקרא או מאמרי חז"ל - שים במירכאות
+- דוגמאות לציטוטים לשים במירכאות:
+  • "שנאמר..." 
+  • "כדאיתא בגמרא..."
+  • "אמרו חכמים..."
+  • "כמו שכתוב..."
+  • "תניא..."
+  • "כדכתיב..."
+  • "משנה במסכת..."
+  • "וכתוב..."
+  • "כמאמר חז״ל..."
+  • "דאמר..."
+- אל תשים במירכאות: הסברים, פירושים, או דעות אישיות של הרב
+
+עיצוב הטקסט:
+- שמור על טון רשמי ומכובד המתאים לדברי רב
+- חלק לפסקאות מובחנות לפי נושאים
+- אם יש מילים לא ברורות, ציין [לא ברור] במקום לנחש
+- אל תוסיף כותרות או עיצובים מיוחדים - רק התוכן הנתמלל
+
+התחל את התמלול עכשיו:`;
 
     const result = await model.generateContent([
       {
@@ -496,6 +515,9 @@ async function realGeminiTranscription(filePath, filename, language) {
       .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
       .replace(/^\s+|\s+$/gm, '') // Trim whitespace from lines
       .trim();
+    
+    // Additional cleanup for quotation marks
+    transcription = cleanupQuotations(transcription);
     
     if (!transcription || transcription.length < 10) {
       throw new Error('התמלול לא הצליח - קובץ ריק או לא זוהה תוכן');
@@ -519,193 +541,212 @@ async function realGeminiTranscription(filePath, filename, language) {
   }
 }
 
-// Create formatted Word document
+// פונקציה לניקוי ושיפור מירכאות בתמלול
+function cleanupQuotations(text) {
+  // תיקון מירכאות לא סדירות
+  text = text.replace(/״([^״]+)״/g, '"$1"'); // החלפת גרשיים בכפול למירכאות רגילות
+  text = text.replace(/׳([^׳]+)׳/g, '"$1"'); // החלפת גרש למירכאות
+  
+  // הסרת מירכאות כפולות
+  text = text.replace(/""/g, '"');
+  text = text.replace(/"""/g, '"');
+  
+  // תיקון רווחים סביב מירכאות
+  text = text.replace(/\s+"/g, ' "');
+  text = text.replace(/"\s+/g, '" ');
+  
+  return text;
+}
+
+// Create formatted Word document - styled like the screenshot
 async function createWordDocument(transcription, filename, duration) {
   const doc = new Document({
     sections: [{
       properties: {},
       children: [
+        // כותרת ראשית מרכוזה
         new Paragraph({
           children: [
             new TextRun({
-              text: "תמלול אוטומטי - Gemini 2.5 Pro",
+              text: "תמלול אוטומטי",
               bold: true,
-              size: 32,
-              color: "2E74B5"
+              size: 28, // 14pt
+              font: "David"
             })
           ],
-          alignment: "center"
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 }
         }),
+        
+        // פרטי הקובץ
         new Paragraph({
           children: [
             new TextRun({
-              text: "═══════════════════════════════════",
-              size: 20,
-              color: "CCCCCC"
+              text: `שם הקובץ: ${filename}`,
+              size: 24, // 12pt
+              font: "David"
             })
           ],
-          alignment: "center"
-        }),
-        new Paragraph({ text: "" }), // Empty line
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "📁 שם הקובץ: ",
-              bold: true,
-              size: 24
-            }),
-            new TextRun({
-              text: filename,
-              size: 24
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "⏱️ משך הקובץ: ",
-              bold: true,
-              size: 24
-            }),
-            new TextRun({
-              text: `${duration} דקות`,
-              size: 24,
-              color: "2E74B5"
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "📅 תאריך התמלול: ",
-              bold: true,
-              size: 24
-            }),
-            new TextRun({
-              text: new Date().toLocaleDateString('he-IL'),
-              size: 24
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "🤖 מערכת: ",
-              bold: true,
-              size: 20
-            }),
-            new TextRun({
-              text: "Google Gemini 2.5 Pro - תמלול מתקדם לעברית",
-              size: 20,
-              italics: true,
-              color: "4A90E2"
-            })
-          ]
-        }),
-        new Paragraph({ text: "" }), // Empty line
-        new Paragraph({ text: "" }), // Empty line
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "תוכן התמלול:",
-              bold: true,
-              size: 26,
-              color: "2E74B5"
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "─────────────────────────────────────────",
-              size: 20,
-              color: "CCCCCC"
-            })
-          ]
-        }),
-        new Paragraph({ text: "" }), // Empty line
-        
-        // Process transcription content
-        ...transcription.split('\n').filter(line => line.trim()).map(line => {
-          // Special formatting for speakers or sections
-          if (line.includes('רב:') || line.includes('שואל:') || line.includes('תשובה:')) {
-            return new Paragraph({
-              children: [
-                new TextRun({
-                  text: line,
-                  size: 22,
-                  bold: true,
-                  color: "C5504B"
-                })
-              ]
-            });
-          }
-          
-          // Regular content
-          return new Paragraph({
-            children: [
-              new TextRun({
-                text: line,
-                size: 22
-              })
-            ]
-          });
+          spacing: { after: 120 }
         }),
         
-        // Footer
-        new Paragraph({ text: "" }), // Empty line
-        new Paragraph({ text: "" }), // Empty line
         new Paragraph({
           children: [
             new TextRun({
-              text: "─────────────────────────────────────────",
-              size: 16,
-              color: "CCCCCC"
+              text: `משך זמן: ${duration} דקות`,
+              size: 24, // 12pt
+              font: "David"
             })
-          ]
+          ],
+          spacing: { after: 120 }
         }),
+        
         new Paragraph({
           children: [
             new TextRun({
-              text: "הערות חשובות:",
-              bold: true,
-              size: 18,
-              color: "E67E22"
+              text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
+              size: 24, // 12pt
+              font: "David"
             })
-          ]
+          ],
+          spacing: { after: 240 }
         }),
+        
+        // קו הפרדה
         new Paragraph({
           children: [
             new TextRun({
-              text: "• התמלול מותאם לעברית עם הגיה ליטאית ומושגי ארמית",
-              size: 16,
-              color: "666666"
+              text: "────────────────────────────────────────",
+              size: 20, // 10pt
+              font: "David"
             })
-          ]
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 240 }
         }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "• מומלץ לבדוק ולערוך את התוכן בהתאם לצורך",
-              size: 16,
-              color: "666666"
-            })
-          ]
-        }),
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "• איכות התמלול תלויה באיכות ההקלטה המקורית",
-              size: 16,
-              color: "666666"
-            })
-          ]
-        })
+        
+        // עיבוד תוכן התמלול
+        ...processTranscriptionContent(transcription)
       ]
     }]
   });
   
   return await Packer.toBuffer(doc);
+}
+
+// פונקציה עזר לעיבוד תוכן התמלול
+function processTranscriptionContent(transcription) {
+  const paragraphs = [];
+  
+  // חלוקה לפסקאות על בסיס שורות ריקות כפולות
+  const sections = transcription.split(/\n\s*\n/).filter(section => section.trim());
+  
+  for (let section of sections) {
+    const lines = section.split('\n').map(line => line.trim()).filter(line => line);
+    
+    if (lines.length === 0) continue;
+    
+    // יצירת פסקה אחת מכל הקטע
+    const fullText = lines.join(' ');
+    
+    // זיהוי אם זו שורת דובר או תוכן רגיל
+    if (isSpeakerLine(fullText)) {
+      paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: fullText,
+            size: 24, // 12pt
+            font: "David",
+            bold: true
+          })
+        ],
+        spacing: { 
+          before: 240, // רווח לפני
+          after: 120   // רווח אחרי
+        }
+      }));
+    } else {
+      // פסקה רגילה - מעבדים ציטוטים
+      const processedText = addQuotationMarks(fullText);
+      
+      paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: processedText,
+            size: 24, // 12pt
+            font: "David"
+          })
+        ],
+        spacing: { 
+          before: 120, // רווח קל לפני
+          after: 200   // רווח אחרי
+        }
+      }));
+    }
+  }
+  
+  return paragraphs;
+}
+
+// פונקציה לזיהוי שורות דוברים
+function isSpeakerLine(line) {
+  const speakerPatterns = [
+    /^רב\s*:/,
+    /^הרב\s*:/,
+    /^שואל\s*:/,
+    /^תשובה\s*:/,
+    /^שאלה\s*:/,
+    /^המשיב\s*:/,
+    /^התלמיד\s*:/,
+    /^השואל\s*:/,
+    /^מרצה\s*:/,
+    /^דובר\s+\d+\s*:/,
+    /^[א-ת]{2,}\s*:/
+  ];
+  
+  return speakerPatterns.some(pattern => pattern.test(line));
+}
+
+// פונקציה להוספת מירכאות לציטוטים
+function addQuotationMarks(text) {
+  // ביטויים שצריכים להיות במירכאות
+  const citationPatterns = [
+    // ציטוטים מהתלמוד
+    /(כדאיתא ב[א-ת\s,():.״״׳׳0-9]+)/g,
+    /(כמו שכתוב ב[א-ת\s,():.״״׳׳0-9]+)/g,
+    /(שנאמר[^.!?]*)/g,
+    /(כמאמר חז״ל[^.!?]*)/g,
+    /(אמרו חכמים[^.!?]*)/g,
+    /(תניא[^.!?]*)/g,
+    /(דאמר[^.!?]*)/g,
+    /(כדכתיב[^.!?]*)/g,
+    /(והיינו דאמר[^.!?]*)/g,
+    
+    // ציטוטים מקראיים
+    /(וכתוב[^.!?]*)/g,
+    /(כמו שנאמר[^.!?]*)/g,
+    /(שכתוב[^.!?]*)/g,
+    /(כתיב[^.!?]*)/g,
+    
+    // ציטוטים מהמשנה
+    /(משנה[^.!?]*)/g,
+    /(ברייתא[^.!?]*)/g,
+    /(תוספתא[^.!?]*)/g,
+    /(מתני׳[^.!?]*)/g,
+    /(גמ׳[^.!?]*)/g
+  ];
+  
+  citationPatterns.forEach(pattern => {
+    text = text.replace(pattern, (match) => {
+      // בדיקה אם הציטוט כבר במירכאות
+      if (match.startsWith('"') && match.endsWith('"')) {
+        return match;
+      }
+      return `"${match.trim()}"`;
+    });
+  });
+  
+  return text;
 }
 
 // Send transcription email
