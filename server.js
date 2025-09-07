@@ -678,3 +678,4 @@ app.listen(PORT, () => {
   console.log('   👨‍💼 Admin: admin@example.com / admin123');
   console.log('   👤 User: test@example.com / test123');
 });
+
