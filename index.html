@@ -83,11 +83,19 @@
     document.getElementById('transcriptionForm').addEventListener('submit', handleTranscription);
     document.getElementById('addMinutesBtn').addEventListener('click', addMinutesToUser);
     uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.currentTarget.style.backgroundColor = '#f7f8fa'; });
+    uploadArea.addEventListener('dragleave', (e) => { e.currentTarget.style.backgroundColor = 'transparent'; });
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.currentTarget.style.backgroundColor = 'transparent';
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     function switchTab(nav, tabName) {
         nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
         nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        nav.closest('div').querySelectorAll('.tab-content').forEach(content => {
+        nav.closest('#appSection, #authSection').querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
     }
@@ -106,6 +114,32 @@
         document.getElementById('totalTranscribed').textContent = currentUser.totalTranscribed;
         document.getElementById('adminPanel').style.display = currentUser.isAdmin ? 'block' : 'none';
     }
+
+    function handleFiles(files) {
+        filesToUpload.push(...Array.from(files));
+        renderFileList();
+        submitBtn.disabled = filesToUpload.length === 0;
+    }
+
+    function renderFileList() {
+        fileListDiv.innerHTML = '';
+        filesToUpload.forEach((file, index) => {
+            const fileDiv = document.createElement('div');
+            fileDiv.style.display = 'flex';
+            fileDiv.style.justifyContent = 'space-between';
+            fileDiv.style.marginBottom = '5px';
+            fileDiv.innerHTML = `<span>${file.name}</span><button data-index="${index}" style="background:none;border:none;color:red;cursor:pointer;">&times;</button>`;
+            fileListDiv.appendChild(fileDiv);
+        });
+    }
+
+    fileListDiv.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            filesToUpload.splice(parseInt(e.target.dataset.index), 1);
+            renderFileList();
+            submitBtn.disabled = filesToUpload.length === 0;
+        }
+    });
 
     async function handleAuth(e) {
         e.preventDefault();
@@ -126,18 +160,11 @@
         const userEmail = document.getElementById('adminUserEmail').value;
         const minutes = document.getElementById('adminMinutesToAdd').value;
         if (!userEmail || !minutes) return showStatus('נא למלא אימייל ומספר דקות', 'error');
-
         try {
-            const body = {
-                adminEmail: currentUser.email, // Send admin's email for verification
-                userEmail: userEmail,
-                minutes: minutes
-            };
+            const body = { adminEmail: currentUser.email, userEmail, minutes };
             const data = await apiCall('admin/add-minutes', 'POST', body);
             showStatus(data.message, 'success');
-            if (currentUser.email === userEmail) {
-                currentUser.remainingMinutes = data.newBalance;
-            }
+            if (currentUser.email === userEmail) { currentUser.remainingMinutes = data.newBalance; }
             updateDashboard();
         } catch (error) {
             showStatus(error.message, 'error');
@@ -146,15 +173,36 @@
 
     async function handleTranscription(e) {
         e.preventDefault();
-        // Handle file transcription logic here...
+        if (filesToUpload.length === 0) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'מעבד...';
+        showStatus('מעלה קבצים...', 'success');
+
+        const formData = new FormData();
+        filesToUpload.forEach(file => formData.append('files', file));
+        formData.append('email', currentUser.email);
+
+        try {
+            const response = await fetch('/api/transcribe', { method: 'POST', body: formData });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'שגיאה בשרת');
+            
+            showStatus('התמלול התחיל! התוצאות יישלחו למייל שלך בקרוב.', 'success');
+            currentUser.remainingMinutes -= data.estimatedMinutes;
+            updateDashboard();
+            filesToUpload = [];
+            renderFileList();
+        } catch (error) {
+            showStatus(error.message, 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'התחל תמלול';
+        }
     }
 
     async function apiCall(endpoint, method, body) {
-        const options = {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        };
+        const headers = { 'Content-Type': 'application/json' };
+        const options = { method, headers, body: JSON.stringify(body) };
         const response = await fetch(`/api/${endpoint}`, options);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'אירעה שגיאה');
