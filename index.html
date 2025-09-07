@@ -151,6 +151,9 @@
             authSection.style.display = 'none';
             appSection.style.display = 'block';
             updateDashboard();
+            if (endpoint === 'register') {
+                showStatus('ההרשמה הצליחה! ברוך הבא.', 'success');
+            }
         } catch (error) {
             showStatus(error.message, 'error');
         }
