@@ -97,9 +97,14 @@
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     function switchTab(nav, tabName) {
+        const parentSection = nav.closest('#appSection, #authSection');
+        if (!parentSection) return; // Safety check to prevent the TypeError
+
         nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-        nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        nav.closest('#appSection, #authSection').querySelectorAll('.tab-content').forEach(content => {
+        const activeTab = nav.querySelector(`[data-tab="${tabName}"]`);
+        if (activeTab) activeTab.classList.add('active');
+        
+        parentSection.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
     }
