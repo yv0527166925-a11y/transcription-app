@@ -97,14 +97,9 @@
     fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     function switchTab(nav, tabName) {
-        const parentSection = nav.closest('#appSection, #authSection');
-        if (!parentSection) return; // Safety check to prevent the TypeError
-
         nav.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-        const activeTab = nav.querySelector(`[data-tab="${tabName}"]`);
-        if (activeTab) activeTab.classList.add('active');
-        
-        parentSection.querySelectorAll('.tab-content').forEach(content => {
+        nav.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+        nav.closest('#appSection, #authSection').querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
     }
@@ -218,8 +213,7 @@
             if (!response.ok) throw new Error(data.error || 'שגיאה בשרת');
             
             showStatus('התמלול התחיל! התוצאות יישלחו למייל שלך בקרוב.', 'success');
-            currentUser.remainingMinutes -= data.estimatedMinutes;
-            updateDashboard();
+            // We no longer update minutes here, server does it after processing.
             filesToUpload = [];
             renderFileList();
         } catch (error) {
@@ -231,19 +225,4 @@
     }
 
     async function apiCall(endpoint, method, body) {
-        const headers = { 'Content-Type': 'application/json' };
-        const options = { method, headers, body: JSON.stringify(body) };
-        const response = await fetch(`/api/${endpoint}`, options);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'אירעה שגיאה');
-        return data;
-    }
-
-    function logout() {
-        currentUser = null;
-        authSection.style.display = 'block';
-        appSection.style.display = 'none';
-    }
-</script>
-</body>
-</html>
+        const headers
