@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname))); // Serve static files like index.html
+app.use(express.static(path.join(__dirname)));
 
 // --- Multer Configuration ---
 const storage = multer.diskStorage({
@@ -77,30 +77,25 @@ app.post('/api/login', (req, res) => {
   if (!user || user.password !== password) {
     return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
   }
-  const { password: _, ...userToReturn } = user; // Exclude password from response
+  const { password: _, ...userToReturn } = user;
   res.json({ success: true, user: userToReturn });
 });
 
 app.post('/api/admin/add-minutes', (req, res) => {
     const { adminEmail, userEmail, minutes } = req.body;
-
     const adminUser = users.get(adminEmail);
     if (!adminUser || !adminUser.isAdmin) {
         return res.status(403).json({ success: false, error: 'Forbidden: User is not an admin.' });
     }
-  
     const targetUser = users.get(userEmail);
     if (!targetUser) {
         return res.status(404).json({ success: false, error: 'User to add minutes to was not found.' });
     }
-
     const minutesToAdd = parseInt(minutes);
     if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
         return res.status(400).json({ success: false, error: 'Invalid number of minutes.' });
     }
-  
     targetUser.remainingMinutes += minutesToAdd;
-    console.log(`✅ Admin ${adminEmail} added ${minutesToAdd} minutes to ${userEmail}.`);
     res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
 });
 
@@ -118,11 +113,10 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 
   if (totalMinutes > user.remainingMinutes) {
-    files.forEach(file => fs.unlinkSync(file.path)); // Clean up uploaded files
+    files.forEach(file => fs.unlinkSync(file.path));
     return res.status(402).json({ success: false, error: 'אין מספיק דקות בחשבון' });
   }
 
-  // Start processing in the background and respond immediately
   processTranscriptionJob(files, user, totalMinutes);
   res.json({ success: true, message: 'התמלול התחיל', estimatedMinutes: totalMinutes });
 });
@@ -133,18 +127,19 @@ async function processTranscriptionJob(files, user, totalMinutes) {
   const successfulTranscriptions = [];
 
   for (const file of files) {
-    const originalFileName = Buffer.from(file.filename.split('_').slice(1).join('_'), 'utf-8').toString();
+    // **FILENAME FIX**: Use file.originalname which is already a clean UTF-8 string
+    const originalFileName = file.originalname; 
     try {
       const convertedPath = await convertAudioForGemini(file.path);
       const transcriptionText = await transcribeWithGemini(convertedPath);
-      const wordDocBuffer = await createWordDocument(transcriptionText, originalFileName);
+      const wordDocBuffer = await createWordDocument(transcriptionText, originalFileName, totalMinutes);
       successfulTranscriptions.push({ filename: originalFileName, wordDoc: wordDocBuffer });
     } catch (error) {
       console.error(`❌ Failed to process ${originalFileName}:`, error.message);
     } finally {
-      if (fs.existsSync(file.path)) fs.unlinkSync(file.path); // Clean up original
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       const convertedPathCheck = file.path.replace(/\.[^/.]+$/, '_converted.wav');
-      if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck); // Clean up converted
+      if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck);
     }
   }
 
@@ -169,34 +164,51 @@ async function convertAudioForGemini(inputPath) {
 }
 
 async function transcribeWithGemini(filePath) {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" }); // Using 2.5 Pro as requested
+  // **TRANSCRIPTION FIX**: Use the correct model for long audio files
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" }); 
+  
   const audioData = fs.readFileSync(filePath);
   const base64Audio = audioData.toString('base64');
-  
   const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
   
-  const prompt = `תמלל את קובץ האודיו במלואו, מההתחלה ועד הסוף. זהו שיעור תורני בעברית.
-- תמלל כל מילה ומילה. אל תסכם.
-- שמור על מבנה של פסקאות, עם שורה ריקה בין כל פסקה.`;
+  const prompt = `תמלל את קובץ האודיו הבא במלואו, מהשנייה הראשונה ועד השנייה האחרונה. זהו קובץ ארוך. חשוב ביותר שתמשיך לעבד עד שתגיע לסוף המוחלט של הקובץ. אל תעצור באמצע ואל תסכם דבר. חובה לתמלל כל מילה ומילה.`;
   
   const result = await model.generateContent([prompt, audioPart]);
-  const transcription = result.response.text().trim();
+  const response = result.response;
+
+  if (response.promptFeedback?.blockReason) {
+    throw new Error(`Transcription blocked: ${response.promptFeedback.blockReason}`);
+  }
+  
+  const transcription = response.text().trim();
   if (!transcription) throw new Error('Transcription result was empty');
   return transcription;
 }
 
-async function createWordDocument(transcription, filename) {
+async function createWordDocument(transcription, filename, duration) {
   const paragraphs = transcription.split(/\n\s*\n/).filter(s => s.trim()).map(section =>
     new Paragraph({
       children: [new TextRun({ text: section, size: 24, font: { name: "David" }, rightToLeft: true })],
       bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 }
     })
   );
+
+  // **FILENAME FIX**: Use TextRun for the filename to handle RTL characters correctly
+  const fileNameParagraph = new Paragraph({
+      alignment: AlignmentType.RIGHT,
+      children: [
+          new TextRun({ text: "שם הקובץ: ", bold: true, rightToLeft: true, size: 24 }),
+          new TextRun({ text: filename, rightToLeft: true, size: 24 })
+      ]
+  });
+
   const doc = new Document({
     sections: [{
       children: [
-        new Paragraph({ text: `תמלול הקובץ: ${filename}`, alignment: AlignmentType.CENTER, heading: "Heading1" }),
-        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+        new Paragraph({ text: `אוטומטי תמלול`, alignment: AlignmentType.CENTER, heading: "Title" }),
+        fileNameParagraph,
+        new Paragraph({ text: `זמן משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }),
+        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }),
         ...paragraphs
       ]
     }]
