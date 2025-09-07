@@ -213,4 +213,12 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
   await transporter.sendMail({
     from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
     to: userEmail,
-    subject: '✅ התמלול שלך
+    subject: '✅ התמלול שלך מוכן!',
+    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
+    attachments
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server is live on port ${PORT}`);
+});
