@@ -28,7 +28,9 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const extension = path.extname(file.originalname);
-    cb(null, `${timestamp}_${file.originalname}`);
+    // תיקון: שמירת שם קובץ בעברית
+    const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    cb(null, `${timestamp}_${safeName}`);
   }
 });
 
@@ -40,18 +42,54 @@ const upload = multer({
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure email transporter
-const transporter = nodemailer.createTransport({
+// Configure email transporter with Hebrew support
+const transporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
+  },
+  tls: {
+    rejectUnauthorized: false
   }
 });
 
-// In-memory database
+// In-memory database with demo users
 const users = new Map();
 const transcriptionJobs = new Map();
+
+// Initialize demo users
+function initializeDemoUsers() {
+  // Admin user
+  users.set('admin@example.com', {
+    id: 'admin1',
+    name: 'מנהל המערכת',
+    email: 'admin@example.com',
+    password: 'admin123',
+    phone: '050-1234567',
+    remainingMinutes: 1000,
+    totalTranscribed: 150,
+    isAdmin: true,
+    history: [],
+    createdAt: new Date()
+  });
+
+  // Test user
+  users.set('test@example.com', {
+    id: 'user1',
+    name: 'משתמש בדיקה',
+    email: 'test@example.com',
+    password: 'test123',
+    phone: '050-7654321',
+    remainingMinutes: 45,
+    totalTranscribed: 25,
+    isAdmin: false,
+    history: [],
+    createdAt: new Date()
+  });
+
+  console.log('✅ Demo users initialized');
+}
 
 // Debug function to list all users
 function debugListUsers() {
@@ -127,67 +165,83 @@ async function convertAudioForGemini(inputPath) {
 
 // API ROUTES
 app.post('/api/register', (req, res) => {
-  const { name, email, password, phone } = req.body;
-  
-  if (users.has(email)) {
-    return res.status(400).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' });
-  }
-  
-  const user = {
-    id: Date.now().toString(),
-    name,
-    email,
-    password,
-    phone,
-    remainingMinutes: 30,
-    totalTranscribed: 0,
-    isAdmin: false,
-    history: [],
-    createdAt: new Date()
-  };
-  
-  users.set(email, user);
-  
-  res.json({
-    success: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      remainingMinutes: user.remainingMinutes,
-      totalTranscribed: user.totalTranscribed,
-      isAdmin: user.isAdmin,
-      history: user.history
+  try {
+    const { name, email, password, phone } = req.body;
+    
+    if (users.has(email)) {
+      return res.status(400).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' });
     }
-  });
+    
+    const user = {
+      id: Date.now().toString(),
+      name,
+      email,
+      password,
+      phone,
+      remainingMinutes: 30,
+      totalTranscribed: 0,
+      isAdmin: false,
+      history: [],
+      createdAt: new Date()
+    };
+    
+    users.set(email, user);
+    console.log(`✅ New user registered: ${email}`);
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        remainingMinutes: user.remainingMinutes,
+        totalTranscribed: user.totalTranscribed,
+        isAdmin: user.isAdmin,
+        history: user.history
+      }
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בהרשמה' });
+  }
 });
 
 app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
-  
-  const user = users.get(email);
-  if (!user || user.password !== password) {
-    return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
-  }
-  
-  res.json({
-    success: true,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      remainingMinutes: user.remainingMinutes,
-      totalTranscribed: user.totalTranscribed,
-      isAdmin: user.isAdmin,
-      history: user.history
+  try {
+    const { email, password } = req.body;
+    
+    const user = users.get(email);
+    if (!user || user.password !== password) {
+      return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
     }
-  });
+    
+    console.log(`✅ User logged in: ${email}`);
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        remainingMinutes: user.remainingMinutes,
+        totalTranscribed: user.totalTranscribed,
+        isAdmin: user.isAdmin,
+        history: user.history
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בהתחברות' });
+  }
 });
 
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   try {
     const { email, language } = req.body;
     const files = req.files;
+    
+    console.log(`🎯 Transcription request from: ${email}`);
+    console.log(`🎯 Files uploaded: ${files ? files.length : 0}`);
     
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
@@ -206,7 +260,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         const duration = await getAudioDuration(file.path);
         totalMinutes += duration;
         fileInfos.push({ file, duration });
+        console.log(`📁 File: ${file.originalname}, Duration: ${duration} minutes`);
       } catch (error) {
+        console.warn(`⚠️ Could not get duration for ${file.originalname}, using estimate`);
         const estimatedDuration = 5;
         totalMinutes += estimatedDuration;
         fileInfos.push({ file, duration: estimatedDuration });
@@ -223,6 +279,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     }
     
     const jobId = Date.now().toString();
+    console.log(`🚀 Starting transcription job: ${jobId}`);
+    
+    // Start processing asynchronously
     processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes);
     
     res.json({
@@ -238,62 +297,60 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
-// FIXED: Admin add minutes route
+// Admin add minutes route
 app.post('/api/admin/add-minutes', (req, res) => {
-  console.log('🔧 Admin add minutes request received');
-  console.log('🔧 Request body:', req.body);
-  console.log('🔧 Request headers:', req.headers);
-  
-  debugListUsers(); // הדפס רשימת משתמשים
-  
-  const { userEmail, minutes } = req.body;
-  
-  // בדיקות בסיסיות
-  if (!userEmail || !minutes) {
-    console.log('❌ Missing fields:', { userEmail, minutes });
-    return res.status(400).json({ 
-      success: false, 
-      error: 'חסרים פרטים: אימייל משתמש ומספר דקות' 
+  try {
+    console.log('🔧 Admin add minutes request received');
+    console.log('🔧 Request body:', req.body);
+    
+    const { userEmail, minutes } = req.body;
+    
+    if (!userEmail || !minutes) {
+      console.log('❌ Missing fields:', { userEmail, minutes });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'חסרים פרטים: אימייל משתמש ומספר דקות' 
+      });
+    }
+    
+    const user = users.get(userEmail);
+    console.log('🔧 Found user:', user ? 'YES' : 'NO');
+    
+    if (!user) {
+      console.log('❌ User not found:', userEmail);
+      console.log('🔧 Available users:', Array.from(users.keys()));
+      return res.status(404).json({ 
+        success: false, 
+        error: `משתמש עם אימייל ${userEmail} לא נמצא` 
+      });
+    }
+    
+    const minutesToAdd = parseInt(minutes);
+    if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
+      console.log('❌ Invalid minutes:', minutes);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'מספר הדקות חייב להיות מספר חיובי' 
+      });
+    }
+    
+    const oldBalance = user.remainingMinutes;
+    user.remainingMinutes += minutesToAdd;
+    
+    console.log(`✅ Added ${minutesToAdd} minutes to ${userEmail}`);
+    console.log(`   Old balance: ${oldBalance}, New balance: ${user.remainingMinutes}`);
+    
+    res.json({
+      success: true,
+      message: `נוספו ${minutesToAdd} דקות למשתמש ${userEmail}`,
+      oldBalance: oldBalance,
+      newBalance: user.remainingMinutes,
+      userFound: true
     });
+  } catch (error) {
+    console.error('Admin add minutes error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בהוספת דקות' });
   }
-  
-  // מציאת המשתמש
-  const user = users.get(userEmail);
-  console.log('🔧 Found user:', user ? 'YES' : 'NO');
-  
-  if (!user) {
-    console.log('❌ User not found:', userEmail);
-    console.log('🔧 Available users:', Array.from(users.keys()));
-    return res.status(404).json({ 
-      success: false, 
-      error: `משתמש עם אימייל ${userEmail} לא נמצא` 
-    });
-  }
-  
-  // בדיקת תקינות הדקות
-  const minutesToAdd = parseInt(minutes);
-  if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
-    console.log('❌ Invalid minutes:', minutes);
-    return res.status(400).json({ 
-      success: false, 
-      error: 'מספר הדקות חייב להיות מספר חיובי' 
-    });
-  }
-  
-  // הוספת הדקות
-  const oldBalance = user.remainingMinutes;
-  user.remainingMinutes += minutesToAdd;
-  
-  console.log(`✅ Added ${minutesToAdd} minutes to ${userEmail}`);
-  console.log(`   Old balance: ${oldBalance}, New balance: ${user.remainingMinutes}`);
-  
-  res.json({
-    success: true,
-    message: `נוספו ${minutesToAdd} דקות למשתמש ${userEmail}`,
-    oldBalance: oldBalance,
-    newBalance: user.remainingMinutes,
-    userFound: true
-  });
 });
 
 app.get('/api/job/:jobId', (req, res) => {
@@ -308,7 +365,9 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
+    geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
+    users: users.size,
+    jobs: transcriptionJobs.size
   });
 });
 
@@ -316,7 +375,8 @@ app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
     message: 'API is working!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    usersCount: users.size
   });
 });
 
@@ -336,6 +396,7 @@ app.get('*', (req, res) => {
 // Process transcription job asynchronously
 async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
   try {
+    console.log(`🎯 Processing job ${jobId} with ${fileInfos.length} files`);
     transcriptionJobs.set(jobId, { status: 'processing', progress: 0 });
     
     const transcriptions = [];
@@ -349,6 +410,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       });
       
       try {
+        console.log(`🎵 Processing file: ${file.originalname}`);
         const convertedPath = await convertAudioForGemini(file.path);
         const transcription = await realGeminiTranscription(convertedPath, file.originalname, language);
         const wordDoc = await createWordDocument(transcription, file.originalname, duration);
@@ -360,12 +422,15 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
           duration: duration
         });
         
+        // Cleanup converted file
         if (convertedPath !== file.path && fs.existsSync(convertedPath)) {
           fs.unlinkSync(convertedPath);
         }
         
+        console.log(`✅ Completed file: ${file.originalname}`);
+        
       } catch (error) {
-        console.error(`Error processing ${file.originalname}:`, error);
+        console.error(`❌ Error processing ${file.originalname}:`, error);
         transcriptions.push({
           filename: file.originalname,
           error: error.message,
@@ -379,13 +444,16 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
     const successfulTranscriptions = transcriptions.filter(t => !t.error);
     
     if (successfulTranscriptions.length > 0) {
+      console.log(`📧 Sending email with ${successfulTranscriptions.length} documents`);
       await sendTranscriptionEmail(user.email, successfulTranscriptions);
     }
     
+    // Update user balance
     const successfulMinutes = successfulTranscriptions.reduce((sum, t) => sum + t.duration, 0);
     user.remainingMinutes -= successfulMinutes;
     user.totalTranscribed += successfulMinutes;
     
+    // Add to history
     transcriptions.forEach((trans, index) => {
       user.history.push({
         id: Date.now() + index,
@@ -406,11 +474,14 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       failed: transcriptions.length - successfulTranscriptions.length
     });
     
+    // Cleanup uploaded files
     fileInfos.forEach(({ file }) => {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
     });
+    
+    console.log(`🎉 Job ${jobId} completed successfully`);
     
   } catch (error) {
     console.error('Job processing error:', error);
@@ -418,7 +489,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
   }
 }
 
-// IMPROVED: Real Gemini 2.5 Pro transcription with better completeness
+// Real Gemini 2.5 Pro transcription with Hebrew support
 async function realGeminiTranscription(filePath, filename, language) {
   try {
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
@@ -428,8 +499,8 @@ async function realGeminiTranscription(filePath, filename, language) {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-pro",
       generationConfig: {
-        temperature: 0.1,  // תמלול יותר מדויק
-        maxOutputTokens: 8192  // יותר טקסט פלט
+        temperature: 0.1,
+        maxOutputTokens: 8192
       }
     });
     
@@ -443,7 +514,6 @@ async function realGeminiTranscription(filePath, filename, language) {
     else if (ext === '.m4a') mimeType = 'audio/mp4';
     else if (ext === '.mov') mimeType = 'video/quicktime';
 
-    // פרומפט משופר לתמלול שלם
     const prompt = `אני רוצה שתמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
 📌 חשוב מאוד - הנחיות חובה:
@@ -475,9 +545,7 @@ async function realGeminiTranscription(filePath, filename, language) {
 
 התחל עכשיו:`;
 
-    console.log(`🎯 Starting transcription for: ${filename}`);
-    console.log(`🎯 File size: ${audioData.length} bytes`);
-    console.log(`🎯 MIME type: ${mimeType}`);
+    console.log(`🎯 Starting Gemini transcription for: ${filename}`);
 
     const result = await model.generateContent([
       {
@@ -492,9 +560,9 @@ async function realGeminiTranscription(filePath, filename, language) {
     const response = await result.response;
     let transcription = response.text();
     
-    console.log(`🎯 Raw transcription length: ${transcription.length} characters`);
+    console.log(`🎯 Transcription completed, length: ${transcription.length} characters`);
     
-    // עיבוד טקסט משופר
+    // Clean up text
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n')
@@ -503,17 +571,9 @@ async function realGeminiTranscription(filePath, filename, language) {
       .trim();
     
     transcription = cleanupQuotations(transcription);
-    transcription = transcription.replace(/([א-ת])\n\n/g, '$1.\n\n');
-    
-    console.log(`🎯 Final transcription length: ${transcription.length} characters`);
     
     if (!transcription || transcription.length < 50) {
       throw new Error('התמלול לא הצליח - טקסט קצר מדי או ריק');
-    }
-    
-    // בדיקה שהתמלול לא נקטע
-    if (transcription.length < 100) {
-      console.warn('⚠️ Transcription seems too short, might be incomplete');
     }
     
     return transcription;
@@ -525,17 +585,13 @@ async function realGeminiTranscription(filePath, filename, language) {
       throw new Error('שגיאה באימות Gemini API');
     } else if (error.message.includes('quota')) {
       throw new Error('הגעת למגבלת השימוש ב-Gemini API');
-    } else if (error.message.includes('format')) {
-      throw new Error('פורמט הקובץ אינו נתמך');
-    } else if (error.message.includes('SAFETY')) {
-      throw new Error('הקובץ נחסם מסיבות בטיחות - נסה קובץ אחר');
     } else {
       throw new Error(`שגיאה בתמלול: ${error.message}`);
     }
   }
 }
 
-// פונקציה לניקוי ושיפור מירכאות בתמלול
+// Cleanup quotations function
 function cleanupQuotations(text) {
   text = text.replace(/״([^״]+)״/g, '"$1"');
   text = text.replace(/׳([^׳]+)׳/g, '"$1"');
@@ -552,119 +608,124 @@ function cleanupQuotations(text) {
   return text;
 }
 
-// Create formatted Word document - IMPROVED FORMATTING
+// Create formatted Word document with Hebrew support
 async function createWordDocument(transcription, filename, duration) {
-  const doc = new Document({
-    sections: [{
-      properties: {
-        page: {
-          margin: {
-            top: 1440,
-            right: 1440,
-            bottom: 1440,
-            left: 1440
+  try {
+    console.log(`📄 Creating Word document for: ${filename}`);
+    
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              right: 1440,
+              bottom: 1440,
+              left: 1440
+            }
           }
-        }
-      },
-      children: [
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "תמלול אוטומטי",
-              bold: true,
-              size: 32,
-              font: {
-                name: "David",
-                hint: "default"
-              }
-            })
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { 
-            after: 400,
-            line: 360
-          }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `שם הקובץ: ${filename}`,
-              size: 24,
-              font: {
-                name: "David",
-                hint: "default"
-              }
-            })
-          ],
-          spacing: { 
-            after: 200,
-            line: 360
-          }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `משך זמן: ${duration} דקות`,
-              size: 24,
-              font: {
-                name: "David",
-                hint: "default"
-              }
-            })
-          ],
-          spacing: { 
-            after: 200,
-            line: 360
-          }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
-              size: 24,
-              font: {
-                name: "David",
-                hint: "default"
-              }
-            })
-          ],
-          spacing: { 
-            after: 400,
-            line: 360
-          }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "─".repeat(50),
-              size: 20,
-              font: {
-                name: "David",
-                hint: "default"
-              }
-            })
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { 
-            after: 400,
-            line: 360
-          }
-        }),
-        
-        ...processTranscriptionContentImproved(transcription)
-      ]
-    }]
-  });
-  
-  return await Packer.toBuffer(doc);
+        },
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "תמלול אוטומטי",
+                bold: true,
+                size: 32,
+                font: {
+                  name: "David"
+                }
+              })
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { 
+              after: 400,
+              line: 360
+            }
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `שם הקובץ: ${filename}`,
+                size: 24,
+                font: {
+                  name: "David"
+                }
+              })
+            ],
+            spacing: { 
+              after: 200,
+              line: 360
+            }
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `משך זמן: ${duration} דקות`,
+                size: 24,
+                font: {
+                  name: "David"
+                }
+              })
+            ],
+            spacing: { 
+              after: 200,
+              line: 360
+            }
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
+                size: 24,
+                font: {
+                  name: "David"
+                }
+              })
+            ],
+            spacing: { 
+              after: 400,
+              line: 360
+            }
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: "─".repeat(50),
+                size: 20,
+                font: {
+                  name: "David"
+                }
+              })
+            ],
+            alignment: AlignmentType.CENTER,
+            spacing: { 
+              after: 400,
+              line: 360
+            }
+          }),
+          
+          ...processTranscriptionContent(transcription)
+        ]
+      }]
+    });
+    
+    const buffer = await Packer.toBuffer(doc);
+    console.log(`✅ Word document created successfully for: ${filename}`);
+    return buffer;
+    
+  } catch (error) {
+    console.error('Error creating Word document:', error);
+    throw error;
+  }
 }
 
-// פונקציה משופרת לעיבוד תוכן התמלול
-function processTranscriptionContentImproved(transcription) {
+// Process transcription content into paragraphs
+function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
   let cleanedText = transcription
@@ -672,165 +733,84 @@ function processTranscriptionContentImproved(transcription) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   
-  const sections = cleanedText.split(/(?:\n\s*\n)|(?:\.\s*(?=[א-ת]))/g)
+  const sections = cleanedText.split(/\n\s*\n/)
     .map(section => section.trim())
     .filter(section => section.length > 0);
   
-  for (let i = 0; i < sections.length; i++) {
-    let section = sections[i];
-    
+  sections.forEach(section => {
     section = section.replace(/\n+/g, ' ').trim();
-    
-    if (section.length < 50 && i < sections.length - 1) {
-      sections[i + 1] = section + '. ' + sections[i + 1];
-      continue;
-    }
     
     if (!section.endsWith('.') && !section.endsWith('!') && !section.endsWith('?') && !section.endsWith(':')) {
       section += '.';
     }
     
-    section = addQuotationMarksImproved(section);
-    
-    if (isSpeakerLineImproved(section)) {
-      paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: section,
-            size: 24,
-            font: {
-              name: "David",
-              hint: "default"
-            },
-            bold: true
-          })
-        ],
-        spacing: { 
-          before: 400,
-          after: 200,
-          line: 360
-        }
-      }));
-    } else {
-      paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: section,
-            size: 24,
-            font: {
-              name: "David",
-              hint: "default"
-            }
-          })
-        ],
-        spacing: { 
-          before: 200,
-          after: 300,
-          line: 400
-        }
-      }));
-    }
-  }
+    paragraphs.push(new Paragraph({
+      children: [
+        new TextRun({
+          text: section,
+          size: 24,
+          font: {
+            name: "David"
+          }
+        })
+      ],
+      spacing: { 
+        before: 200,
+        after: 300,
+        line: 400
+      }
+    }));
+  });
   
   return paragraphs;
 }
 
-// פונקציה משופרת לזיהוי שורות דוברים
-function isSpeakerLineImproved(line) {
-  const speakerPatterns = [
-    /^רב\s*:/,
-    /^הרב\s*:/,
-    /^שואל\s*:/,
-    /^תשובה\s*:/,
-    /^שאלה\s*:/,
-    /^המשיב\s*:/,
-    /^התלמיד\s*:/,
-    /^השואל\s*:/,
-    /^מרצה\s*:/,
-    /^דובר\s+\d+\s*:/,
-    /^[א-ת]{2,10}\s*:/
-  ];
-  
-  return speakerPatterns.some(pattern => pattern.test(line.trim()));
+// Send transcription email with Hebrew support
+async function sendTranscriptionEmail(userEmail, transcriptions) {
+  try {
+    console.log(`📧 Preparing email for: ${userEmail}`);
+    
+    const attachments = transcriptions.map((trans, index) => ({
+      filename: `תמלול_${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
+      content: trans.wordDoc,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    }));
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: userEmail,
+      subject: '✅ התמלול הושלם בהצלחה',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif;">
+          <h2>🎯 התמלול הושלם בהצלחה!</h2>
+          <p>שלום,</p>
+          <p>התמלול שלך הושלם. מצורפים הקבצים:</p>
+          <ul>
+            ${transcriptions.map(t => `<li>📄 ${t.filename}</li>`).join('')}
+          </ul>
+          <p><strong>💫 תמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית</strong></p>
+          <p>בברכה,<br>מערכת התמלול החכמה</p>
+        </div>
+      `,
+      attachments: attachments
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Email sent successfully to: ${userEmail}`);
+    
+  } catch (error) {
+    console.error('Email sending error:', error);
+    throw error;
+  }
 }
 
-// פונקציה משופרת להוספת מירכאות לציטוטים
-function addQuotationMarksImproved(text) {
-  const citationPatterns = [
-    {
-      pattern: /(כדאיתא\s+ב[א-ת\s,():.״״׳׳0-9]+?)(?=\s|$|\.)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(כמו\s+שכתוב\s+ב[א-ת\s,():.״״׳׳0-9]+?)(?=\s|$|\.)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(שנאמר\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(כמאמר\s+חז״ל\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(אמרו\s+חכמים\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(תניא\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(דאמר\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(כדכתיב\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(והיינו\s+דאמר\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(וכתוב\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(כמו\s+שנאמר\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(שכתוב\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(כתיב\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(משנה\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(ברייתא\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(תוספתא\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(מתני׳\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    },
-    {
-      pattern: /(גמ׳\s+[^.!?]*?)(?=\.|$)/gi,
-      addQuotes: true
-    }
-  ];
-  
-  citationPatterns.forEach(({pattern, addQuotes}) => {
-    if (addQuotes) {
-      text = text.replace
+// Initialize and start server
+initializeDemoUsers();
+debugListUsers();
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Access: http://localhost:${PORT}`);
+  console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
+  console.log(`🤖 Gemini configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+});
