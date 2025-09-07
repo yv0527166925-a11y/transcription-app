@@ -79,9 +79,7 @@ app.get('/', (req, res) => { res.sendFile(path.join(__dirname, 'index.html')); }
 app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const user = users.get(email);
-  if (!user || user.password !== password) {
-    return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
-  }
+  if (!user || user.password !== password) { return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' }); }
   const { password: _, ...userToReturn } = user;
   res.json({ success: true, user: userToReturn });
 });
@@ -116,15 +114,11 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   if (!user) return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
   if (!files || files.length === 0) return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
 
-  let totalMinutes = 0;
-  for (const file of files) { totalMinutes += await getMediaDuration(file.path); }
-  if (totalMinutes > user.remainingMinutes) {
-    files.forEach(file => fs.unlinkSync(file.path));
-    return res.status(402).json({ success: false, error: 'אין מספיק דקות בחשבון' });
-  }
+  // Respond immediately to the user
+  res.json({ success: true, message: 'התמלול התחיל' });
 
-  processTranscriptionJob(files, user, totalMinutes);
-  res.json({ success: true, message: 'התמלול התחיל', estimatedMinutes: totalMinutes });
+  // Process files in the background
+  processTranscriptionJob(files, user);
 });
 
 app.get('/api/download/:fileId', (req, res) => {
@@ -144,12 +138,91 @@ app.get('/api/download/:fileId', (req, res) => {
 
 
 // --- Background Processing & Helpers ---
-async function processTranscriptionJob(files, user, totalMinutes) { /* ... same as before ... */ }
-async function convertAudioForGemini(inputPath) { /* ... same as before ... */ }
-async function transcribeWithGemini(filePath) { /* ... same as before ... */ }
-async function createWordDocument(transcription, filename, duration) { /* ... same as before ... */ }
-async function sendTranscriptionEmail(userEmail, transcriptions) { /* ... same as before ... */ }
+async function processTranscriptionJob(files, user) {
+  for (const file of files) {
+    const originalFileName = file.originalname;
+    let duration = 0;
+    try {
+      duration = await getMediaDuration(file.path);
+      if (duration > user.remainingMinutes) {
+          throw new Error(`Not enough minutes for file ${originalFileName}. Required: ${duration}, Available: ${user.remainingMinutes}`);
+      }
+      
+      const convertedPath = await convertAudioForGemini(file.path);
+      const transcriptionText = await transcribeWithGemini(convertedPath);
+      const wordDocBuffer = await createWordDocument(transcriptionText, originalFileName, duration);
+      
+      const fileId = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.docx`;
+      const savePath = path.join(__dirname, 'transcripts', fileId);
+      if (!fs.existsSync(path.join(__dirname, 'transcripts'))) {
+          fs.mkdirSync(path.join(__dirname, 'transcripts'));
+      }
+      fs.writeFileSync(savePath, wordDocBuffer);
+      
+      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration, status: 'completed', fileId });
+      await sendTranscriptionEmail(user.email, [{ filename: originalFileName, wordDoc: wordDocBuffer }]);
+      
+      // Deduct minutes *after* successful processing and email sending
+      user.remainingMinutes -= duration;
+      user.totalTranscribed += duration;
+      console.log(`✅ Successfully processed ${originalFileName} for ${user.email}.`);
 
+    } catch (error) {
+      console.error(`❌ Failed to process ${originalFileName} for ${user.email}:`, error.message);
+      user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration, status: 'failed', fileId: null });
+    } finally {
+      // Clean up temporary files
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      const convertedPathCheck = file.path.replace(/\.[^/.]+$/, '_converted.wav');
+      if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck);
+    }
+  }
+}
+
+async function convertAudioForGemini(inputPath) {
+    return new Promise((resolve, reject) => {
+        const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
+        const ffmpeg = spawn('ffmpeg', ['-i', inputPath, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-y', outputPath]);
+        ffmpeg.on('close', (code) => code === 0 ? resolve(outputPath) : reject(new Error('ffmpeg conversion failed')));
+        ffmpeg.on('error', (err) => reject(err));
+    });
+}
+
+async function transcribeWithGemini(filePath) {
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" }); 
+  const fileResponse = await genAI.uploadFile(filePath, { mimeType: 'audio/wav', displayName: path.basename(filePath) });
+  const prompt = `Please transcribe the following audio file accurately from start to finish.`;
+  const filePart = { fileData: { mimeType: fileResponse.file.mimeType, fileUri: fileResponse.file.uri } };
+  const result = await model.generateContent([prompt, filePart]);
+  await genAI.deleteFile(fileResponse.file.name);
+  const response = result.response;
+  if (response.promptFeedback?.blockReason) { throw new Error(`Transcription blocked: ${response.promptFeedback.blockReason}`); }
+  const transcription = response.text().trim();
+  if (!transcription) throw new Error('Transcription result was empty');
+  return transcription;
+}
+
+async function createWordDocument(transcription, filename, duration) {
+  const paragraphs = transcription.split(/\n\s*\n/).filter(s => s.trim()).map(section => new Paragraph({ children: [new TextRun({ text: section, size: 24, font: { name: "David" }, rightToLeft: true })], bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 } }));
+  const fileNameParagraph = new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: "שם הקובץ: ", bold: true, rightToLeft: true, size: 24 }), new TextRun({ text: filename, rightToLeft: true, size: 24 })] });
+  const doc = new Document({ sections: [{ children: [ new Paragraph({ text: `תמלול אוטומטי`, alignment: AlignmentType.CENTER, heading: "Title" }), fileNameParagraph, new Paragraph({ text: `משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }), new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }), ...paragraphs ] }] });
+  return Packer.toBuffer(doc);
+}
+
+async function sendTranscriptionEmail(userEmail, transcriptions) {
+  const attachments = transcriptions.map(trans => ({
+    filename: `תמלול - ${path.basename(trans.filename, path.extname(trans.filename))}.docx`,
+    content: trans.wordDoc,
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  }));
+  await transporter.sendMail({
+    from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
+    to: userEmail,
+    subject: '✅ התמלול שלך מוכן!',
+    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
+    attachments
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is live on port ${PORT}`);
