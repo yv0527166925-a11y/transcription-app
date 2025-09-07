@@ -1,15 +1,12 @@
 {
   "name": "transcription-app",
   "version": "1.0.0",
-  "description": "מערכת תמלול חכמה עם Gemini 2.5 Pro - מותאם לעברית עם הגיה ליטאית",
+  "description": "מערכת תמלול חכמה עם Gemini 2.5 Pro",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "echo 'No build step required'",
-    "install-ffmpeg": "npm run install-ffmpeg-linux || npm run install-ffmpeg-windows || echo 'Please install FFmpeg manually'",
-    "install-ffmpeg-linux": "sudo apt-get update && sudo apt-get install -y ffmpeg",
-    "install-ffmpeg-windows": "echo 'Please download FFmpeg from https://ffmpeg.org/download.html'"
+    "build": "echo 'No build step required'"
   },
   "keywords": [
     "transcription",
@@ -17,11 +14,8 @@
     "ai",
     "hebrew",
     "aramaic",
-    "lithuanian",
     "audio",
-    "video",
-    "rabbi",
-    "speech"
+    "video"
   ],
   "author": "Your Name",
   "license": "MIT",
@@ -39,13 +33,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "your-github-repo-url"
-  },
-  "bugs": {
-    "url": "your-github-repo-url/issues"
-  },
-  "homepage": "your-github-repo-url#readme"
+  }
 }
