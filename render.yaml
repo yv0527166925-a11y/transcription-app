@@ -2,17 +2,15 @@ services:
   - type: web
     name: transcription-app
     env: node
-    plan: free # You can change this to a paid plan if needed
-    buildCommand: |
-      npm install
-      apt-get update && apt-get install -y ffmpeg
+    plan: free
+    buildCommand: "npm install && apt-get update && apt-get install -y ffmpeg"
     startCommand: "npm start"
     envVars:
       - key: NODE_ENV
         value: production
       - key: GEMINI_API_KEY
-        sync: false # Set this in the Render dashboard
+        sync: false
       - key: EMAIL_USER
-        sync: false # Set this in the Render dashboard
+        sync: false
       - key: EMAIL_PASS
-        sync: false # Set this in the Render dashboard
+        sync: false
