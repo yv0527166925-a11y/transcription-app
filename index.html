@@ -79,7 +79,6 @@
             display: block;
         }
 
-        /* Login/Register Styles */
         .auth-container {
             max-width: 400px;
             margin: 0 auto;
@@ -155,7 +154,6 @@
             font-size: 1em;
         }
 
-        /* Dashboard Styles */
         .dashboard-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -202,7 +200,6 @@
             color: #666;
         }
 
-        /* Upload Area Styles */
         .upload-area {
             border: 3px dashed #667eea;
             border-radius: 15px;
@@ -347,7 +344,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* History Styles */
         .history-table {
             width: 100%;
             border-collapse: collapse;
@@ -393,7 +389,6 @@
             color: #721c24;
         }
 
-        /* Payment Styles */
         .payment-options {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -512,7 +507,6 @@
             }
         }
 
-        /* Debug Info */
         .debug-info {
             background: rgba(255, 255, 0, 0.1);
             padding: 10px;
@@ -533,7 +527,6 @@
                 <strong>🤖 Powered by Gemini 2.5 Pro</strong> | 📄 תמלול מדויק לקובץ Word מעוצב
             </div>
             
-            <!-- Debug Info -->
             <div class="debug-info" id="debugInfo">
                 🔧 מצב דיבאג: בדיקת קישוריות API...
             </div>
@@ -565,8 +558,8 @@
                     
                     <div style="margin-top: 20px; padding: 10px; background: rgba(102, 126, 234, 0.1); border-radius: 5px; font-size: 0.9em;">
                         <strong>💡 לבדיקה מהירה:</strong><br>
-                        אימייל: admin@example.com<br>
-                        סיסמה: admin123
+                        מנהל: admin@example.com / admin123<br>
+                        משתמש: test@example.com / test123
                     </div>
                 </div>
             </div>
@@ -627,14 +620,14 @@
                     </div>
                 </div>
 
-                <!-- Admin Panel (only visible for admin users) -->
+                <!-- Admin Panel -->
                 <div id="adminPanel" class="admin-panel" style="display: none;">
-                    <div class="admin-title">🔧 פאנל ניהול</div>
+                    <div class="admin-title">🔧 פאנל ניהול - הוספת דקות</div>
                     <div class="admin-controls">
                         <div>
                             <div class="form-group">
                                 <label for="adminUserEmail">אימייל לקוח:</label>
-                                <input type="email" id="adminUserEmail" placeholder="הכנס אימייל לקוח">
+                                <input type="email" id="adminUserEmail" placeholder="הכנס אימייל לקוח (לדוגמה: test@example.com)">
                             </div>
                             <div class="form-group">
                                 <label for="adminMinutesToAdd">דקות להוספה:</label>
@@ -642,6 +635,10 @@
                             </div>
                         </div>
                         <button class="btn" onclick="addMinutesToUser()">הוסף דקות</button>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(255, 193, 7, 0.2); border-radius: 5px; font-size: 0.9em;">
+                        <strong>💡 טיפ:</strong> נסה עם המשתמש הבדיקה: test@example.com
                     </div>
                 </div>
             </div>
@@ -782,78 +779,6 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    updateDebugInfo('✅ API מחובר ועובד!');
-                    setTimeout(() => {
-                        const debugInfo = document.getElementById('debugInfo');
-                        if (debugInfo) debugInfo.style.display = 'none';
-                    }, 3000);
-                } else {
-                    updateDebugInfo('⚠️ API לא מגיב כראוי');
-                }
-            } catch (error) {
-                updateDebugInfo(`❌ שגיאה בחיבור API: ${error.message}`);
-                console.error('API Test failed:', error);
-            }
-        }
-
-        // Tab switching functions
-        function switchTab(tabName) {
-            document.querySelectorAll('#authSection .nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('#authSection .tab-content').forEach(content => content.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.add('active');
-        }
-
-        function switchAppTab(tabName) {
-            document.querySelectorAll('#appSection .nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('#appSection .tab-content').forEach(content => content.classList.remove('active'));
-            
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.add('active');
-
-            if (tabName === 'history') {
-                loadHistory();
-            }
-        }
-
-        // Authentication functions with better error handling
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            updateDebugInfo('מנסה להתחבר...');
-
-            try {
-                const response = await fetch(`${API_BASE}/login`, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.error('Non-JSON response:', text);
-                    throw new Error('השרת החזיר תגובה לא תקינה');
-                }
-
-                const data = await response.json();
-                console.log('Login response:', data);
-                
-                if (data.success) {
                     currentUser = data.user;
                     updateDebugInfo('✅ התחברות הצליחה!');
                     showApp();
@@ -930,7 +855,6 @@
             document.getElementById('appSection').style.display = 'none';
             document.getElementById('loginForm').reset();
             document.getElementById('registerForm').reset();
-            // Reset debug values
             document.getElementById('loginEmail').value = 'admin@example.com';
             document.getElementById('loginPassword').value = 'admin123';
         }
@@ -946,23 +870,44 @@
             // Show admin panel if user is admin
             if (currentUser.isAdmin) {
                 document.getElementById('adminPanel').style.display = 'block';
+                console.log('🔧 Admin panel displayed for user:', currentUser.email);
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
             }
         }
 
         // FIXED: Admin function to add minutes to user
         async function addMinutesToUser() {
+            console.log('🔧 Admin function called');
+            console.log('🔧 Current user:', currentUser);
+            
             const email = document.getElementById('adminUserEmail').value.trim();
             const minutes = parseInt(document.getElementById('adminMinutesToAdd').value);
             
-            console.log('Trying to add minutes:', { email, minutes });
+            console.log('🔧 Input values:', { email, minutes });
+            
+            // בדיקה שהמשתמש הוא מנהל
+            if (!currentUser || !currentUser.isAdmin) {
+                showStatus('❌ אין הרשאות מנהל', 'error');
+                return;
+            }
             
             if (!email || !minutes || minutes <= 0) {
-                showStatus('אנא מלא את כל השדות עם ערכים תקינים', 'error');
+                showStatus('❌ אנא מלא את כל השדות עם ערכים תקינים', 'error');
                 return;
             }
             
             try {
                 showStatus('<div class="spinner"></div>מוסיף דקות...', 'processing');
+                
+                console.log('🔧 Sending request to server...');
+                
+                const requestBody = { 
+                    userEmail: email, 
+                    minutes: minutes 
+                };
+                
+                console.log('🔧 Request body:', requestBody);
                 
                 const response = await fetch('/api/admin/add-minutes', {
                     method: 'POST',
@@ -970,30 +915,23 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ 
-                        userEmail: email, 
-                        minutes: minutes 
-                    })
+                    body: JSON.stringify(requestBody)
                 });
 
-                console.log('Response status:', response.status);
+                console.log('🔧 Response status:', response.status);
+                console.log('🔧 Response headers:', Object.fromEntries(response.headers.entries()));
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.error('Non-JSON response:', text);
-                    throw new Error('השרת החזיר תגובה לא תקינה');
+                    const errorText = await response.text();
+                    console.error('🔧 Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
                 const data = await response.json();
-                console.log('Add minutes response:', data);
+                console.log('🔧 Success response:', data);
                 
                 if (data.success) {
-                    showStatus(`✅ הצלחה! נוספו ${minutes} דקות למשתמש ${email}<br>יתרה חדשה: ${data.newBalance} דקות`, 'success');
+                    showStatus(`✅ הצלחה! נוספו ${minutes} דקות למשתמש ${email}<br>יתרה ישנה: ${data.oldBalance} → יתרה חדשה: ${data.newBalance} דקות`, 'success');
                     
                     // ניקוי השדות
                     document.getElementById('adminUserEmail').value = '';
@@ -1009,7 +947,7 @@
                 }
                 
             } catch (error) {
-                console.error('Add minutes error:', error);
+                console.error('🔧 Add minutes error:', error);
                 showStatus(`❌ שגיאה בהוספת דקות: ${error.message}`, 'error');
             }
         }
@@ -1029,14 +967,12 @@
                     
                     audio.addEventListener('error', () => {
                         URL.revokeObjectURL(url);
-                        // Fallback estimation based on file size
                         const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
                         resolve(Math.max(1, estimatedMinutes));
                     });
                     
                     audio.src = url;
                 } else {
-                    // Fallback for unsupported formats
                     const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
                     resolve(Math.max(1, estimatedMinutes));
                 }
@@ -1205,7 +1141,7 @@
                     <small>🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית</small>
                 `;
                 document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול אמיתי';
+                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול מלא';
             }
         }
 
@@ -1263,7 +1199,7 @@
             showStatus(`
                 <div class="spinner"></div>
                 <strong>מעבד ${selectedFiles.length} קבצים עם Gemini 2.5 Pro...</strong><br>
-                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 מותאם לעברית + ארמית + הגיה ליטאית</small><br>
+                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 תמלול מלא ומותאם לעברית</small><br>
                 <small>📧 התוצאות יישלחו למייל ${currentUser.email}</small>
             `, 'processing');
 
@@ -1303,7 +1239,7 @@
                         ⏱️ נוצלו ${data.estimatedMinutes || totalMinutes} דקות מהחשבון<br>
                         💰 יתרה נוכחית: <strong>${currentUser.remainingMinutes} דקות</strong><br>
                         🕒 זמן עיבוד משוער: <strong>3-8 דקות</strong><br>
-                        🎯 התמלול מותאם במיוחד לרבנים עם הגיה ליטאית ומושגי ארמית
+                        🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית
                     `, 'success');
                     
                     selectedFiles = [];
@@ -1319,7 +1255,7 @@
                 showStatus(`❌ <strong>שגיאה:</strong> ${error.message}<br><small>אנא נסה שוב או צור קשר לתמיכה</small>`, 'error');
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = '🚀 התחל תמלול אמיתי';
+                submitBtn.textContent = '🚀 התחל תמלול מלא';
                 setTimeout(() => {
                     document.getElementById('progressBar').style.display = 'none';
                     updateProgress(0);
@@ -1350,10 +1286,11 @@
                 document.querySelectorAll('.payment-option').forEach(option => {
                     option.classList.remove('selected');
                 });
+                const minutes = selectedPayment.minutes;
                 selectedPayment = null;
                 document.getElementById('purchaseBtn').disabled = true;
                 
-                showStatus(`✅ התשלום בוצע בהצלחה!<br>נוספו ${selectedPayment.minutes} דקות לחשבון`, 'success');
+                showStatus(`✅ התשלום בוצע בהצלחה!<br>נוספו ${minutes} דקות לחשבון`, 'success');
             }, 2000);
         }
 
@@ -1419,4 +1356,74 @@
         window.addEventListener('load', testAPI);
     </script>
 </body>
-</html>
+</html>updateDebugInfo('✅ API מחובר ועובד!');
+                    setTimeout(() => {
+                        const debugInfo = document.getElementById('debugInfo');
+                        if (debugInfo) debugInfo.style.display = 'none';
+                    }, 3000);
+                } else {
+                    updateDebugInfo('⚠️ API לא מגיב כראוי');
+                }
+            } catch (error) {
+                updateDebugInfo(`❌ שגיאה בחיבור API: ${error.message}`);
+                console.error('API Test failed:', error);
+            }
+        }
+
+        // Tab switching functions
+        function switchTab(tabName) {
+            document.querySelectorAll('#authSection .nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('#authSection .tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        function switchAppTab(tabName) {
+            document.querySelectorAll('#appSection .nav-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('#appSection .tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+
+            if (tabName === 'history') {
+                loadHistory();
+            }
+        }
+
+        // Authentication functions with better error handling
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            updateDebugInfo('מנסה להתחבר...');
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                console.log('Response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text);
+                    throw new Error('השרת החזיר תגובה לא תקינה');
+                }
+
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.success) {
