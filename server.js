@@ -26,7 +26,7 @@ app.use(cors());
 app.use(express.static(path.join(__dirname)));
 app.use(express.json());
 
-// --- Services Configuration & Data ---
+// --- Services & Data ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -114,11 +114,8 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   if (!user) return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
   if (!files || files.length === 0) return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
 
-  // Respond immediately to the user
-  res.json({ success: true, message: 'התמלול התחיל' });
-
-  // Process files in the background
   processTranscriptionJob(files, user);
+  res.json({ success: true, message: 'התמלול התחיל' });
 });
 
 app.get('/api/download/:fileId', (req, res) => {
@@ -145,7 +142,7 @@ async function processTranscriptionJob(files, user) {
     try {
       duration = await getMediaDuration(file.path);
       if (duration > user.remainingMinutes) {
-          throw new Error(`Not enough minutes for file ${originalFileName}. Required: ${duration}, Available: ${user.remainingMinutes}`);
+          throw new Error(`Not enough minutes for file ${originalFileName}.`);
       }
       
       const convertedPath = await convertAudioForGemini(file.path);
@@ -162,7 +159,6 @@ async function processTranscriptionJob(files, user) {
       user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration, status: 'completed', fileId });
       await sendTranscriptionEmail(user.email, [{ filename: originalFileName, wordDoc: wordDocBuffer }]);
       
-      // Deduct minutes *after* successful processing and email sending
       user.remainingMinutes -= duration;
       user.totalTranscribed += duration;
       console.log(`✅ Successfully processed ${originalFileName} for ${user.email}.`);
@@ -171,7 +167,6 @@ async function processTranscriptionJob(files, user) {
       console.error(`❌ Failed to process ${originalFileName} for ${user.email}:`, error.message);
       user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration, status: 'failed', fileId: null });
     } finally {
-      // Clean up temporary files
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       const convertedPathCheck = file.path.replace(/\.[^/.]+$/, '_converted.wav');
       if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck);
