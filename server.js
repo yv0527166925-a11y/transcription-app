@@ -248,30 +248,4 @@ async function createWordDocument(transcription, filename, duration) {
         new Paragraph({ text: `אוטומטי תמלול`, alignment: AlignmentType.CENTER, heading: "Title" }),
         fileNameParagraph,
         new Paragraph({ text: `זמן משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }),
-        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }),
-        ...paragraphs
-      ]
-    }]
-  });
-  return Packer.toBuffer(doc);
-}
-
-async function sendTranscriptionEmail(userEmail, transcriptions) {
-  const attachments = transcriptions.map(trans => ({
-    filename: `תמלול - ${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
-    content: trans.wordDoc,
-    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  }));
-  await transporter.sendMail({
-    from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
-    to: userEmail,
-    subject: '✅ התמלול שלך מוכן!',
-    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
-    attachments
-  });
-  console.log(`📧 Email sent to ${userEmail}`);
-}
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server is live on port ${PORT}`);
-});
+        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT,
