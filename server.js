@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Configure multer for file uploads
+// Configure multer for file uploads with Hebrew support
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = 'uploads/';
@@ -28,7 +28,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const extension = path.extname(file.originalname);
-    // תיקון: שמירת שם קובץ בעברית
+    // Fix Hebrew filename encoding
     const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     cb(null, `${timestamp}_${safeName}`);
   }
@@ -42,25 +42,21 @@ const upload = multer({
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure email transporter with Hebrew support
+// Configure email transporter
 const transporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
   }
 });
 
-// In-memory database with demo users
+// In-memory database
 const users = new Map();
 const transcriptionJobs = new Map();
 
 // Initialize demo users
 function initializeDemoUsers() {
-  // Admin user
   users.set('admin@example.com', {
     id: 'admin1',
     name: 'מנהל המערכת',
@@ -74,7 +70,6 @@ function initializeDemoUsers() {
     createdAt: new Date()
   });
 
-  // Test user
   users.set('test@example.com', {
     id: 'user1',
     name: 'משתמש בדיקה',
@@ -91,17 +86,9 @@ function initializeDemoUsers() {
   console.log('✅ Demo users initialized');
 }
 
-// Debug function to list all users
-function debugListUsers() {
-  console.log('🔧 Current users in system:');
-  users.forEach((user, email) => {
-    console.log(`   📧 ${email}: ${user.name} (${user.remainingMinutes} דקות, Admin: ${user.isAdmin})`);
-  });
-}
-
-// Audio duration extraction utility
+// Audio duration extraction
 async function getAudioDuration(filePath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const ffprobe = spawn('ffprobe', [
       '-v', 'quiet',
       '-show_entries', 'format=duration',
@@ -121,23 +108,21 @@ async function getAudioDuration(filePath) {
       } else {
         const stats = fs.statSync(filePath);
         const fileSizeInMB = stats.size / (1024 * 1024);
-        const estimatedMinutes = Math.ceil(fileSizeInMB / 2);
-        resolve(estimatedMinutes);
+        resolve(Math.ceil(fileSizeInMB / 2));
       }
     });
 
-    ffprobe.on('error', (err) => {
+    ffprobe.on('error', () => {
       const stats = fs.statSync(filePath);
       const fileSizeInMB = stats.size / (1024 * 1024);
-      const estimatedMinutes = Math.ceil(fileSizeInMB / 2);
-      resolve(estimatedMinutes);
+      resolve(Math.ceil(fileSizeInMB / 2));
     });
   });
 }
 
-// Convert audio/video to compatible format for Gemini
+// Convert audio for Gemini
 async function convertAudioForGemini(inputPath) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
     
     const ffmpeg = spawn('ffmpeg', [
@@ -150,14 +135,10 @@ async function convertAudioForGemini(inputPath) {
     ]);
 
     ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        resolve(outputPath);
-      } else {
-        resolve(inputPath);
-      }
+      resolve(code === 0 ? outputPath : inputPath);
     });
 
-    ffmpeg.on('error', (err) => {
+    ffmpeg.on('error', () => {
       resolve(inputPath);
     });
   });
@@ -241,7 +222,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     const files = req.files;
     
     console.log(`🎯 Transcription request from: ${email}`);
-    console.log(`🎯 Files uploaded: ${files ? files.length : 0}`);
     
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
@@ -260,9 +240,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         const duration = await getAudioDuration(file.path);
         totalMinutes += duration;
         fileInfos.push({ file, duration });
-        console.log(`📁 File: ${file.originalname}, Duration: ${duration} minutes`);
       } catch (error) {
-        console.warn(`⚠️ Could not get duration for ${file.originalname}, using estimate`);
         const estimatedDuration = 5;
         totalMinutes += estimatedDuration;
         fileInfos.push({ file, duration: estimatedDuration });
@@ -297,16 +275,13 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
-// Admin add minutes route
 app.post('/api/admin/add-minutes', (req, res) => {
   try {
-    console.log('🔧 Admin add minutes request received');
-    console.log('🔧 Request body:', req.body);
+    console.log('🔧 Admin add minutes request');
     
     const { userEmail, minutes } = req.body;
     
     if (!userEmail || !minutes) {
-      console.log('❌ Missing fields:', { userEmail, minutes });
       return res.status(400).json({ 
         success: false, 
         error: 'חסרים פרטים: אימייל משתמש ומספר דקות' 
@@ -314,11 +289,7 @@ app.post('/api/admin/add-minutes', (req, res) => {
     }
     
     const user = users.get(userEmail);
-    console.log('🔧 Found user:', user ? 'YES' : 'NO');
-    
     if (!user) {
-      console.log('❌ User not found:', userEmail);
-      console.log('🔧 Available users:', Array.from(users.keys()));
       return res.status(404).json({ 
         success: false, 
         error: `משתמש עם אימייל ${userEmail} לא נמצא` 
@@ -327,7 +298,6 @@ app.post('/api/admin/add-minutes', (req, res) => {
     
     const minutesToAdd = parseInt(minutes);
     if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
-      console.log('❌ Invalid minutes:', minutes);
       return res.status(400).json({ 
         success: false, 
         error: 'מספר הדקות חייב להיות מספר חיובי' 
@@ -338,14 +308,12 @@ app.post('/api/admin/add-minutes', (req, res) => {
     user.remainingMinutes += minutesToAdd;
     
     console.log(`✅ Added ${minutesToAdd} minutes to ${userEmail}`);
-    console.log(`   Old balance: ${oldBalance}, New balance: ${user.remainingMinutes}`);
     
     res.json({
       success: true,
       message: `נוספו ${minutesToAdd} דקות למשתמש ${userEmail}`,
       oldBalance: oldBalance,
-      newBalance: user.remainingMinutes,
-      userFound: true
+      newBalance: user.remainingMinutes
     });
   } catch (error) {
     console.error('Admin add minutes error:', error);
@@ -353,21 +321,12 @@ app.post('/api/admin/add-minutes', (req, res) => {
   }
 });
 
-app.get('/api/job/:jobId', (req, res) => {
-  const job = transcriptionJobs.get(req.params.jobId);
-  if (!job) {
-    return res.status(404).json({ success: false, error: 'עבודה לא נמצאה' });
-  }
-  res.json(job);
-});
-
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
     geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
-    users: users.size,
-    jobs: transcriptionJobs.size
+    users: users.size
   });
 });
 
@@ -375,15 +334,13 @@ app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
     message: 'API is working!',
-    timestamp: new Date().toISOString(),
-    usersCount: users.size
+    timestamp: new Date().toISOString()
   });
 });
 
 // Static files
 app.use(express.static('.'));
 
-// Catch-all route
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
@@ -392,11 +349,9 @@ app.get('*', (req, res) => {
 });
 
 // HELPER FUNCTIONS
-
-// Process transcription job asynchronously
 async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
   try {
-    console.log(`🎯 Processing job ${jobId} with ${fileInfos.length} files`);
+    console.log(`🎯 Processing job ${jobId}`);
     transcriptionJobs.set(jobId, { status: 'processing', progress: 0 });
     
     const transcriptions = [];
@@ -410,7 +365,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       });
       
       try {
-        console.log(`🎵 Processing file: ${file.originalname}`);
+        console.log(`🎵 Processing: ${file.originalname}`);
         const convertedPath = await convertAudioForGemini(file.path);
         const transcription = await realGeminiTranscription(convertedPath, file.originalname, language);
         const wordDoc = await createWordDocument(transcription, file.originalname, duration);
@@ -422,12 +377,10 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
           duration: duration
         });
         
-        // Cleanup converted file
+        // Cleanup
         if (convertedPath !== file.path && fs.existsSync(convertedPath)) {
           fs.unlinkSync(convertedPath);
         }
-        
-        console.log(`✅ Completed file: ${file.originalname}`);
         
       } catch (error) {
         console.error(`❌ Error processing ${file.originalname}:`, error);
@@ -439,16 +392,13 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       }
     }
     
-    transcriptionJobs.set(jobId, { status: 'processing', progress: 90 });
-    
     const successfulTranscriptions = transcriptions.filter(t => !t.error);
     
     if (successfulTranscriptions.length > 0) {
-      console.log(`📧 Sending email with ${successfulTranscriptions.length} documents`);
       await sendTranscriptionEmail(user.email, successfulTranscriptions);
     }
     
-    // Update user balance
+    // Update user
     const successfulMinutes = successfulTranscriptions.reduce((sum, t) => sum + t.duration, 0);
     user.remainingMinutes -= successfulMinutes;
     user.totalTranscribed += successfulMinutes;
@@ -462,26 +412,24 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
         duration: trans.duration,
         language: language,
         status: trans.error ? 'failed' : 'completed',
-        jobId: jobId,
-        error: trans.error
+        jobId: jobId
       });
     });
     
     transcriptionJobs.set(jobId, { 
       status: 'completed', 
       progress: 100,
-      successful: successfulTranscriptions.length,
-      failed: transcriptions.length - successfulTranscriptions.length
+      successful: successfulTranscriptions.length
     });
     
-    // Cleanup uploaded files
+    // Cleanup files
     fileInfos.forEach(({ file }) => {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
     });
     
-    console.log(`🎉 Job ${jobId} completed successfully`);
+    console.log(`🎉 Job ${jobId} completed`);
     
   } catch (error) {
     console.error('Job processing error:', error);
@@ -489,7 +437,6 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
   }
 }
 
-// Real Gemini 2.5 Pro transcription with Hebrew support
 async function realGeminiTranscription(filePath, filename, language) {
   try {
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
@@ -512,40 +459,27 @@ async function realGeminiTranscription(filePath, filename, language) {
     if (ext === '.mp3') mimeType = 'audio/mpeg';
     else if (ext === '.mp4') mimeType = 'video/mp4';
     else if (ext === '.m4a') mimeType = 'audio/mp4';
-    else if (ext === '.mov') mimeType = 'video/quicktime';
 
-    const prompt = `אני רוצה שתמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
+    const prompt = `תמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
-📌 חשוב מאוד - הנחיות חובה:
-
-1. תמלל את כל הקובץ מההתחלה ועד הסוף - אל תקצר כלום!
-2. אל תשמיט אף משפט או רעיון
-3. אל תסכם - תמלל הכל מילה במילה
-4. אם הקובץ ארוך, המשך לתמלל עד הסוף המוחלט
-
-עיצוב הטקסט:
-- חלק לפסקאות של 3-4 משפטים
-- השאר שורה ריקה בין פסקאות
-- כל משפט מסתיים בנקודה
-- אם יש דובר חדש, כתוב "רב:" או "שואל:" רק אם זה ברור
+🔴 חשוב מאוד - תמלל הכל מההתחלה עד הסוף:
+1. אל תקצר או תסכם כלום
+2. תמלל כל מילה שנאמרת
+3. אם הקובץ ארוך - המשך עד הסוף המוחלט
+4. חלק לפסקאות של 2-3 משפטים
+5. השאר שורה ריקה בין פסקאות
 
 ציטוטים במירכאות:
-- "שנאמר..." 
+- "שנאמר..."
 - "כדאיתא בגמרא..."
 - "אמרו חכמים..."
 - "כמו שכתוב..."
 - "תניא..."
 - "כדכתיב..."
-- "משנה במסכת..."
-- "וכתוב..."
-- "כמאמר חז״ל..."
-- "דאמר..."
 
-זכור: תמלל הכל! אל תקצר! המשך עד הסוף המוחלט של הקובץ!
+התחל עכשיו ותמלל הכל:`;
 
-התחל עכשיו:`;
-
-    console.log(`🎯 Starting Gemini transcription for: ${filename}`);
+    console.log(`🎯 Starting Gemini transcription: ${filename}`);
 
     const result = await model.generateContent([
       {
@@ -560,26 +494,22 @@ async function realGeminiTranscription(filePath, filename, language) {
     const response = await result.response;
     let transcription = response.text();
     
-    console.log(`🎯 Transcription completed, length: ${transcription.length} characters`);
-    
     // Clean up text
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n')
       .replace(/^\s+|\s+$/gm, '')
-      .replace(/([.!?])\s*([א-ת])/g, '$1 $2')
       .trim();
     
-    transcription = cleanupQuotations(transcription);
-    
     if (!transcription || transcription.length < 50) {
-      throw new Error('התמלול לא הצליח - טקסט קצר מדי או ריק');
+      throw new Error('התמלול נכשל - טקסט קצר מדי');
     }
     
+    console.log(`✅ Transcription completed: ${transcription.length} chars`);
     return transcription;
     
   } catch (error) {
-    console.error('🔥 Gemini transcription error:', error);
+    console.error('Gemini error:', error);
     
     if (error.message.includes('API key')) {
       throw new Error('שגיאה באימות Gemini API');
@@ -591,40 +521,10 @@ async function realGeminiTranscription(filePath, filename, language) {
   }
 }
 
-// Cleanup quotations function
-function cleanupQuotations(text) {
-  text = text.replace(/״([^״]+)״/g, '"$1"');
-  text = text.replace(/׳([^׳]+)׳/g, '"$1"');
-  text = text.replace(/"/g, '"').replace(/"/g, '"');
-  text = text.replace(/""+/g, '"');
-  text = text.replace(/\s+"/g, ' "');
-  text = text.replace(/"\s+/g, '" ');
-  
-  const quotes = text.match(/"/g);
-  if (quotes && quotes.length % 2 !== 0) {
-    text += '"';
-  }
-  
-  return text;
-}
-
-// Create formatted Word document with Hebrew support
 async function createWordDocument(transcription, filename, duration) {
   try {
-    console.log(`📄 Creating Word document for: ${filename}`);
-    
     const doc = new Document({
       sections: [{
-        properties: {
-          page: {
-            margin: {
-              top: 1440,
-              right: 1440,
-              bottom: 1440,
-              left: 1440
-            }
-          }
-        },
         children: [
           new Paragraph({
             children: [
@@ -632,16 +532,11 @@ async function createWordDocument(transcription, filename, duration) {
                 text: "תמלול אוטומטי",
                 bold: true,
                 size: 32,
-                font: {
-                  name: "David"
-                }
+                font: { name: "David" }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { 
-              after: 400,
-              line: 360
-            }
+            spacing: { after: 400 }
           }),
           
           new Paragraph({
@@ -649,15 +544,10 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `שם הקובץ: ${filename}`,
                 size: 24,
-                font: {
-                  name: "David"
-                }
+                font: { name: "David" }
               })
             ],
-            spacing: { 
-              after: 200,
-              line: 360
-            }
+            spacing: { after: 200 }
           }),
           
           new Paragraph({
@@ -665,15 +555,10 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `משך זמן: ${duration} דקות`,
                 size: 24,
-                font: {
-                  name: "David"
-                }
+                font: { name: "David" }
               })
             ],
-            spacing: { 
-              after: 200,
-              line: 360
-            }
+            spacing: { after: 200 }
           }),
           
           new Paragraph({
@@ -681,15 +566,10 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
                 size: 24,
-                font: {
-                  name: "David"
-                }
+                font: { name: "David" }
               })
             ],
-            spacing: { 
-              after: 400,
-              line: 360
-            }
+            spacing: { after: 400 }
           }),
           
           new Paragraph({
@@ -697,16 +577,11 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: "─".repeat(50),
                 size: 20,
-                font: {
-                  name: "David"
-                }
+                font: { name: "David" }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { 
-              after: 400,
-              line: 360
-            }
+            spacing: { after: 400 }
           }),
           
           ...processTranscriptionContent(transcription)
@@ -714,28 +589,22 @@ async function createWordDocument(transcription, filename, duration) {
       }]
     });
     
-    const buffer = await Packer.toBuffer(doc);
-    console.log(`✅ Word document created successfully for: ${filename}`);
-    return buffer;
+    return await Packer.toBuffer(doc);
     
   } catch (error) {
-    console.error('Error creating Word document:', error);
+    console.error('Word doc error:', error);
     throw error;
   }
 }
 
-// Process transcription content into paragraphs
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
-  let cleanedText = transcription
+  const sections = transcription
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  
-  const sections = cleanedText.split(/\n\s*\n/)
-    .map(section => section.trim())
-    .filter(section => section.length > 0);
+    .split(/\n\s*\n/)
+    .filter(section => section.trim().length > 0);
   
   sections.forEach(section => {
     section = section.replace(/\n+/g, ' ').trim();
@@ -749,28 +618,21 @@ function processTranscriptionContent(transcription) {
         new TextRun({
           text: section,
           size: 24,
-          font: {
-            name: "David"
-          }
+          font: { name: "David" }
         })
       ],
-      spacing: { 
-        before: 200,
-        after: 300,
-        line: 400
-      }
+      spacing: { before: 200, after: 300 }
     }));
   });
   
   return paragraphs;
 }
 
-// Send transcription email with Hebrew support
 async function sendTranscriptionEmail(userEmail, transcriptions) {
   try {
     console.log(`📧 Preparing email for: ${userEmail}`);
     
-    const attachments = transcriptions.map((trans, index) => ({
+    const attachments = transcriptions.map(trans => ({
       filename: `תמלול_${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
       content: trans.wordDoc,
       contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -806,11 +668,13 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
 
 // Initialize and start server
 initializeDemoUsers();
-debugListUsers();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Access: http://localhost:${PORT}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
   console.log(`🤖 Gemini configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+  console.log('📊 Demo users available:');
+  console.log('   👨‍💼 Admin: admin@example.com / admin123');
+  console.log('   👤 User: test@example.com / test123');
 });
