@@ -100,6 +100,34 @@ app.post('/api/login', (req, res) => {
   res.json({ success: true, user: userToReturn });
 });
 
+// =========================================================
+//  FIX: Re-added the missing register route
+// =========================================================
+app.post('/api/register', (req, res) => {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+        return res.status(400).json({ success: false, error: 'נא למלא את כל השדות' });
+    }
+    if (users.has(email)) {
+        return res.status(409).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' });
+    }
+    const newUser = {
+        id: Date.now().toString(),
+        name,
+        email,
+        password, // In a real app, you should hash this password
+        remainingMinutes: 30, // Welcome gift
+        totalTranscribed: 0,
+        isAdmin: false,
+        history: []
+    };
+    users.set(email, newUser);
+    console.log(`✅ New user registered: ${email}`);
+    const { password: _, ...userToReturn } = newUser;
+    res.status(201).json({ success: true, user: userToReturn });
+});
+
+
 app.post('/api/admin/add-minutes', (req, res) => {
     const { adminEmail, userEmail, minutes } = req.body;
     const adminUser = users.get(adminEmail);
