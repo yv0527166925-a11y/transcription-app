@@ -10,7 +10,7 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 require('dotenv').config();
 
-// --- Environment Variable Check ---
+// --- Environment Variable Check (for core services) ---
 const requiredEnvVars = ['GEMINI_API_KEY', 'EMAIL_USER', 'EMAIL_PASS'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
@@ -65,7 +65,7 @@ async function getMediaDuration(filePath) {
         resolve(Math.ceil(parseFloat(output.trim()) / 60));
       } else {
         const stats = fs.statSync(filePath);
-        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 2))));
+        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 5)))); // Adjusted for video files
       }
     });
     ffprobe.on('error', () => resolve(1));
@@ -88,18 +88,14 @@ app.post('/api/login', (req, res) => {
 
 app.post('/api/register', (req, res) => {
     const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-        return res.status(400).json({ success: false, error: 'נא למלא את כל השדות' });
-    }
-    if (users.has(email)) {
-        return res.status(409).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' });
-    }
+    if (!name || !email || !password) { return res.status(400).json({ success: false, error: 'נא למלא את כל השדות' }); }
+    if (users.has(email)) { return res.status(409).json({ success: false, error: 'משתמש עם אימייל זה כבר קיים' }); }
     const newUser = { id: Date.now().toString(), name, email, password, remainingMinutes: 30, totalTranscribed: 0, isAdmin: false, history: [] };
     users.set(email, newUser);
-    console.log(`✅ New user registered: ${email}`);
     const { password: _, ...userToReturn } = newUser;
     res.status(201).json({ success: true, user: userToReturn });
 });
+
 
 app.post('/api/admin/add-minutes', (req, res) => {
     const { adminEmail, userEmail, minutes } = req.body;
@@ -135,14 +131,12 @@ app.get('/api/download/:fileId', (req, res) => {
     const { fileId } = req.params;
     const { userEmail } = req.query;
     if (!userEmail) return res.status(401).send('Unauthorized');
-
     const user = users.get(userEmail);
     const historyItem = user?.history.find(item => item.fileId === fileId);
     if (!historyItem) return res.status(404).send('File not found or access denied.');
-
     const filePath = path.join(__dirname, 'transcripts', fileId);
     if (fs.existsSync(filePath)) {
-        res.download(filePath, `תמלול - ${historyItem.fileName}.docx`);
+        res.download(filePath, `תמלול - ${historyItem.fileName}`);
     } else {
         res.status(404).send('File not found on server.');
     }
@@ -151,9 +145,7 @@ app.get('/api/download/:fileId', (req, res) => {
 
 // --- Background Processing & Helpers ---
 async function processTranscriptionJob(files, user, totalMinutes) {
-  console.log(`🚀 Starting job for ${user.email}`);
   const successfulTranscriptions = [];
-
   for (const file of files) {
     const originalFileName = file.originalname;
     try {
@@ -168,6 +160,7 @@ async function processTranscriptionJob(files, user, totalMinutes) {
       }
       fs.writeFileSync(savePath, wordDocBuffer);
       
+      // The file name in history is the original video/audio file name
       user.history.push({ date: new Date().toISOString(), fileName: originalFileName, duration: totalMinutes, status: 'completed', fileId: fileId });
       successfulTranscriptions.push({ filename: originalFileName, wordDoc: wordDocBuffer });
 
@@ -191,7 +184,8 @@ async function processTranscriptionJob(files, user, totalMinutes) {
 async function convertAudioForGemini(inputPath) {
     return new Promise((resolve, reject) => {
         const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
-        const ffmpeg = spawn('ffmpeg', ['-i', inputPath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-y', outputPath]);
+        // The `-vn` flag tells ffmpeg to ignore video and extract only the audio.
+        const ffmpeg = spawn('ffmpeg', ['-i', inputPath, '-vn', '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-y', outputPath]);
         ffmpeg.on('close', (code) => {
             if (code === 0) resolve(outputPath);
             else reject(new Error('ffmpeg conversion failed'));
@@ -231,7 +225,7 @@ async function createWordDocument(transcription, filename, duration) {
   const doc = new Document({
     sections: [{
       children: [
-        new Paragraph({ text: `אוטומטי תמלול`, alignment: AlignmentType.CENTER, heading: "Title" }),
+        new Paragraph({ text: `תמלול אוטומטי`, alignment: AlignmentType.CENTER, heading: "Title" }),
         fileNameParagraph,
         new Paragraph({ text: `זמן משך: ${duration} דקות`, alignment: AlignmentType.RIGHT }),
         new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.RIGHT, spacing: { after: 400 } }),
@@ -244,7 +238,7 @@ async function createWordDocument(transcription, filename, duration) {
 
 async function sendTranscriptionEmail(userEmail, transcriptions) {
   const attachments = transcriptions.map(trans => ({
-    filename: `תמלול - ${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
+    filename: `תמלול - ${path.basename(trans.filename, path.extname(trans.filename))}.docx`,
     content: trans.wordDoc,
     contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   }));
@@ -255,7 +249,6 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
     html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
     attachments
   });
-  console.log(`📧 Email sent to ${userEmail}`);
 }
 
 app.listen(PORT, () => {
