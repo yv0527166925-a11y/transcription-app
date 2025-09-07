@@ -33,7 +33,10 @@ const upload = multer({ storage });
 
 // --- Services Configuration ---
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const transporter = nodemailer.createTransporter({
+// =========================================================
+//  THE FIX IS HERE
+// =========================================================
+const transporter = nodemailer.createTransport({ // Corrected from createTransporter
   service: 'gmail',
   auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
 });
@@ -112,7 +115,6 @@ async function processTranscriptionJob(files, user, totalMinutes) {
   for (const file of files) {
     const originalFileName = Buffer.from(file.filename.split('_').slice(1).join('_'), 'utf-8').toString();
     try {
-      // **CRITICAL FIX**: Convert audio to a consistent format for Gemini
       const convertedPath = await convertAudioForGemini(file.path);
       const transcriptionText = await transcribeWithGemini(convertedPath);
       const wordDocBuffer = await createWordDocument(transcriptionText, originalFileName);
@@ -151,7 +153,6 @@ async function transcribeWithGemini(filePath) {
   const audioData = fs.readFileSync(filePath);
   const base64Audio = audioData.toString('base64');
   
-  // **CRITICAL FIX**: Use the correct MIME type for the converted WAV file
   const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
   
   const prompt = `תמלל את קובץ האודיו במלואו, מההתחלה ועד הסוף. זהו שיעור תורני בעברית.
@@ -175,31 +176,4 @@ async function createWordDocument(transcription, filename) {
     sections: [{
       children: [
         new Paragraph({ text: `תמלול הקובץ: ${filename}`, alignment: AlignmentType.CENTER, heading: "Heading1" }),
-        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
-        ...paragraphs
-      ]
-    }]
-  });
-  return Packer.toBuffer(doc);
-}
-
-async function sendTranscriptionEmail(userEmail, transcriptions) {
-  const attachments = transcriptions.map(trans => ({
-    filename: `תמלול - ${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
-    content: trans.wordDoc,
-    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  }));
-  await transporter.sendMail({
-    from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
-    to: userEmail,
-    subject: '✅ התמלול שלך מוכן!',
-    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
-    attachments
-  });
-  console.log(`📧 Email sent to ${userEmail}`);
-}
-
-// --- Server Start ---
-app.listen(PORT, () => {
-  console.log(`🚀 Server is live on port ${PORT}`);
-});
+        new Paragraph({ text: `תאריך: ${new
