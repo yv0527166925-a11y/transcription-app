@@ -12,7 +12,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware - ORDER MATTERS!
+// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -34,13 +34,13 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit for large files
+  limits: { fileSize: 500 * 1024 * 1024 }
 });
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Configure email transporter - FIXED THE TYPO!
+// Configure email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -49,14 +49,13 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// In-memory database (replace with real database in production)
+// In-memory database
 const users = new Map();
 const transcriptionJobs = new Map();
 
 // Audio duration extraction utility
 async function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
-    // Using ffprobe to get duration
     const ffprobe = spawn('ffprobe', [
       '-v', 'quiet',
       '-show_entries', 'format=duration',
@@ -72,19 +71,16 @@ async function getAudioDuration(filePath) {
     ffprobe.on('close', (code) => {
       if (code === 0) {
         const duration = parseFloat(output.trim());
-        resolve(Math.ceil(duration / 60)); // Return duration in minutes (rounded up)
+        resolve(Math.ceil(duration / 60));
       } else {
-        // Fallback: estimate based on file size (rough estimation)
         const stats = fs.statSync(filePath);
         const fileSizeInMB = stats.size / (1024 * 1024);
-        const estimatedMinutes = Math.ceil(fileSizeInMB / 2); // Very rough estimate
+        const estimatedMinutes = Math.ceil(fileSizeInMB / 2);
         resolve(estimatedMinutes);
       }
     });
 
     ffprobe.on('error', (err) => {
-      console.warn('ffprobe not available, using file size estimation');
-      // Fallback estimation
       const stats = fs.statSync(filePath);
       const fileSizeInMB = stats.size / (1024 * 1024);
       const estimatedMinutes = Math.ceil(fileSizeInMB / 2);
@@ -98,13 +94,12 @@ async function convertAudioForGemini(inputPath) {
   return new Promise((resolve, reject) => {
     const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
     
-    // Convert to WAV format that Gemini can process
     const ffmpeg = spawn('ffmpeg', [
       '-i', inputPath,
-      '-ar', '16000', // 16kHz sample rate
-      '-ac', '1',     // Mono
-      '-c:a', 'pcm_s16le', // PCM 16-bit
-      '-y',           // Overwrite output file
+      '-ar', '16000',
+      '-ac', '1',
+      '-c:a', 'pcm_s16le',
+      '-y',
       outputPath
     ]);
 
@@ -112,27 +107,18 @@ async function convertAudioForGemini(inputPath) {
       if (code === 0) {
         resolve(outputPath);
       } else {
-        // If ffmpeg fails, try to use original file
-        console.warn('FFmpeg conversion failed, trying original file');
         resolve(inputPath);
       }
     });
 
     ffmpeg.on('error', (err) => {
-      console.warn('FFmpeg not available, using original file');
       resolve(inputPath);
     });
   });
 }
 
-// =================================
-// API ROUTES - MUST BE FIRST!
-// =================================
-
-// User registration
+// API ROUTES
 app.post('/api/register', (req, res) => {
-  console.log('Register request received:', req.body);
-  
   const { name, email, password, phone } = req.body;
   
   if (users.has(email)) {
@@ -143,9 +129,9 @@ app.post('/api/register', (req, res) => {
     id: Date.now().toString(),
     name,
     email,
-    password, // In production, hash the password!
+    password,
     phone,
-    remainingMinutes: 30, // Free minutes for new users
+    remainingMinutes: 30,
     totalTranscribed: 0,
     isAdmin: false,
     history: [],
@@ -154,8 +140,6 @@ app.post('/api/register', (req, res) => {
   
   users.set(email, user);
   
-  console.log('User registered successfully:', email);
-  
   res.json({
     success: true,
     user: {
@@ -170,19 +154,13 @@ app.post('/api/register', (req, res) => {
   });
 });
 
-// User login
 app.post('/api/login', (req, res) => {
-  console.log('Login request received:', req.body);
-  
   const { email, password } = req.body;
   
   const user = users.get(email);
   if (!user || user.password !== password) {
-    console.log('Login failed for:', email);
     return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
   }
-  
-  console.log('Login successful for:', email);
   
   res.json({
     success: true,
@@ -198,10 +176,7 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// Process transcription
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
-  console.log('Transcription request received');
-  
   try {
     const { email, language } = req.body;
     const files = req.files;
@@ -215,7 +190,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
       return res.status(404).json({ success: false, error: 'משתמש לא נמצא' });
     }
     
-    // Calculate actual duration for all files
     let totalMinutes = 0;
     const fileInfos = [];
     
@@ -225,8 +199,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         totalMinutes += duration;
         fileInfos.push({ file, duration });
       } catch (error) {
-        console.error('Error getting duration for', file.originalname, error);
-        // Fallback estimation
         const estimatedDuration = 5;
         totalMinutes += estimatedDuration;
         fileInfos.push({ file, duration: estimatedDuration });
@@ -243,8 +215,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     }
     
     const jobId = Date.now().toString();
-    
-    // Start async processing
     processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes);
     
     res.json({
@@ -260,7 +230,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
-// Admin: Add minutes to user
 app.post('/api/admin/add-minutes', (req, res) => {
   const { adminEmail, userEmail, minutes } = req.body;
   
@@ -283,17 +252,14 @@ app.post('/api/admin/add-minutes', (req, res) => {
   });
 });
 
-// Check job status
 app.get('/api/job/:jobId', (req, res) => {
   const job = transcriptionJobs.get(req.params.jobId);
   if (!job) {
     return res.status(404).json({ success: false, error: 'עבודה לא נמצאה' });
   }
-  
   res.json(job);
 });
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
@@ -302,7 +268,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Test API endpoint
 app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
@@ -311,463 +276,12 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// =================================
-// STATIC FILES - AFTER API ROUTES
-// =================================
-
+// Static files
 app.use(express.static('.'));
 
-// =================================
-// CATCH-ALL ROUTE - MUST BE LAST!
-// =================================
-
+// Catch-all route
 app.get('*', (req, res) => {
-  // Don't intercept API calls
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
-  
-  // Serve the main HTML file for all other routes
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// =================================
-// HELPER FUNCTIONS
-// =================================
-
-// Process transcription job asynchronously
-async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
-  try {
-    transcriptionJobs.set(jobId, { status: 'processing', progress: 0 });
-    
-    const transcriptions = [];
-    
-    for (let i = 0; i < fileInfos.length; i++) {
-      const { file, duration } = fileInfos[i];
-      
-      // Update progress
-      transcriptionJobs.set(jobId, { 
-        status: 'processing', 
-        progress: (i / fileInfos.length) * 80 
-      });
-      
-      try {
-        // Convert audio to compatible format
-        const convertedPath = await convertAudioForGemini(file.path);
-        
-        // Real transcription with Gemini 2.5 Pro
-        const transcription = await realGeminiTranscription(convertedPath, file.originalname, language);
-        
-        // Create Word document
-        const wordDoc = await createWordDocument(transcription, file.originalname, duration);
-        
-        transcriptions.push({
-          filename: file.originalname,
-          wordDoc: wordDoc,
-          transcription: transcription,
-          duration: duration
-        });
-        
-        // Clean up converted file if different from original
-        if (convertedPath !== file.path && fs.existsSync(convertedPath)) {
-          fs.unlinkSync(convertedPath);
-        }
-        
-      } catch (error) {
-        console.error(`Error processing ${file.originalname}:`, error);
-        // Add error entry to transcriptions
-        transcriptions.push({
-          filename: file.originalname,
-          error: error.message,
-          duration: duration
-        });
-      }
-    }
-    
-    // Update progress
-    transcriptionJobs.set(jobId, { status: 'processing', progress: 90 });
-    
-    // Filter successful transcriptions for email
-    const successfulTranscriptions = transcriptions.filter(t => !t.error);
-    
-    if (successfulTranscriptions.length > 0) {
-      // Send email with attachments
-      await sendTranscriptionEmail(user.email, successfulTranscriptions);
-    }
-    
-    // Update user account (only for successful transcriptions)
-    const successfulMinutes = successfulTranscriptions.reduce((sum, t) => sum + t.duration, 0);
-    user.remainingMinutes -= successfulMinutes;
-    user.totalTranscribed += successfulMinutes;
-    
-    // Add to history
-    transcriptions.forEach((trans, index) => {
-      user.history.push({
-        id: Date.now() + index,
-        date: new Date().toLocaleDateString('he-IL'),
-        fileName: trans.filename,
-        duration: trans.duration,
-        language: language,
-        status: trans.error ? 'failed' : 'completed',
-        jobId: jobId,
-        error: trans.error
-      });
-    });
-    
-    // Complete job
-    transcriptionJobs.set(jobId, { 
-      status: 'completed', 
-      progress: 100,
-      successful: successfulTranscriptions.length,
-      failed: transcriptions.length - successfulTranscriptions.length
-    });
-    
-    // Clean up uploaded files
-    fileInfos.forEach(({ file }) => {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-      }
-    });
-    
-  } catch (error) {
-    console.error('Job processing error:', error);
-    transcriptionJobs.set(jobId, { status: 'failed', error: error.message });
-  }
-}
-
-// Real Gemini 2.5 Pro transcription with improved citation handling
-async function realGeminiTranscription(filePath, filename, language) {
-  try {
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-      throw new Error('Gemini API key לא הוגדר');
-    }
-
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-    
-    // Read audio file as base64
-    const audioData = fs.readFileSync(filePath);
-    const base64Audio = audioData.toString('base64');
-    
-    // Determine MIME type
-    const ext = path.extname(filePath).toLowerCase();
-    let mimeType = 'audio/wav';
-    if (ext === '.mp3') mimeType = 'audio/mpeg';
-    else if (ext === '.mp4') mimeType = 'video/mp4';
-    else if (ext === '.m4a') mimeType = 'audio/mp4';
-    else if (ext === '.mov') mimeType = 'video/quicktime';
-
-    // Enhanced prompt for Hebrew with Lithuanian pronunciation and Aramaic terms
-    const prompt = `תמלל את הקובץ האודיו הבא לעברית בלבד. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
-
-הנחיות חשובות לתמלול:
-
-כללי:
-1. תמלל רק בעברית - אל תתרגם לשפות אחרות
-2. שמור על ההגיה הליטאית המיוחדת (למשל: "א" נהגית כמו "אה", "ו" כמו "או")
-3. כתוב מושגים ארמיים בכתיב המקורי (למשל: אבא, אמא, רבנן, תנא קמא)
-4. הוסף סימני פיסוק מדויקים
-5. חלק לפסקאות לוגיות ברורות
-6. תקן שגיאות דקדוק קלות אך שמור על הסגנון המקורי
-
-זיהוי דוברים:
-- אל תוסיף זיהוי דוברים אלא אם הם מוזכרים באופן ברור
-- אם יש שינוי דובר ברור, התחל פסקה חדשה
-- אם אין זיהוי ברור של דוברים, פשוט תמלל את התוכן ברציפות
-
-ציטוטים מהמקורות (חשוב מאוד!):
-- כל ציטוט מהתלמוד, משנה, מקרא או מאמרי חז"ל - שים במירכאות
-- דוגמאות לציטוטים לשים במירכאות:
-  • "שנאמר..." 
-  • "כדאיתא בגמרא..."
-  • "אמרו חכמים..."
-  • "כמו שכתוב..."
-  • "תניא..."
-  • "כדכתיב..."
-  • "משנה במסכת..."
-  • "וכתוב..."
-  • "כמאמר חז״ל..."
-  • "דאמר..."
-- אל תשים במירכאות: הסברים, פירושים, או דעות אישיות של הרב
-
-עיצוב הטקסט:
-- שמור על טון רשמי ומכובד המתאים לדברי רב
-- חלק לפסקאות מובחנות לפי נושאים
-- אם יש מילים לא ברורות, ציין [לא ברור] במקום לנחש
-- אל תוסיף כותרות או עיצובים מיוחדים - רק התוכן הנתמלל
-
-התחל את התמלול עכשיו:`;
-
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: mimeType,
-          data: base64Audio
-        }
-      },
-      prompt
-    ]);
-
-    const response = await result.response;
-    let transcription = response.text();
-    
-    // Post-processing for better formatting
-    transcription = transcription
-      .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
-      .replace(/^\s+|\s+$/gm, '') // Trim whitespace from lines
-      .trim();
-    
-    // Additional cleanup for quotation marks
-    transcription = cleanupQuotations(transcription);
-    
-    if (!transcription || transcription.length < 10) {
-      throw new Error('התמלול לא הצליח - קובץ ריק או לא זוהה תוכן');
-    }
-    
-    return transcription;
-    
-  } catch (error) {
-    console.error('Gemini transcription error:', error);
-    
-    // More specific error messages
-    if (error.message.includes('API key')) {
-      throw new Error('שגיאה באימות Gemini API');
-    } else if (error.message.includes('quota')) {
-      throw new Error('הגעת למגבלת השימוש ב-Gemini API');
-    } else if (error.message.includes('format')) {
-      throw new Error('פורמט הקובץ אינו נתמך');
-    } else {
-      throw new Error(`שגיאה בתמלול: ${error.message}`);
-    }
-  }
-}
-
-// פונקציה לניקוי ושיפור מירכאות בתמלול
-function cleanupQuotations(text) {
-  // תיקון מירכאות לא סדירות
-  text = text.replace(/״([^״]+)״/g, '"$1"'); // החלפת גרשיים בכפול למירכאות רגילות
-  text = text.replace(/׳([^׳]+)׳/g, '"$1"'); // החלפת גרש למירכאות
-  
-  // הסרת מירכאות כפולות
-  text = text.replace(/""/g, '"');
-  text = text.replace(/"""/g, '"');
-  
-  // תיקון רווחים סביב מירכאות
-  text = text.replace(/\s+"/g, ' "');
-  text = text.replace(/"\s+/g, '" ');
-  
-  return text;
-}
-
-// Create formatted Word document - styled like the screenshot
-async function createWordDocument(transcription, filename, duration) {
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: [
-        // כותרת ראשית מרכוזה
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "תמלול אוטומטי",
-              bold: true,
-              size: 28, // 14pt
-              font: "David"
-            })
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 }
-        }),
-        
-        // פרטי הקובץ
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `שם הקובץ: ${filename}`,
-              size: 24, // 12pt
-              font: "David"
-            })
-          ],
-          spacing: { after: 120 }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `משך זמן: ${duration} דקות`,
-              size: 24, // 12pt
-              font: "David"
-            })
-          ],
-          spacing: { after: 120 }
-        }),
-        
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
-              size: 24, // 12pt
-              font: "David"
-            })
-          ],
-          spacing: { after: 240 }
-        }),
-        
-        // קו הפרדה
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: "────────────────────────────────────────",
-              size: 20, // 10pt
-              font: "David"
-            })
-          ],
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 240 }
-        }),
-        
-        // עיבוד תוכן התמלול
-        ...processTranscriptionContent(transcription)
-      ]
-    }]
-  });
-  
-  return await Packer.toBuffer(doc);
-}
-
-// פונקציה עזר לעיבוד תוכן התמלול
-function processTranscriptionContent(transcription) {
-  const paragraphs = [];
-  
-  // חלוקה לפסקאות על בסיס שורות ריקות כפולות
-  const sections = transcription.split(/\n\s*\n/).filter(section => section.trim());
-  
-  for (let section of sections) {
-    const lines = section.split('\n').map(line => line.trim()).filter(line => line);
-    
-    if (lines.length === 0) continue;
-    
-    // יצירת פסקה אחת מכל הקטע
-    const fullText = lines.join(' ');
-    
-    // זיהוי אם זו שורת דובר או תוכן רגיל
-    if (isSpeakerLine(fullText)) {
-      paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: fullText,
-            size: 24, // 12pt
-            font: "David",
-            bold: true
-          })
-        ],
-        spacing: { 
-          before: 240, // רווח לפני
-          after: 120   // רווח אחרי
-        }
-      }));
-    } else {
-      // פסקה רגילה - מעבדים ציטוטים
-      const processedText = addQuotationMarks(fullText);
-      
-      paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: processedText,
-            size: 24, // 12pt
-            font: "David"
-          })
-        ],
-        spacing: { 
-          before: 120, // רווח קל לפני
-          after: 200   // רווח אחרי
-        }
-      }));
-    }
-  }
-  
-  return paragraphs;
-}
-
-// פונקציה לזיהוי שורות דוברים
-function isSpeakerLine(line) {
-  const speakerPatterns = [
-    /^רב\s*:/,
-    /^הרב\s*:/,
-    /^שואל\s*:/,
-    /^תשובה\s*:/,
-    /^שאלה\s*:/,
-    /^המשיב\s*:/,
-    /^התלמיד\s*:/,
-    /^השואל\s*:/,
-    /^מרצה\s*:/,
-    /^דובר\s+\d+\s*:/,
-    /^[א-ת]{2,}\s*:/
-  ];
-  
-  return speakerPatterns.some(pattern => pattern.test(line));
-}
-
-// פונקציה להוספת מירכאות לציטוטים
-function addQuotationMarks(text) {
-  // ביטויים שצריכים להיות במירכאות
-  const citationPatterns = [
-    // ציטוטים מהתלמוד
-    /(כדאיתא ב[א-ת\s,():.״״׳׳0-9]+)/g,
-    /(כמו שכתוב ב[א-ת\s,():.״״׳׳0-9]+)/g,
-    /(שנאמר[^.!?]*)/g,
-    /(כמאמר חז״ל[^.!?]*)/g,
-    /(אמרו חכמים[^.!?]*)/g,
-    /(תניא[^.!?]*)/g,
-    /(דאמר[^.!?]*)/g,
-    /(כדכתיב[^.!?]*)/g,
-    /(והיינו דאמר[^.!?]*)/g,
-    
-    // ציטוטים מקראיים
-    /(וכתוב[^.!?]*)/g,
-    /(כמו שנאמר[^.!?]*)/g,
-    /(שכתוב[^.!?]*)/g,
-    /(כתיב[^.!?]*)/g,
-    
-    // ציטוטים מהמשנה
-    /(משנה[^.!?]*)/g,
-    /(ברייתא[^.!?]*)/g,
-    /(תוספתא[^.!?]*)/g,
-    /(מתני׳[^.!?]*)/g,
-    /(גמ׳[^.!?]*)/g
-  ];
-  
-  citationPatterns.forEach(pattern => {
-    text = text.replace(pattern, (match) => {
-      // בדיקה אם הציטוט כבר במירכאות
-      if (match.startsWith('"') && match.endsWith('"')) {
-        return match;
-      }
-      return `"${match.trim()}"`;
-    });
-  });
-  
-  return text;
-}
-
-// Send transcription email
-async function sendTranscriptionEmail(email, transcriptions) {
-  const attachments = transcriptions.map((trans, index) => ({
-    filename: `${trans.filename.replace(/\.[^/.]+$/, "")}_תמלול.docx`,
-    content: trans.wordDoc
-  }));
-  
-  const totalMinutes = transcriptions.reduce((sum, trans) => sum + trans.duration, 0);
-  
-  const mailOptions = {
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: '🎯 התמלול שלך מוכן! (Gemini 2.5 Pro)',
-    html: `
-      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; text-align: center; color: white; border-radius: 10px 10px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">🎯 התמלול הושלם בהצלחה!</h1>
-          <p style="margin: 10px 0 0 0; opacity: 0.9;">מופק על ידי Gemini 2.5 Pro</p>
-        </div>
-        
-        <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <p style="font-size: 16px; margin-bottom
+  res.sendFile
