@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname))); // Serve static files like index.html
 
 // --- Multer Configuration ---
 const storage = multer.diskStorage({
@@ -54,10 +54,15 @@ async function getMediaDuration(filePath) {
     const ffprobe = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', filePath]);
     let output = '';
     ffprobe.stdout.on('data', (data) => { output += data.toString(); });
-    ffprobe.on('close', () => {
-        resolve(Math.ceil(parseFloat(output.trim() || '60') / 60)); // Default to 1 min if fails
+    ffprobe.on('close', (code) => {
+      if (code === 0 && output) {
+        resolve(Math.ceil(parseFloat(output.trim()) / 60));
+      } else {
+        const stats = fs.statSync(filePath);
+        resolve(Math.max(1, Math.ceil(stats.size / (1024 * 1024 * 2)))); // Fallback
+      }
     });
-    ffprobe.on('error', () => resolve(1));
+    ffprobe.on('error', () => resolve(1)); // Error fallback
   });
 }
 
@@ -72,37 +77,32 @@ app.post('/api/login', (req, res) => {
   if (!user || user.password !== password) {
     return res.status(401).json({ success: false, error: 'אימייל או סיסמה שגויים' });
   }
-  const { password: _, ...userToReturn } = user;
+  const { password: _, ...userToReturn } = user; // Exclude password from response
   res.json({ success: true, user: userToReturn });
 });
 
-// =========================================================
-//  FIX: Re-added the missing admin route with security
-// =========================================================
 app.post('/api/admin/add-minutes', (req, res) => {
-  const { adminEmail, userEmail, minutes } = req.body;
+    const { adminEmail, userEmail, minutes } = req.body;
 
-  // Security check
-  const adminUser = users.get(adminEmail);
-  if (!adminUser || !adminUser.isAdmin) {
-    return res.status(403).json({ success: false, error: 'Forbidden: User is not an admin.' });
-  }
+    const adminUser = users.get(adminEmail);
+    if (!adminUser || !adminUser.isAdmin) {
+        return res.status(403).json({ success: false, error: 'Forbidden: User is not an admin.' });
+    }
   
-  const targetUser = users.get(userEmail);
-  if (!targetUser) {
-    return res.status(404).json({ success: false, error: 'User to add minutes to was not found.' });
-  }
+    const targetUser = users.get(userEmail);
+    if (!targetUser) {
+        return res.status(404).json({ success: false, error: 'User to add minutes to was not found.' });
+    }
 
-  const minutesToAdd = parseInt(minutes);
-  if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
-    return res.status(400).json({ success: false, error: 'Invalid number of minutes.' });
-  }
+    const minutesToAdd = parseInt(minutes);
+    if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
+        return res.status(400).json({ success: false, error: 'Invalid number of minutes.' });
+    }
   
-  targetUser.remainingMinutes += minutesToAdd;
-  console.log(`✅ Admin ${adminEmail} added ${minutesToAdd} minutes to ${userEmail}.`);
-  res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
+    targetUser.remainingMinutes += minutesToAdd;
+    console.log(`✅ Admin ${adminEmail} added ${minutesToAdd} minutes to ${userEmail}.`);
+    res.json({ success: true, message: `נוספו ${minutesToAdd} דקות בהצלחה`, newBalance: targetUser.remainingMinutes });
 });
-
 
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   const { email } = req.body;
@@ -118,16 +118,109 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 
   if (totalMinutes > user.remainingMinutes) {
-    files.forEach(file => fs.unlinkSync(file.path));
+    files.forEach(file => fs.unlinkSync(file.path)); // Clean up uploaded files
     return res.status(402).json({ success: false, error: 'אין מספיק דקות בחשבון' });
   }
 
+  // Start processing in the background and respond immediately
   processTranscriptionJob(files, user, totalMinutes);
   res.json({ success: true, message: 'התמלול התחיל', estimatedMinutes: totalMinutes });
 });
 
 // --- Background Processing ---
 async function processTranscriptionJob(files, user, totalMinutes) {
-  // ... (rest of the functions are the same)
+  console.log(`🚀 Starting transcription job for ${user.email}`);
+  const successfulTranscriptions = [];
+
+  for (const file of files) {
+    const originalFileName = Buffer.from(file.filename.split('_').slice(1).join('_'), 'utf-8').toString();
+    try {
+      const convertedPath = await convertAudioForGemini(file.path);
+      const transcriptionText = await transcribeWithGemini(convertedPath);
+      const wordDocBuffer = await createWordDocument(transcriptionText, originalFileName);
+      successfulTranscriptions.push({ filename: originalFileName, wordDoc: wordDocBuffer });
+    } catch (error) {
+      console.error(`❌ Failed to process ${originalFileName}:`, error.message);
+    } finally {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path); // Clean up original
+      const convertedPathCheck = file.path.replace(/\.[^/.]+$/, '_converted.wav');
+      if (fs.existsSync(convertedPathCheck)) fs.unlinkSync(convertedPathCheck); // Clean up converted
+    }
+  }
+
+  if (successfulTranscriptions.length > 0) {
+    await sendTranscriptionEmail(user.email, successfulTranscriptions);
+    user.remainingMinutes -= totalMinutes;
+    user.totalTranscribed += totalMinutes;
+    console.log(`✅ Job finished for ${user.email}. ${totalMinutes} minutes deducted.`);
+  }
 }
-// (The rest of the `server.js` file remains unchanged)
+
+async function convertAudioForGemini(inputPath) {
+    return new Promise((resolve, reject) => {
+        const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
+        const ffmpeg = spawn('ffmpeg', ['-i', inputPath, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', '-y', outputPath]);
+        ffmpeg.on('close', (code) => {
+            if (code === 0) resolve(outputPath);
+            else reject(new Error('ffmpeg conversion failed'));
+        });
+        ffmpeg.on('error', (err) => reject(err));
+    });
+}
+
+async function transcribeWithGemini(filePath) {
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" }); // Using 2.5 Pro as requested
+  const audioData = fs.readFileSync(filePath);
+  const base64Audio = audioData.toString('base64');
+  
+  const audioPart = { inlineData: { mimeType: 'audio/wav', data: base64Audio } };
+  
+  const prompt = `תמלל את קובץ האודיו במלואו, מההתחלה ועד הסוף. זהו שיעור תורני בעברית.
+- תמלל כל מילה ומילה. אל תסכם.
+- שמור על מבנה של פסקאות, עם שורה ריקה בין כל פסקה.`;
+  
+  const result = await model.generateContent([prompt, audioPart]);
+  const transcription = result.response.text().trim();
+  if (!transcription) throw new Error('Transcription result was empty');
+  return transcription;
+}
+
+async function createWordDocument(transcription, filename) {
+  const paragraphs = transcription.split(/\n\s*\n/).filter(s => s.trim()).map(section =>
+    new Paragraph({
+      children: [new TextRun({ text: section, size: 24, font: { name: "David" }, rightToLeft: true })],
+      bidirectional: true, alignment: AlignmentType.RIGHT, spacing: { after: 200 }
+    })
+  );
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ text: `תמלול הקובץ: ${filename}`, alignment: AlignmentType.CENTER, heading: "Heading1" }),
+        new Paragraph({ text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`, alignment: AlignmentType.CENTER, spacing: { after: 400 } }),
+        ...paragraphs
+      ]
+    }]
+  });
+  return Packer.toBuffer(doc);
+}
+
+async function sendTranscriptionEmail(userEmail, transcriptions) {
+  const attachments = transcriptions.map(trans => ({
+    filename: `תמלול - ${trans.filename.replace(/\.[^/.]+$/, '')}.docx`,
+    content: trans.wordDoc,
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  }));
+  await transporter.sendMail({
+    from: `"תמלול חכם" <${process.env.EMAIL_USER}>`,
+    to: userEmail,
+    subject: '✅ התמלול שלך מוכן!',
+    html: `<div dir="rtl"><h2>התמלול הושלם!</h2><p>מצורפים קבצי ה-Word שהזמנת.</p></div>`,
+    attachments
+  });
+  console.log(`📧 Email sent to ${userEmail}`);
+}
+
+// --- Server Start ---
+app.listen(PORT, () => {
+  console.log(`🚀 Server is live on port ${PORT}`);
+});
