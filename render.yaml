@@ -2,7 +2,7 @@ services:
   - type: web
     name: transcription-app
     env: node
-    plan: free # Change to "standard" or your plan
+    plan: standard # Or your specific plan
     buildCommand: "npm install && apt-get update && apt-get install -y ffmpeg"
     startCommand: "npm start"
     healthCheckPath: /health
