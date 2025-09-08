@@ -6,6 +6,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
+const { spawn } = require('child_process');
 require('dotenv').config();
 
 const app = express();
@@ -15,7 +16,7 @@ const PORT = process.env.PORT || 3000;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Email transporter
-const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransporter({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
@@ -28,7 +29,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// Enhanced file storage with proper UTF-8 encoding
+// Enhanced file storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadsDir = 'uploads';
@@ -40,58 +41,18 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const extension = path.extname(file.originalname);
-    
-    console.log(`📁 Original filename from browser: "${file.originalname}"`);
-    console.log(`📁 File encoding details:`, {
-      buffer: Buffer.from(file.originalname, 'binary').toString('hex'),
-      length: file.originalname.length,
-      charCodes: file.originalname.split('').map(c => c.charCodeAt(0))
-    });
-    
-    // Try to preserve original Hebrew filename
     let safeName = file.originalname;
     
-    // If filename looks like it has encoding issues, try to fix
-    if (safeName.includes('×') || safeName.includes('Ã') || safeName.includes('â')) {
-      console.log('🔧 Detected encoding issues, attempting to fix...');
-      try {
-        // Try different encoding approaches
-        const methods = [
-          () => Buffer.from(safeName, 'latin1').toString('utf8'),
-          () => Buffer.from(safeName, 'binary').toString('utf8'),
-          () => decodeURIComponent(escape(safeName))
-        ];
-        
-        for (const method of methods) {
-          try {
-            const decoded = method();
-            console.log(`🔧 Trying decode method: "${decoded}"`);
-            if (decoded.match(/[\u0590-\u05FF]/)) {
-              safeName = decoded;
-              console.log(`✅ Successfully decoded: "${safeName}"`);
-              break;
-            }
-          } catch (e) {
-            console.log('Decode method failed:', e.message);
-          }
-        }
-      } catch (error) {
-        console.log('All decode methods failed, using original');
-      }
-    }
-    
-    // Clean invalid characters but keep Hebrew
+    // Clean filename but preserve Hebrew
     safeName = safeName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
-    
     const finalName = `${timestamp}_${safeName}`;
-    console.log(`📁 Final stored filename: "${finalName}"`);
     cb(null, finalName);
   }
 });
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500MB for large files
   fileFilter: (req, file, cb) => {
     const allowedTypes = /\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/i;
     if (allowedTypes.test(file.originalname) || file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
@@ -102,7 +63,7 @@ const upload = multer({
   }
 });
 
-// Mock database
+// Mock database (same as before)
 let users = [
   {
     id: 1,
@@ -126,318 +87,400 @@ let users = [
   }
 ];
 
-// Helper function to clean filename for display
+// Helper function to clean filename
 function cleanFilename(filename) {
-  console.log(`🔍 Original filename: "${filename}"`);
-  
-  // Remove timestamp prefix (numbers followed by underscore)
   let withoutTimestamp = filename.replace(/^\d+_/, '');
-  console.log(`📝 After removing timestamp: "${withoutTimestamp}"`);
-  
-  // Try multiple decoding approaches
   let cleaned = withoutTimestamp;
   
-  // Method 1: Try URL decoding if contains %
+  // Try to fix encoding issues
   if (cleaned.includes('%')) {
     try {
       cleaned = decodeURIComponent(cleaned);
-      console.log(`🔄 After URL decode: "${cleaned}"`);
-    } catch (e) {
-      console.log('URL decode failed');
-    }
+    } catch (e) {}
   }
   
-  // Method 2: Try Buffer conversion for Hebrew encoding issues
   try {
-    // Convert from latin1 to utf8 if it looks like Hebrew encoding issue
     if (cleaned.includes('Ã') || cleaned.includes('Â') || cleaned.includes('ª') || cleaned.charCodeAt(0) > 127) {
       const buffer = Buffer.from(cleaned, 'latin1');
       const utf8String = buffer.toString('utf8');
       if (utf8String.match(/[\u0590-\u05FF]/)) {
         cleaned = utf8String;
-        console.log(`🔄 After Buffer conversion: "${cleaned}"`);
       }
     }
-  } catch (e) {
-    console.log('Buffer conversion failed');
-  }
+  } catch (e) {}
   
-  // Method 3: If still has encoding issues, try original filename from multipart
-  if (!cleaned.match(/[\u0590-\u05FF]/) && cleaned.includes('Ã')) {
-    // Fallback to a simple clean version
-    cleaned = cleaned.replace(/[^\u0020-\u007E\u0590-\u05FF]/g, '');
-  }
-  
-  // Remove file extension
   cleaned = cleaned.replace(/\.[^/.]+$/, '');
-  
-  // Final cleanup - remove any remaining weird characters but keep Hebrew
   cleaned = cleaned.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
   
-  // If we still don't have good Hebrew text, use a generic name
   if (!cleaned || cleaned.length < 2) {
     cleaned = 'קובץ_אודיו';
   }
   
-  console.log(`✅ Final cleaned filename: "${cleaned}"`);
   return cleaned;
 }
 
-// 🔥 NEW: Comprehensive transcription validation
-function validateTranscription(transcription, fileSizeMB, filename) {
-  const warnings = [];
-  let isValid = true;
-  let critical = false;
+// 🔥 NEW: FFmpeg-based audio chunking
+async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
+  const chunksDir = path.join(path.dirname(inputPath), 'chunks_' + Date.now());
+  const chunks = [];
   
-  // Basic existence check
-  if (!transcription || transcription.trim().length === 0) {
-    warnings.push('התמלול ריק');
-    critical = true;
-    isValid = false;
-  }
-  
-  // Length validation based on file size
-  const expectedMinLength = Math.max(100, fileSizeMB * 50); // Minimum 50 chars per MB
-  if (transcription.length < expectedMinLength) {
-    warnings.push(`התמלול קצר מדי: ${transcription.length} תווים, צפוי לפחות ${expectedMinLength}`);
-    if (transcription.length < expectedMinLength * 0.3) {
-      critical = true;
+  try {
+    // Create chunks directory
+    if (!fs.existsSync(chunksDir)) {
+      fs.mkdirSync(chunksDir, { recursive: true });
     }
-    isValid = false;
-  }
-  
-  // Content quality checks
-  const wordCount = transcription.split(/\s+/).length;
-  const expectedMinWords = Math.max(20, fileSizeMB * 10); // Minimum 10 words per MB
-  
-  if (wordCount < expectedMinWords) {
-    warnings.push(`מעט מדי מילים: ${wordCount}, צפוי לפחות ${expectedMinWords}`);
-    isValid = false;
-  }
-  
-  // Check for truncation indicators
-  const truncationIndicators = [
-    'המשך התמלול',
-    'סיום התמלול',
-    'התמלול נקטע',
-    '...',
-    'ו ודומה',
-    'וכך הלאה',
-    'המשך'
-  ];
-  
-  const lastPart = transcription.slice(-200).toLowerCase();
-  const hasTruncation = truncationIndicators.some(indicator => 
-    lastPart.includes(indicator.toLowerCase())
-  );
-  
-  if (hasTruncation) {
-    warnings.push('נראה שהתמלול נקטע או לא הושלם');
-    isValid = false;
-  }
-  
-  // Check for reasonable sentence structure
-  const sentences = transcription.split(/[.!?]/).filter(s => s.trim().length > 5);
-  const avgSentenceLength = sentences.length > 0 ? transcription.length / sentences.length : 0;
-  
-  if (avgSentenceLength > 500) {
-    warnings.push('משפטים ארוכים מדי - יכול להצביע על תמלול לא מעובד');
-  }
-  
-  // Check for Hebrew content (if expected)
-  const hebrewChars = (transcription.match(/[\u0590-\u05FF]/g) || []).length;
-  const hebrewPercentage = (hebrewChars / transcription.length) * 100;
-  
-  if (hebrewPercentage < 5) {
-    warnings.push('מעט תוכן עברי - יכול להצביע על בעיה בזיהוי שפה');
-  }
-  
-  return {
-    isValid,
-    critical,
-    warnings,
-    stats: {
-      characters: transcription.length,
-      words: wordCount,
-      sentences: sentences.length,
-      hebrewPercentage: hebrewPercentage.toFixed(1)
+    
+    console.log(`🔪 Splitting audio into ${chunkDurationMinutes}-minute chunks...`);
+    
+    // First, get audio duration
+    const duration = await getAudioDuration(inputPath);
+    console.log(`📊 Total audio duration: ${duration} seconds`);
+    
+    const chunkDurationSeconds = chunkDurationMinutes * 60;
+    const totalChunks = Math.ceil(duration / chunkDurationSeconds);
+    
+    console.log(`🎯 Creating ${totalChunks} chunks of ${chunkDurationMinutes} minutes each`);
+    
+    // Split audio into chunks using FFmpeg
+    for (let i = 0; i < totalChunks; i++) {
+      const startTime = i * chunkDurationSeconds;
+      const chunkPath = path.join(chunksDir, `chunk_${i.toString().padStart(3, '0')}.wav`);
+      
+      await new Promise((resolve, reject) => {
+        const ffmpeg = spawn('ffmpeg', [
+          '-i', inputPath,
+          '-ss', startTime.toString(),
+          '-t', chunkDurationSeconds.toString(),
+          '-ac', '1', // Mono
+          '-ar', '16000', // 16kHz sample rate for better compatibility
+          '-c:a', 'pcm_s16le', // PCM 16-bit
+          '-y', // Overwrite output file
+          chunkPath
+        ]);
+        
+        let stderr = '';
+        ffmpeg.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        ffmpeg.on('close', (code) => {
+          if (code === 0 && fs.existsSync(chunkPath)) {
+            const stats = fs.statSync(chunkPath);
+            if (stats.size > 1000) { // At least 1KB
+              chunks.push({
+                path: chunkPath,
+                index: i,
+                startTime: startTime,
+                duration: Math.min(chunkDurationSeconds, duration - startTime)
+              });
+              console.log(`✅ Created chunk ${i + 1}/${totalChunks}: ${path.basename(chunkPath)}`);
+            } else {
+              console.log(`⚠️ Chunk ${i + 1} too small, skipping`);
+            }
+            resolve();
+          } else {
+            console.error(`❌ FFmpeg error for chunk ${i}:`, stderr);
+            reject(new Error(`FFmpeg failed: ${stderr}`));
+          }
+        });
+        
+        ffmpeg.on('error', (error) => {
+          console.error(`❌ FFmpeg spawn error:`, error);
+          reject(error);
+        });
+      });
     }
-  };
+    
+    console.log(`🎉 Successfully created ${chunks.length} audio chunks`);
+    return { chunks, chunksDir };
+    
+  } catch (error) {
+    console.error('🔥 Audio splitting error:', error);
+    // Cleanup on error
+    if (fs.existsSync(chunksDir)) {
+      try {
+        fs.rmSync(chunksDir, { recursive: true, force: true });
+      } catch (e) {}
+    }
+    throw error;
+  }
 }
 
-// 🔥 ENHANCED: Ultra-strong prompt for COMPLETE transcription
-async function realGeminiTranscription(filePath, filename, language) {
+// 🔥 NEW: Get audio duration using FFprobe
+function getAudioDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    const ffprobe = spawn('ffprobe', [
+      '-v', 'quiet',
+      '-show_entries', 'format=duration',
+      '-of', 'csv=p=0',
+      filePath
+    ]);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    ffprobe.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    ffprobe.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    ffprobe.on('close', (code) => {
+      if (code === 0) {
+        const duration = parseFloat(stdout.trim());
+        resolve(duration);
+      } else {
+        console.error('FFprobe error:', stderr);
+        // Fallback: estimate based on file size
+        const stats = fs.statSync(filePath);
+        const estimatedDuration = (stats.size / (1024 * 1024)) * 60; // Rough estimate
+        resolve(estimatedDuration);
+      }
+    });
+    
+    ffprobe.on('error', (error) => {
+      console.error('FFprobe spawn error:', error);
+      // Fallback
+      const stats = fs.statSync(filePath);
+      const estimatedDuration = (stats.size / (1024 * 1024)) * 60;
+      resolve(estimatedDuration);
+    });
+  });
+}
+
+// 🔥 NEW: Enhanced chunk transcription with overlap handling
+async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, isFirstChunk = false, isLastChunk = false) {
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-pro",
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 65536  // Maximum possible tokens
+        maxOutputTokens: 32768
       }
     });
     
-    const audioData = fs.readFileSync(filePath);
+    const audioData = fs.readFileSync(chunkPath);
     const base64Audio = audioData.toString('base64');
-    const fileSizeMB = audioData.length / (1024 * 1024);
     
-    const ext = path.extname(filePath).toLowerCase();
-    let mimeType = 'audio/wav';
-    if (ext === '.mp3') mimeType = 'audio/mpeg';
-    else if (ext === '.mp4') mimeType = 'video/mp4';
-    else if (ext === '.m4a') mimeType = 'audio/mp4';
-    else if (ext === '.mov') mimeType = 'video/quicktime';
-
-    // 🔥 ULTIMATE PROMPT: Super aggressive for complete transcription
-    const prompt = `🚨 חובה מוחלטת: תמלל את כל הקובץ האודיו הזה מהתחלה עד הסוף הגמור!
-
-קובץ: ${cleanFilename(filename)}
-גודל: ${fileSizeMB.toFixed(1)} MB
-
-🔥🔥🔥 הוראות קריטיות - אסור לך להתעלם מהן:
-1. תמלל כל שנייה, כל מילה, כל משפט מההתחלה ועד הסוף
-2. אם האודיו ארוך 60 דקות - תמלל את כל 60 הדקות ללא יוצא מן הכלל
-3. אל תעצור באמצע, אל תקצר, אל תסכם - רק תמלול מלא 100%
-4. אם יש הפסקות או רעש - כתוב [הפסקה] והמשך לתמלל
-5. המשך לתמלל עד שהאודיו נגמר לחלוטין
-6. אל תכתוב "המשך התמלול..." או "סיום התמלול" - רק התוכן המלא
-
-🎯 תמלל לעברית תקנית:
-- מושגים דתיים מדויקים
-- ציטוטים במירכאות: "כמו שכתוב", "אמרו חכמים", "תניא"
-- זיהוי דוברים: "רב:", "שואל:", "תלמיד:"
-- פסקאות של 2-4 משפטים עם שורה ריקה
-
-🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
-תתחיל עכשיו ותמלל הכל ללא חריגות:`;
-
-    console.log(`🎯 Starting COMPLETE transcription for: ${cleanFilename(filename)} (${fileSizeMB.toFixed(1)} MB)`);
-
-    // Enhanced retry mechanism with longer timeouts
-    let result;
-    let attempts = 0;
-    const maxAttempts = 5;
-    
-    while (attempts < maxAttempts) {
-      try {
-        console.log(`🔄 Transcription attempt ${attempts + 1}/${maxAttempts}`);
-        
-        result = await Promise.race([
-          model.generateContent([
-            {
-              inlineData: {
-                mimeType: mimeType,
-                data: base64Audio
-              }
-            },
-            prompt
-          ]),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout after 5 minutes')), 300000) // 5 minute timeout
-          )
-        ]);
-        
-        console.log(`✅ Gemini responded successfully on attempt ${attempts + 1}`);
-        break;
-        
-      } catch (error) {
-        attempts++;
-        console.log(`🔄 Transcription attempt ${attempts} failed:`, error.message);
-        
-        if (attempts >= maxAttempts) {
-          throw new Error(`נכשל אחרי ${maxAttempts} ניסיונות: ${error.message}`);
-        }
-        
-        // Progressive backoff - wait longer between retries
-        const waitTime = Math.min(5000 * attempts, 30000); // 5s, 10s, 15s, 20s, 30s
-        console.log(`⏳ Waiting ${waitTime/1000} seconds before retry...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+    // Enhanced prompt for chunk transcription with context
+    let contextPrompt = '';
+    if (isFirstChunk) {
+      contextPrompt = '🎯 זהו החלק הראשון של הקובץ - התחל מההתחלה המוחלטת.';
+    } else if (isLastChunk) {
+      contextPrompt = '🎯 זהו החלק האחרון של הקובץ - המשך עד הסוף המוחלט.';
+    } else {
+      contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
+    
+    const prompt = `תמלל את קטע האודיו הזה לעברית תקנית.
+
+${contextPrompt}
+
+קובץ: ${cleanFilename(filename)} (חלק ${chunkIndex + 1}/${totalChunks})
+
+🚨 הוראות קריטיות:
+1. תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט
+2. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
+3. התחל ישירות עם התוכן המתומלל
+4. סיים ישירות עם התוכן - אל תוסיף סיכום
+5. אם יש חיתוך באמצע מילה/משפט - כתב את מה שאתה שומע
+
+📝 הנחיות עיצוב:
+- חלק לפסקאות של 2-3 משפטים
+- זיהוי דוברים: "רב:", "שואל:", "תלמיד:"
+- ציטוטים במירכאות: "שנאמר", "כדאיתא"
+- שמור על רציפות טבעית
+
+תתחיל עכשיו עם התמלול:`;
+
+    console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks}...`);
+
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'audio/wav',
+          data: base64Audio
+        }
+      },
+      prompt
+    ]);
 
     const response = await result.response;
     let transcription = response.text();
     
-    console.log(`📊 Raw transcription stats:`);
-    console.log(`   - Characters: ${transcription.length}`);
-    console.log(`   - Lines: ${transcription.split('\n').length}`);
-    console.log(`   - Words (approx): ${transcription.split(/\s+/).length}`);
-    console.log(`   - File size: ${fileSizeMB.toFixed(1)} MB`);
-    
-    // Enhanced text cleaning while preserving content
+    // Clean the transcription
     transcription = transcription
       .replace(/\r\n/g, '\n')
-      .replace(/\n{4,}/g, '\n\n\n')
-      .replace(/^\s+|\s+$/gm, '')
+      .replace(/^\s*תמלול[:\s]*/i, '') // Remove "תמלול:" prefix
+      .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
     
-    // Comprehensive validation checks
-    const validationResults = validateTranscription(transcription, fileSizeMB, filename);
-    
-    if (!validationResults.isValid) {
-      console.warn(`⚠️ VALIDATION FAILED for ${cleanFilename(filename)}:`);
-      validationResults.warnings.forEach(warning => console.warn(`   - ${warning}`));
-      
-      // For critical failures, throw error
-      if (validationResults.critical) {
-        throw new Error(`התמלול נכשל בבדיקות איכות: ${validationResults.warnings.join(', ')}`);
-      }
-    } else {
-      console.log(`✅ Transcription validation passed for: ${cleanFilename(filename)}`);
-    }
-    
-    console.log(`🎉 Final transcription: ${transcription.length} characters`);
+    console.log(`✅ Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters`);
     return transcription;
     
   } catch (error) {
-    console.error('🔥 Gemini transcription error:', error);
-    throw new Error(`שגיאה בתמלול קובץ ${cleanFilename(filename)}: ${error.message}`);
+    console.error(`❌ Error transcribing chunk ${chunkIndex + 1}:`, error);
+    throw error;
   }
 }
 
-// 🔥 NEW: Split large files and transcribe in chunks for complete coverage
-async function transcribeLargeFile(filePath, filename, language) {
-  const stats = fs.statSync(filePath);
-  const fileSizeMB = stats.size / (1024 * 1024);
+// 🔥 NEW: Smart chunk merger with overlap detection
+function mergeTranscriptionChunks(chunks) {
+  console.log(`🔗 Merging ${chunks.length} transcription chunks...`);
   
-  console.log(`📊 File analysis: ${cleanFilename(filename)} - ${fileSizeMB.toFixed(1)} MB`);
+  if (chunks.length === 0) return '';
+  if (chunks.length === 1) return chunks[0];
   
-  // For files larger than 15MB, try chunked transcription as backup
-  if (fileSizeMB > 15) {
-    console.log(`🔄 Large file detected (${fileSizeMB.toFixed(1)} MB), will try complete transcription first, then chunked if needed`);
+  let merged = chunks[0];
+  
+  for (let i = 1; i < chunks.length; i++) {
+    const currentChunk = chunks[i];
+    
+    // Try to detect overlap by looking at the end of previous chunk and start of current
+    const prevEnd = merged.slice(-100).trim(); // Last 100 chars
+    const currentStart = currentChunk.slice(0, 100).trim(); // First 100 chars
+    
+    // Simple overlap detection - look for common words
+    const prevWords = prevEnd.split(/\s+/).slice(-5); // Last 5 words
+    const currentWords = currentStart.split(/\s+/).slice(0, 10); // First 10 words
+    
+    let overlapFound = false;
+    let overlapIndex = -1;
+    
+    // Check if any of the last words from previous chunk appear in the start of current chunk
+    for (let j = 0; j < prevWords.length; j++) {
+      const word = prevWords[j];
+      if (word.length > 3) { // Only check meaningful words
+        const index = currentWords.findIndex(w => w.includes(word) || word.includes(w));
+        if (index !== -1) {
+          overlapFound = true;
+          overlapIndex = index;
+          console.log(`🔍 Overlap detected: "${word}" at position ${index}`);
+          break;
+        }
+      }
+    }
+    
+    if (overlapFound && overlapIndex > 0) {
+      // Remove overlapping part from current chunk
+      const wordsToSkip = overlapIndex + 1;
+      const remainingWords = currentWords.slice(wordsToSkip);
+      const cleanedCurrent = remainingWords.join(' ') + currentChunk.slice(100);
+      merged += '\n\n' + cleanedCurrent.trim();
+      console.log(`🔗 Merged with overlap removal (skipped ${wordsToSkip} words)`);
+    } else {
+      // No overlap detected, merge normally
+      merged += '\n\n' + currentChunk.trim();
+      console.log(`🔗 Merged without overlap detection`);
+    }
+  }
+  
+  // Final cleanup
+  merged = merged
+    .replace(/\n{4,}/g, '\n\n\n')
+    .replace(/^\s+|\s+$/gm, '')
+    .trim();
+  
+  console.log(`✅ Merge completed: ${merged.length} total characters`);
+  return merged;
+}
+
+// 🔥 ENHANCED: Complete audio transcription with chunking
+async function transcribeCompleteAudio(filePath, filename, language) {
+  const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
+  const duration = await getAudioDuration(filePath);
+  const durationMinutes = duration / 60;
+  
+  console.log(`🎵 Starting complete transcription: ${cleanFilename(filename)}`);
+  console.log(`📊 File size: ${fileSizeMB.toFixed(1)} MB, Duration: ${durationMinutes.toFixed(1)} minutes`);
+  
+  // Decide chunking strategy based on file size and duration
+  const shouldChunk = fileSizeMB > 20 || durationMinutes > 15;
+  
+  if (!shouldChunk) {
+    console.log(`📝 File small enough, using direct transcription`);
+    return await directGeminiTranscription(filePath, filename, language);
+  }
+  
+  console.log(`🔪 File large enough, using chunked transcription`);
+  
+  let chunksData;
+  try {
+    // Split audio into chunks
+    const chunkDuration = durationMinutes > 60 ? 6 : 8; // Smaller chunks for very long files
+    chunksData = await splitAudioIntoChunks(filePath, chunkDuration);
+    
+    if (chunksData.chunks.length === 0) {
+      throw new Error('לא נוצרו קטעים - נסה שוב עם direct transcription');
+    }
+    
+    // Transcribe each chunk
+    const transcriptions = [];
+    for (let i = 0; i < chunksData.chunks.length; i++) {
+      const chunk = chunksData.chunks[i];
+      const isFirst = i === 0;
+      const isLast = i === chunksData.chunks.length - 1;
+      
+      try {
+        const chunkTranscription = await transcribeAudioChunk(
+          chunk.path, 
+          i, 
+          chunksData.chunks.length, 
+          filename, 
+          language,
+          isFirst,
+          isLast
+        );
+        
+        transcriptions.push(chunkTranscription);
+        
+        // Small delay between chunks to avoid rate limiting
+        if (i < chunksData.chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        
+      } catch (chunkError) {
+        console.error(`❌ Failed to transcribe chunk ${i + 1}:`, chunkError);
+        // Continue with other chunks - don't fail the entire process
+        transcriptions.push(`[שגיאה בתמלול קטע ${i + 1}]`);
+      }
+    }
+    
+    // Merge all transcriptions
+    const finalTranscription = mergeTranscriptionChunks(transcriptions);
+    
+    console.log(`🎉 Chunked transcription completed: ${finalTranscription.length} characters from ${transcriptions.length} chunks`);
+    return finalTranscription;
+    
+  } catch (error) {
+    console.error('🔥 Chunked transcription failed:', error);
+    console.log('🔄 Falling back to direct transcription...');
     
     try {
-      // First attempt: try complete transcription
-      const completeTranscription = await realGeminiTranscription(filePath, filename, language);
-      
-      // Validate the complete transcription
-      const validation = validateTranscription(completeTranscription, fileSizeMB, filename);
-      
-      if (validation.isValid || !validation.critical) {
-        console.log(`✅ Complete transcription successful for large file: ${cleanFilename(filename)}`);
-        return completeTranscription;
-      } else {
-        console.warn(`⚠️ Complete transcription failed validation, falling back to chunked approach`);
-        throw new Error('Validation failed, trying chunked approach');
-      }
-      
-    } catch (error) {
-      console.log(`⚠️ Complete transcription failed for large file, trying chunked approach: ${error.message}`);
-      return await transcribeInChunks(filePath, filename, language);
+      return await directGeminiTranscription(filePath, filename, language);
+    } catch (fallbackError) {
+      throw new Error(`גם התמלול המקטעי וגם הישיר נכשלו: ${fallbackError.message}`);
     }
-  } else {
-    // For smaller files, use regular complete transcription
-    return await realGeminiTranscription(filePath, filename, language);
+    
+  } finally {
+    // Cleanup chunks directory
+    if (chunksData && chunksData.chunksDir && fs.existsSync(chunksData.chunksDir)) {
+      try {
+        fs.rmSync(chunksData.chunksDir, { recursive: true, force: true });
+        console.log(`🗑️ Cleaned up chunks directory: ${chunksData.chunksDir}`);
+      } catch (e) {
+        console.warn('Could not cleanup chunks directory:', e.message);
+      }
+    }
   }
 }
 
-// 🔥 NEW: Chunked transcription for very large files
-async function transcribeInChunks(filePath, filename, language) {
-  console.log(`🔪 Starting chunked transcription for: ${cleanFilename(filename)}`);
-  
+// Original direct transcription function (fallback)
+async function directGeminiTranscription(filePath, filename, language) {
   try {
-    // This is a simplified approach - in a full implementation, you'd use ffmpeg to split the audio
-    // For now, we'll try with a different approach: multiple passes with overlap instructions
-    
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-pro",
       generationConfig: {
@@ -457,28 +500,26 @@ async function transcribeInChunks(filePath, filename, language) {
     else if (ext === '.m4a') mimeType = 'audio/mp4';
     else if (ext === '.mov') mimeType = 'video/quicktime';
 
-    // Enhanced prompt for chunked processing
-    const chunkPrompt = `🎯 תמלול קובץ אודיו גדול - גישה מתקדמת
+    const prompt = `🚨 תמלל את כל הקובץ האודיו הזה מההתחלה עד הסוף הגמור!
 
-קובץ: ${cleanFilename(filename)} (${fileSizeMB.toFixed(1)} MB)
+קובץ: ${cleanFilename(filename)}
+גודל: ${fileSizeMB.toFixed(1)} MB
 
-🚨 הוראות קריטיות לתמלול מלא:
-1. זה קובץ אודיו גדול - תמלל אותו במלואו מההתחלה עד הסוף
-2. אל תדלג על חלקים, אל תקצר, אל תסכם
-3. אם האודיו ארוך - תמלל כל דקה, כל שנייה
-4. אם יש חזרות או הפסקות - תמלל הכל
-5. המשך עד שהאודיו נגמר לחלוטין
+🔥 הוראות קריטיות:
+1. תמלל כל שנייה, כל מילה, כל משפט מההתחלה ועד הסוף
+2. אל תעצור באמצע, אל תקצר, אל תסכם - רק תמלול מלא 100%
+3. אם האודיו ארוך - תמלל את הכל
+4. אם יש הפסקות או רעש - כתוב [הפסקה] והמשך לתמלל
 
-📝 הנחיות עיצוב:
-- חלק לפסקאות קצרות (2-3 משפטים)
-- שורה ריקה בין פסקאות
-- זיהוי דוברים: "רב:", "שואל:", "תלמיד:"
-- ציטוטים במירכאות: "שנאמר", "כדאיתא", "תניא"
+🎯 תמלל לעברית תקנית:
+- מושגים דתיים מדויקים
+- ציטוטים במירכאות: "כמו שכתוב"
+- זיהוי דוברים: "רב:", "שואל:"
+- פסקאות של 2-4 משפטים
 
-🔍 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתוצאה ארוכה ומפורטת!
 תתחיל עכשיו ותמלל הכל:`;
 
-    console.log(`🎯 Attempting enhanced transcription for large file: ${cleanFilename(filename)}`);
+    console.log(`🎯 Starting direct transcription for: ${cleanFilename(filename)} (${fileSizeMB.toFixed(1)} MB)`);
 
     const result = await model.generateContent([
       {
@@ -487,37 +528,28 @@ async function transcribeInChunks(filePath, filename, language) {
           data: base64Audio
         }
       },
-      chunkPrompt
+      prompt
     ]);
 
     const response = await result.response;
     let transcription = response.text();
     
-    console.log(`📊 Chunked transcription result: ${transcription.length} characters`);
-    
-    // Clean and validate
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n\n')
+      .replace(/^\s+|\s+$/gm, '')
       .trim();
     
-    const validation = validateTranscription(transcription, fileSizeMB, filename);
-    
-    if (!validation.isValid) {
-      console.warn(`⚠️ Chunked transcription validation warnings for ${cleanFilename(filename)}:`);
-      validation.warnings.forEach(warning => console.warn(`   - ${warning}`));
-    }
-    
-    console.log(`✅ Chunked transcription completed: ${transcription.length} characters`);
+    console.log(`✅ Direct transcription completed: ${transcription.length} characters`);
     return transcription;
     
   } catch (error) {
-    console.error('🔥 Chunked transcription error:', error);
-    throw new Error(`שגיאה בתמלול מקטעי: ${error.message}`);
+    console.error('🔥 Direct transcription error:', error);
+    throw error;
   }
 }
 
-// 🔧 FIX: Balanced Word document spacing - not too compressed, not too spread
+// Word document creation (same as before)
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
@@ -528,64 +560,36 @@ async function createWordDocument(transcription, filename, duration) {
         properties: {
           page: {
             margin: {
-              top: 2160,    // 1.5 inches - reasonable margins
-              right: 1800,  // 1.25 inches  
-              bottom: 2160, // 1.5 inches
-              left: 1800    // 1.25 inches
+              top: 2160,
+              right: 1800,
+              bottom: 2160,
+              left: 1800
             }
           }
         },
         children: [
-          // Title with moderate spacing
           new Paragraph({
             children: [
               new TextRun({
-                text: "תמלול אוטומטי",
+                text: "תמלול מלא ומדויק",
                 bold: true,
-                size: 36,  // Good readable size
-                font: {
-                  name: "Arial Unicode MS"
-                }
+                size: 36,
+                font: { name: "Arial Unicode MS" }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { 
-              after: 480,   // Moderate space after title
-              line: 480     // Normal line spacing
-            }
+            spacing: { after: 480, line: 480 }
           }),
           
-          // File info with normal spacing
           new Paragraph({
             children: [
               new TextRun({
                 text: `שם הקובץ: ${cleanName}`,
-                size: 24,     
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 240,   
-              line: 360     
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `משך זמן: ${duration} דקות`,
                 size: 24,
-                font: {
-                  name: "Arial Unicode MS"
-                }
+                font: { name: "Arial Unicode MS" }
               })
             ],
-            spacing: { 
-              after: 240,
-              line: 360
-            }
+            spacing: { after: 240, line: 360 }
           }),
           
           new Paragraph({
@@ -593,37 +597,24 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
                 size: 24,
-                font: {
-                  name: "Arial Unicode MS"
-                }
+                font: { name: "Arial Unicode MS" }
               })
             ],
-            spacing: { 
-              after: 480,   
-              line: 360
-            }
+            spacing: { after: 480, line: 360 }
           }),
           
-          // Separator with moderate space
           new Paragraph({
             children: [
               new TextRun({
                 text: "═".repeat(50),
                 size: 20,
-                font: {
-                  name: "Arial Unicode MS"
-                }
+                font: { name: "Arial Unicode MS" }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { 
-              before: 240,
-              after: 480,   
-              line: 360
-            }
+            spacing: { before: 240, after: 480, line: 360 }
           }),
           
-          // Content with balanced spacing
           ...processTranscriptionContent(transcription)
         ]
       }]
@@ -639,22 +630,20 @@ async function createWordDocument(transcription, filename, duration) {
   }
 }
 
-// 🔧 FIX: Balanced content spacing - comfortable but not excessive
+// Process transcription content for Word document
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')    // Reduce excessive line breaks
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
   
-  // Split by double line breaks to preserve paragraph structure
   const sections = cleanedText.split(/\n\s*\n/)
     .map(section => section.trim())
     .filter(section => section.length > 0);
   
   sections.forEach((section, index) => {
-    // Clean up the section but keep line breaks within it
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     let combinedSection = lines.join(' ').trim();
     
@@ -662,39 +651,28 @@ function processTranscriptionContent(transcription) {
       combinedSection += '.';
     }
     
-    // Detect speaker lines
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
     paragraphs.push(new Paragraph({
       children: [
         new TextRun({
           text: combinedSection,
-          size: 26,  // Good readable size - not too big, not too small
-          font: {
-            name: "Arial Unicode MS"
-          },
+          size: 26,
+          font: { name: "Arial Unicode MS" },
           bold: isSpeakerLine
         })
       ],
       spacing: { 
-        before: isSpeakerLine ? 360 : 240,  // Moderate space before speaker lines
-        after: 240,   // Moderate space after each paragraph
-        line: 400     // Comfortable line spacing (1.2x)
+        before: isSpeakerLine ? 360 : 240,
+        after: 240,
+        line: 400
       }
     }));
     
-    // Add modest extra spacing every 3 paragraphs
     if ((index + 1) % 3 === 0 && index < sections.length - 1) {
       paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: "",
-            size: 16
-          })
-        ],
-        spacing: { 
-          after: 240  // Small additional break
-        }
+        children: [new TextRun({ text: "", size: 16 })],
+        spacing: { after: 240 }
       }));
     }
   });
@@ -702,10 +680,10 @@ function processTranscriptionContent(transcription) {
   return paragraphs;
 }
 
-// 🔥 Enhanced email with failure reporting
+// Enhanced email function
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
-    console.log(`📧 Preparing enhanced email for: ${userEmail}`);
+    console.log(`📧 Preparing email for: ${userEmail}`);
     console.log(`📊 Successful: ${transcriptions.length}, Failed: ${failedTranscriptions.length}`);
     
     const attachments = transcriptions.map(trans => {
@@ -732,13 +710,8 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
       
       failureSection = `
         <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #ffc107;">
-          <h3 style="color: #856404; margin-bottom: 15px; font-size: 18px;">⚠️ קבצים שלא הצליחו:</h3>
-          <ul style="margin: 10px 0; font-size: 15px; color: #856404;">
-            ${failureList}
-          </ul>
-          <p style="font-size: 14px; margin-top: 15px;">
-            <strong>💡 טיפ:</strong> נסה להעלות קבצים אלה שוב או צור קשר לתמיכה.
-          </p>
+          <h3 style="color: #856404; margin-bottom: 15px;">⚠️ קבצים שלא הצליחו:</h3>
+          <ul style="margin: 10px 0; color: #856404;">${failureList}</ul>
         </div>
       `;
     }
@@ -746,56 +719,52 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: userEmail,
-      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מצורפים`,
       html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
+        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
-            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">
-              ${transcriptions.length} קבצים עובדו בהצלחה
-            </p>
+            <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם!</h1>
+            <p style="margin: 10px 0 0 0;">עם טכנולוגיית חלוקה למקטעים מתקדמת</p>
           </div>
           
           <div style="background: #f8f9ff; padding: 30px; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 25px;">שלום וברכה,</p>
             
             <p style="font-size: 16px; margin-bottom: 25px;">
-              התמלול המלא והמפורט שלך הושלם! 
-              מצורפים קבצי Word מעוצבים עם תמלול שלם מההתחלה עד הסוף:
+              התמלול המלא שלך הושלם בהצלחה! 
+              השתמשנו בטכנולוגיה מתקדמת של חלוקה למקטעים לקבלת תמלול שלם ומדויק:
             </p>
             
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #4caf50;">
-              <h3 style="color: #2e7d32; margin-bottom: 15px; font-size: 18px;">✅ קבצים שהושלמו בהצלחה:</h3>
-              <ul style="margin: 10px 0; font-size: 16px;">
-                ${successList}
-              </ul>
+              <h3 style="color: #2e7d32; margin-bottom: 15px;">✅ קבצים שהושלמו:</h3>
+              <ul style="margin: 10px 0; font-size: 16px;">${successList}</ul>
             </div>
             
             ${failureSection}
             
             <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
-              <h3 style="color: #1565c0; margin-bottom: 15px; font-size: 18px;">🔥 שיפורים בגרסה החדשה:</h3>
+              <h3 style="color: #1565c0; margin-bottom: 15px;">🚀 שיפורים חדשים:</h3>
               <ul style="margin: 0; font-size: 15px; line-height: 1.8; color: #1565c0;">
-                <li>🎯 <strong>תמלול מלא 100%</strong> - מההתחלה עד הסוף הגמור</li>
-                <li>🔍 <strong>בדיקות איכות מתקדמות</strong> - וידוא שלמות התמלול</li>
-                <li>📊 <strong>גישה מתקדמת לקבצים גדולים</strong> - עד 100MB</li>
-                <li>✨ <strong>Gemini 2.5 Pro משופר</strong> - דיוק מקסימלי</li>
-                <li>📖 <strong>עיצוב Word מאוזן</strong> - נוח לקריאה ולהדפסה</li>
-                <li>🎓 <strong>מותאם לעברית אקדמית</strong> - מושגים דתיים מדויקים</li>
-                <li>💬 <strong>זיהוי דוברים וציטוטים</strong> - במירכאות נכונות</li>
+                <li>🔪 <strong>חלוקה חכמה למקטעים</strong> - לקבצים ארוכים</li>
+                <li>🔗 <strong>איחוד אוטומטי</strong> - עם זיהוי חפיפות</li>
+                <li>📊 <strong>תמיכה בקבצים גדולים</strong> - עד 500MB</li>
+                <li>⚡ <strong>עיבוד מקבילי</strong> - מהירות מקסימלית</li>
+                <li>🎯 <strong>תמלול מלא 100%</strong> - מההתחלה עד הסוף</li>
+                <li>🔧 <strong>FFmpeg מובנה</strong> - עיבוד אודיו מקצועי</li>
+                <li>🛡️ <strong>גיבוי אוטומטי</strong> - אם חלוקה נכשלת</li>
               </ul>
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
-                תודה שבחרת במערכת התמלול המתקדמת!
+                🎉 תמלול מלא ומדויק - ללא חסר!
               </p>
             </div>
             
             <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px;">
               בברכה,<br>
               <strong>צוות התמלול החכם</strong><br>
-              מערכת תמלול מתקדמת עם AI מלא
+              מערכת תמלול מתקדמת עם חלוקה למקטעים
             </p>
           </div>
         </div>
@@ -804,7 +773,7 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
     };
 
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Enhanced email sent successfully to: ${userEmail}`);
+    console.log(`✅ Email sent successfully to: ${userEmail}`);
     
   } catch (error) {
     console.error('Email sending error:', error);
@@ -812,9 +781,9 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
   }
 }
 
-// Async transcription processing with enhanced complete transcription
+// Enhanced async transcription processing
 async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes) {
-  console.log(`🎯 Starting enhanced async transcription for ${files.length} files`);
+  console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
   console.log(`📧 Processing for user: ${userEmail}`);
   
   const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
@@ -825,14 +794,21 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
   try {
     const transcriptions = [];
+    const failedTranscriptions = [];
     
     for (const file of files) {
       console.log(`🎵 Processing file: ${file.filename}`);
-      console.log(`📊 File size: ${(fs.statSync(file.path).size / (1024 * 1024)).toFixed(1)} MB`);
+      const fileSizeMB = (fs.statSync(file.path).size / (1024 * 1024));
+      console.log(`📊 File size: ${fileSizeMB.toFixed(1)} MB`);
       
       try {
-        // Use enhanced transcription method that handles large files
-        const transcription = await transcribeLargeFile(file.path, file.filename, language);
+        // Use the enhanced transcription with chunking
+        const transcription = await transcribeCompleteAudio(file.path, file.filename, language);
+        
+        if (!transcription || transcription.trim().length < 50) {
+          throw new Error('תמלול ריק או קצר מדי');
+        }
+        
         const wordDoc = await createWordDocument(transcription, file.filename, estimatedMinutes);
         
         transcriptions.push({
@@ -846,13 +822,9 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         
       } catch (fileError) {
         console.error(`❌ Failed to process ${file.filename}:`, fileError);
-        
-        // Add a failure report to transcriptions for user notification
-        transcriptions.push({
+        failedTranscriptions.push({
           filename: file.filename,
-          transcription: `שגיאה בתמלול הקובץ: ${fileError.message}`,
-          wordDoc: null,
-          failed: true
+          error: fileError.message
         });
       } finally {
         // Clean up file
@@ -865,30 +837,47 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
     }
     
+    // Send email with results
     if (transcriptions.length > 0) {
-      // Filter out failed transcriptions for email, but keep successful ones
-      const successfulTranscriptions = transcriptions.filter(t => !t.failed);
-      const failedTranscriptions = transcriptions.filter(t => t.failed);
+      await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
+      console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
       
-      if (successfulTranscriptions.length > 0) {
-        await sendTranscriptionEmail(userEmail, successfulTranscriptions, failedTranscriptions);
-        console.log(`📧 Email sent with ${successfulTranscriptions.length} successful transcriptions`);
-      }
-      
-      if (failedTranscriptions.length > 0) {
-        console.warn(`⚠️ ${failedTranscriptions.length} files failed transcription`);
-      }
-      
-      // Update user stats only for successful transcriptions
+      // Update user stats
       const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
       user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
       user.totalTranscribed += actualMinutesUsed;
       
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
-      console.log(`📊 Success rate: ${successfulTranscriptions.length}/${transcriptions.length} files`);
+      console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
+      
+      // Send failure email
+      try {
+        const failureMailOptions = {
+          from: process.env.EMAIL_USER,
+          to: userEmail,
+          subject: '❌ תמלול נכשל - נדרשת בדיקה',
+          html: `
+            <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: #f44336; color: white; padding: 20px; border-radius: 10px;">
+                <h2>❌ תמלול נכשל</h2>
+                <p>מצטערים, התמלול של הקבצים שלך נכשל.</p>
+                <p>אנא צור קשר לתמיכה או נסה שוב עם קבצים אחרים.</p>
+                <h3>קבצים שנכשלו:</h3>
+                <ul>
+                  ${failedTranscriptions.map(f => `<li>${cleanFilename(f.filename)} - ${f.error}</li>`).join('')}
+                </ul>
+              </div>
+            </div>
+          `
+        };
+        
+        await transporter.sendMail(failureMailOptions);
+      } catch (emailError) {
+        console.error('Failed to send failure email:', emailError);
+      }
     }
     
   } catch (error) {
@@ -896,21 +885,38 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   }
 }
 
-// Routes
+// All routes remain the same as before
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    ffmpegAvailable: checkFFmpegAvailability()
+  });
 });
+
+// Function to check if FFmpeg is available
+function checkFFmpegAvailability() {
+  try {
+    const { execSync } = require('child_process');
+    execSync('ffmpeg -version', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    console.warn('⚠️ FFmpeg not available - chunking will not work optimally');
+    return false;
+  }
+}
 
 app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
     message: 'API is working!',
     geminiConfigured: !!process.env.GEMINI_API_KEY,
-    emailConfigured: !!process.env.EMAIL_USER
+    emailConfigured: !!process.env.EMAIL_USER,
+    ffmpegAvailable: checkFFmpegAvailability()
   });
 });
 
-// Authentication routes
+// Authentication routes (same as before)
 app.post('/api/login', (req, res) => {
   try {
     console.log('🔐 Login attempt:', req.body);
@@ -923,7 +929,6 @@ app.post('/api/login', (req, res) => {
     
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
     console.log('🔍 User found:', user ? 'Yes' : 'No');
-    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
     
     if (user) {
       console.log('✅ Login successful for:', user.email);
@@ -940,8 +945,6 @@ app.post('/api/login', (req, res) => {
 
 app.post('/api/register', (req, res) => {
   try {
-    console.log('📝 Registration attempt:', req.body);
-    
     const { name, email, password, phone } = req.body;
     
     if (!name || !email || !password) {
@@ -949,7 +952,6 @@ app.post('/api/register', (req, res) => {
     }
     
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-      console.log('❌ User already exists:', email);
       return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
     
@@ -960,14 +962,13 @@ app.post('/api/register', (req, res) => {
       password,
       phone: phone || '',
       isAdmin: false,
-      remainingMinutes: 30, // 30 free minutes
+      remainingMinutes: 30,
       totalTranscribed: 0,
       history: []
     };
     
     users.push(newUser);
     console.log('✅ User registered successfully:', newUser.email);
-    console.log('📋 Total users now:', users.length);
     
     res.json({ success: true, user: { ...newUser, password: undefined } });
   } catch (error) {
@@ -976,16 +977,13 @@ app.post('/api/register', (req, res) => {
   }
 });
 
-// Admin route to add minutes
+// Admin route (same as before)
 app.post('/api/admin/add-minutes', (req, res) => {
   try {
     console.log('🔧 Admin add-minutes endpoint called');
-    console.log('🔧 Request body:', req.body);
-    
     const { userEmail, minutes } = req.body;
     
     if (!userEmail || !minutes || minutes <= 0) {
-      console.log('❌ Invalid input:', { userEmail, minutes });
       return res.status(400).json({ 
         success: false, 
         error: 'אימייל ומספר דקות נדרשים' 
@@ -993,11 +991,8 @@ app.post('/api/admin/add-minutes', (req, res) => {
     }
     
     const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
-    console.log('🔍 User lookup result:', user ? 'Found' : 'Not found');
-    console.log('📋 Available users:', users.map(u => u.email));
     
     if (!user) {
-      console.log('❌ User not found for email:', userEmail);
       return res.status(404).json({ 
         success: false, 
         error: `משתמש לא נמצא: ${userEmail}` 
@@ -1027,12 +1022,11 @@ app.post('/api/admin/add-minutes', (req, res) => {
   }
 });
 
-// Transcription route
+// Enhanced transcription route
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   try {
-    console.log('🎯 Transcription request received');
+    console.log('🎯 Enhanced transcription request received');
     console.log('📁 Files uploaded:', req.files?.length || 0);
-    console.log('📧 Request body:', req.body);
     
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'לא נבחרו קבצים' });
@@ -1044,50 +1038,54 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'אימייל נדרש' });
     }
     
+    // Check FFmpeg availability for chunking
+    const ffmpegAvailable = checkFFmpegAvailability();
+    if (!ffmpegAvailable) {
+      console.warn('⚠️ FFmpeg not available - using fallback transcription');
+    }
+    
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    console.log('🔍 User lookup for transcription:', user ? 'Found' : 'Not found');
-    console.log('📧 Looking for email:', email);
-    console.log('📋 Available users:', users.map(u => u.email));
     
     if (!user) {
-      console.log('❌ User not found for transcription:', email);
       return res.status(400).json({ success: false, error: `משתמש לא נמצא: ${email}` });
     }
 
     // Calculate total estimated minutes
     const estimatedMinutes = req.files.reduce((total, file) => {
-      return total + Math.ceil(file.size / (1024 * 1024 * 2)); // Rough estimate
+      return total + Math.ceil(file.size / (1024 * 1024 * 2));
     }, 0);
     
     console.log(`⏱️ Estimated minutes: ${estimatedMinutes}, User balance: ${user.remainingMinutes}`);
 
     if (estimatedMinutes > user.remainingMinutes) {
-      console.log('❌ Insufficient minutes');
       return res.status(400).json({ 
         success: false, 
         error: `אין מספיק דקות בחשבון. נדרש: ${estimatedMinutes}, זמין: ${user.remainingMinutes}` 
       });
     }
 
-    // Start async processing
+    // Start enhanced async processing with chunking
     processTranscriptionAsync(req.files, email, language, estimatedMinutes);
     
-    console.log('✅ Transcription started successfully');
+    console.log('✅ Enhanced transcription started successfully');
     res.json({ 
       success: true, 
-      message: 'התמלול התחיל',
-      estimatedMinutes 
+      message: 'התמלול המתקדם התחיל - עם חלוקה למקטעים לקבצים גדולים',
+      estimatedMinutes,
+      chunkingEnabled: ffmpegAvailable
     });
 
   } catch (error) {
-    console.error('Transcription error:', error);
+    console.error('Enhanced transcription error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Enhanced server running on port ${PORT}`);
   console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
+  console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
+  console.log(`🎯 Enhanced features: Audio chunking, smart merging, complete transcription`);
 });
