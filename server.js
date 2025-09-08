@@ -661,7 +661,7 @@ async function createWordDocument(transcription, filename, duration) {
                 bold: true,
                 size: 36,  // Good readable size
                 font: {
-                  name: "Arial Unicode MS"
+                  name: "David"
                 }
               })
             ],
@@ -671,74 +671,7 @@ async function createWordDocument(transcription, filename, duration) {
               line: 480     // Normal line spacing
             }
           }),
-          
-          // File info with normal spacing
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `שם הקובץ: ${cleanName}`,
-                size: 24,     
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 240,   
-              line: 360     
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `משך זמן: ${duration} דקות`,
-                size: 24,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 240,
-              line: 360
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
-                size: 24,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 480,   
-              line: 360
-            }
-          }),
-          
-          // Separator with moderate space
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "═".repeat(50),
-                size: 20,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { 
-              before: 240,
-              after: 480,   
-              line: 360
-            }
-          }),
+            }),
           
           // Content with balanced spacing
           ...processTranscriptionContent(transcription)
@@ -786,7 +719,7 @@ function processTranscriptionContent(transcription) {
       children: [
         new TextRun({
           text: combinedSection,
-          size: 26,  // Good readable size - not too big, not too small
+          size: 22,  // Good readable size - not too big, not too small
           font: {
             name: "Arial Unicode MS"
           },
@@ -1217,4 +1150,5 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
