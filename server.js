@@ -1,4 +1,26 @@
-const express = require('express');
+// 🔥 Enhanced email with failure reporting
+async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
+  try {
+    console.log(`📧 Preparing enhanced email for: ${userEmail}`);
+    console.log(`📊 Successful: ${transcriptions.length}, Failed: ${failedTranscriptions.length}`);
+    
+    const attachments = transcriptions.map(trans => {
+      const cleanName = cleanFilename(trans.filename);
+      return {
+        filename: `תמלול_מלא_${cleanName}.docx`,
+        content: trans.wordDoc,
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      };
+    });
+
+    const successList = transcriptions.map(t => {
+      const cleanName = cleanFilename(t.filename);
+      const wordCount = t.transcription.split(/\s+/).length;
+      return `<li>📄 <strong>${cleanName}</strong> <small>(${wordCount} מילים)</small></li>`;
+    }).join('');
+
+    let failureSection = '';
+    if (faileconst express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
