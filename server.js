@@ -1085,18 +1085,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
-// Start server with FFmpeg check
-app.listen(PORT, async () => {
+// Start server
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
-  
-  // Check FFmpeg availability
-  const hasFFmpeg = await checkFFmpeg();
-  if (hasFFmpeg) {
-    console.log(`🔪 Chunked transcription enabled - supports files of any length!`);
-  } else {
-    console.log(`⚠️ Chunked transcription disabled - install FFmpeg for better long file support`);
-    console.log(`💡 Install FFmpeg: https://ffmpeg.org/download.html`);
-  }
 });
