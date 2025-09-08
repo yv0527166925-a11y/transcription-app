@@ -440,15 +440,34 @@ function processTranscriptionContent(transcription) {
   return paragraphs;
 }
 
+// Special function for email filename - extra safe
+function createSafeEmailFilename(originalFilename) {
+  const cleaned = cleanFilename(originalFilename);
+  
+  // For email attachment, be extra safe with characters
+  let safe = cleaned
+    .replace(/[^\u0590-\u05FF\u0041-\u005A\u0061-\u007A\u0030-\u0039\u0020]/g, '_') // Only Hebrew, English, numbers, spaces
+    .replace(/\s+/g, '_') // Replace spaces with underscores
+    .replace(/_+/g, '_') // Collapse multiple underscores
+    .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+  
+  if (!safe || safe.length < 2) {
+    safe = 'תמלול_אודיו';
+  }
+  
+  console.log(`📧 Safe email filename: "${safe}"`);
+  return safe;
+}
+
 // Enhanced email
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
     console.log(`📧 Preparing email for: ${userEmail}`);
     
     const attachments = transcriptions.map(trans => {
-      const cleanName = cleanFilename(trans.filename);
+      const safeName = createSafeEmailFilename(trans.filename);
       return {
-        filename: `תמלול_מלא_${cleanName}.docx`,
+        filename: `תמלול_מלא_${safeName}.docx`,
         content: trans.wordDoc,
         contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       };
@@ -508,6 +527,7 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
                 <li>✨ <strong>Gemini 2.5 Pro מתקדם</strong> - דיוק מקסימלי</li>
                 <li>📖 <strong>עיצוב Word מקצועי</strong> - נוח לקריאה ולעריכה</li>
                 <li>🎓 <strong>מותאם לעברית</strong> - מושגים דתיים מדויקים</li>
+                <li>🔤 <strong>שמות קבצים עבריים</strong> - קידוד נכון ובטוח</li>
               </ul>
             </div>
             
