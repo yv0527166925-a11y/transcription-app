@@ -358,13 +358,13 @@ async function createWordDocument(transcription, filename, duration) {
   }
 }
 
-// 🔥 FIX: Much more generous spacing in content
+// 🔧 FIX: Balanced content spacing - comfortable but not excessive
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\n{4,}/g, '\n\n\n')
+    .replace(/\n{3,}/g, '\n\n')    // Reduce excessive line breaks
     .trim();
   
   // Split by double line breaks to preserve paragraph structure
@@ -388,7 +388,7 @@ function processTranscriptionContent(transcription) {
       children: [
         new TextRun({
           text: combinedSection,
-          size: 32,  // Much larger text
+          size: 26,  // Good readable size - not too big, not too small
           font: {
             name: "Arial Unicode MS"
           },
@@ -396,23 +396,23 @@ function processTranscriptionContent(transcription) {
         })
       ],
       spacing: { 
-        before: isSpeakerLine ? 1440 : 720,  // 1 inch before speaker, 0.5 before regular
-        after: 720,   // 0.5 inch after each paragraph
-        line: 720     // Double line spacing
+        before: isSpeakerLine ? 360 : 240,  // Moderate space before speaker lines
+        after: 240,   // Moderate space after each paragraph
+        line: 400     // Comfortable line spacing (1.2x)
       }
     }));
     
-    // Add extra spacing every 2 paragraphs for better readability
-    if ((index + 1) % 2 === 0 && index < sections.length - 1) {
+    // Add modest extra spacing every 3 paragraphs
+    if ((index + 1) % 3 === 0 && index < sections.length - 1) {
       paragraphs.push(new Paragraph({
         children: [
           new TextRun({
             text: "",
-            size: 20
+            size: 16
           })
         ],
         spacing: { 
-          after: 720  // Extra half inch break
+          after: 240  // Small additional break
         }
       }));
     }
