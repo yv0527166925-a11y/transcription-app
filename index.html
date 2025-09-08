@@ -842,4 +842,588 @@
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     const text = await response.text();
-                    console.error('Non-JSON response
+                    console.error('Non-JSON response:', text);
+                    throw new Error('השרת החזיר תגובה לא תקינה');
+                }
+
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.success) {
+                    currentUser = data.user;
+                    updateDebugInfo('✅ התחברות הצליחה!');
+                    showApp();
+                } else {
+                    showStatus(data.error || 'שגיאה בהתחברות', 'error');
+                    updateDebugInfo(`❌ התחברות נכשלה: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                updateDebugInfo(`❌ שגיאה: ${error.message}`);
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const phone = document.getElementById('registerPhone').value;
+
+            updateDebugInfo('מנסה להירשם...');
+
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password, phone })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Non-JSON response:', text);
+                    throw new Error('השרת החזיר תגובה לא תקינה');
+                }
+
+                const data = await response.json();
+                console.log('Register response:', data);
+                
+                if (data.success) {
+                    currentUser = data.user;
+                    updateDebugInfo('✅ הרשמה הצליחה!');
+                    showApp();
+                    showStatus('ההרשמה הושלמה בהצלחה! קיבלת 30 דקות חינם', 'success');
+                } else {
+                    showStatus(data.error || 'שגיאה בהרשמה', 'error');
+                    updateDebugInfo(`❌ הרשמה נכשלה: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                showStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                updateDebugInfo(`❌ שגיאה: ${error.message}`);
+            }
+        });
+
+        function showApp() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('appSection').style.display = 'block';
+            updateDashboard();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('appSection').style.display = 'none';
+            document.getElementById('loginForm').reset();
+            document.getElementById('registerForm').reset();
+            document.getElementById('loginEmail').value = 'admin@example.com';
+            document.getElementById('loginPassword').value = 'admin123';
+        }
+
+        function updateDashboard() {
+            if (!currentUser) return;
+            
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userEmail').textContent = currentUser.email;
+            document.getElementById('remainingMinutes').textContent = currentUser.remainingMinutes;
+            document.getElementById('totalTranscribed').textContent = currentUser.totalTranscribed;
+
+            // Show admin panel if user is admin
+            if (currentUser.isAdmin) {
+                document.getElementById('adminPanel').style.display = 'block';
+                console.log('🔧 Admin panel displayed for user:', currentUser.email);
+            } else {
+                document.getElementById('adminPanel').style.display = 'none';
+            }
+        }
+
+        // Admin function to add minutes to user
+        async function addMinutesToUser() {
+            console.log('🔧 Admin function called');
+            console.log('🔧 Current user:', currentUser);
+            
+            const email = document.getElementById('adminUserEmail').value.trim();
+            const minutes = parseInt(document.getElementById('adminMinutesToAdd').value);
+            
+            console.log('🔧 Input values:', { email, minutes });
+            
+            // Check admin permissions
+            if (!currentUser || !currentUser.isAdmin) {
+                showStatus('❌ אין הרשאות מנהל', 'error');
+                return;
+            }
+            
+            if (!email || !minutes || minutes <= 0) {
+                showStatus('❌ אנא מלא את כל השדות עם ערכים תקינים', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('<div class="spinner"></div>מוסיף דקות...', 'processing');
+                
+                console.log('🔧 Sending request to server...');
+                
+                const requestBody = { 
+                    userEmail: email, 
+                    minutes: minutes 
+                };
+                
+                console.log('🔧 Request body:', requestBody);
+                
+                const response = await fetch('/api/admin/add-minutes', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                console.log('🔧 Response status:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('🔧 Error response:', errorText);
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('🔧 Success response:', data);
+                
+                if (data.success) {
+                    showStatus(`✅ הצלחה! נוספו ${minutes} דקות למשתמש ${email}<br>יתרה ישנה: ${data.oldBalance} → יתרה חדשה: ${data.newBalance} דקות`, 'success');
+                    
+                    // Clear fields
+                    document.getElementById('adminUserEmail').value = '';
+                    document.getElementById('adminMinutesToAdd').value = '';
+                    
+                    // Update dashboard if this is the current user
+                    if (currentUser && currentUser.email === email) {
+                        currentUser.remainingMinutes = data.newBalance;
+                        updateDashboard();
+                    }
+                } else {
+                    showStatus(`❌ שגיאה: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('🔧 Add minutes error:', error);
+                showStatus(`❌ שגיאה בהוספת דקות: ${error.message}`, 'error');
+            }
+        }
+
+        // Real audio/video duration detection
+        function getAudioDuration(file) {
+            return new Promise((resolve) => {
+                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                    const url = URL.createObjectURL(file);
+                    const audio = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
+                    
+                    audio.addEventListener('loadedmetadata', () => {
+                        const duration = Math.ceil(audio.duration / 60);
+                        URL.revokeObjectURL(url);
+                        resolve(duration);
+                    });
+                    
+                    audio.addEventListener('error', () => {
+                        URL.revokeObjectURL(url);
+                        const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
+                        resolve(Math.max(1, estimatedMinutes));
+                    });
+                    
+                    audio.src = url;
+                } else {
+                    const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
+                    resolve(Math.max(1, estimatedMinutes));
+                }
+            });
+        }
+
+        // File upload functions
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFilesDiv = document.getElementById('selectedFiles');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            const validFiles = Array.from(files).filter(file => 
+                file.type.startsWith('audio/') || 
+                file.type.startsWith('video/') ||
+                file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
+            );
+            
+            if (validFiles.length === 0) {
+                showStatus('אנא בחר קבצי אודיו או וידאו תקינים', 'error');
+                return;
+            }
+            
+            showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
+            
+            for (const file of validFiles) {
+                try {
+                    const duration = await getAudioDuration(file);
+                    selectedFiles.push({
+                        file: file,
+                        duration: duration
+                    });
+                    await displayFile(file, duration);
+                } catch (error) {
+                    console.error('Error processing file:', file.name, error);
+                    const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
+                    selectedFiles.push({
+                        file: file,
+                        duration: estimatedDuration
+                    });
+                    await displayFile(file, estimatedDuration);
+                }
+            }
+            
+            updateSubmitButton();
+            updateCostEstimate();
+            hideStatus();
+        }
+
+        function displayFile(file, duration) {
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'selected-file';
+            fileDiv.setAttribute('data-filename', file.name);
+            
+            const fileSizeFormatted = formatFileSize(file.size);
+            const fileTypeIcon = getFileTypeIcon(file.type, file.name);
+            
+            fileDiv.innerHTML = `
+                <div class="file-info">
+                    <div>
+                        <div class="file-name">${fileTypeIcon} ${file.name}</div>
+                        <div class="file-size">📏 גודל: ${fileSizeFormatted}</div>
+                        <div class="file-duration">⏱️ משך זמן: ${duration} דקות</div>
+                        <div class="file-type" style="font-size: 0.8em; color: #888;">סוג: ${getFileTypeDescription(file.type, file.name)}</div>
+                    </div>
+                    <button type="button" class="remove-file" onclick="removeFile('${file.name}')">×</button>
+                </div>
+            `;
+            selectedFilesDiv.appendChild(fileDiv);
+        }
+
+        function getFileTypeIcon(mimeType, fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            
+            if (mimeType.startsWith('video/') || ['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+                return '🎬';
+            } else if (mimeType.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'flac', 'aac', 'ogg'].includes(ext)) {
+                return '🎵';
+            }
+            return '📁';
+        }
+
+        function getFileTypeDescription(mimeType, fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            
+            const descriptions = {
+                'mp3': 'MP3 Audio',
+                'wav': 'WAV Audio',
+                'm4a': 'M4A Audio',
+                'flac': 'FLAC Audio',
+                'aac': 'AAC Audio',
+                'ogg': 'OGG Audio',
+                'mp4': 'MP4 Video',
+                'mov': 'MOV Video',
+                'avi': 'AVI Video',
+                'mkv': 'MKV Video'
+            };
+            
+            return descriptions[ext] || 'קובץ מולטימדיה';
+        }
+
+        function removeFile(fileName) {
+            selectedFiles = selectedFiles.filter(item => item.file.name !== fileName);
+            
+            const fileDiv = document.querySelector(`[data-filename="${fileName}"]`);
+            if (fileDiv) {
+                fileDiv.remove();
+            }
+            
+            updateSubmitButton();
+            updateCostEstimate();
+        }
+
+        function updateSubmitButton() {
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = selectedFiles.length === 0;
+        }
+
+        function updateCostEstimate() {
+            if (selectedFiles.length === 0) {
+                document.getElementById('estimatedCost').style.display = 'none';
+                return;
+            }
+
+            const totalMinutes = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
+            document.getElementById('estimatedMinutes').textContent = totalMinutes;
+            document.getElementById('currentBalance').textContent = currentUser ? currentUser.remainingMinutes : 0;
+            
+            const costDiv = document.getElementById('estimatedCost');
+            costDiv.style.display = 'block';
+            
+            if (currentUser && totalMinutes > currentUser.remainingMinutes) {
+                costDiv.className = 'insufficient-minutes';
+                costDiv.innerHTML = `
+                    <strong>⚠️ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
+                    <strong>יתרה נוכחית:</strong> ${currentUser.remainingMinutes} דקות<br>
+                    <strong style="color: #d32f2f;">חסרות ${totalMinutes - currentUser.remainingMinutes} דקות!</strong><br>
+                    <small>💡 אנא רכוש דקות נוספות או הסר קבצים</small>
+                `;
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').textContent = '⛔ אין מספיק דקות';
+            } else {
+                costDiv.className = 'status success';
+                costDiv.innerHTML = `
+                    <strong>✅ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
+                    <strong>יתרה נוכחית:</strong> ${currentUser ? currentUser.remainingMinutes : 0} דקות<br>
+                    <strong style="color: #2e7d32;">יתרה לאחר תמלול:</strong> ${currentUser ? currentUser.remainingMinutes - totalMinutes : 0} דקות<br>
+                    <small>🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית</small>
+                `;
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול מלא';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            const size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
+            return `${size} ${sizes[i]}`;
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+            status.style.display = 'block';
+        }
+
+        function hideStatus() {
+            setTimeout(() => {
+                const status = document.getElementById('status');
+                if (status.classList.contains('processing')) {
+                    status.style.display = 'none';
+                }
+            }, 2000);
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+        }
+
+        // Form submission with real processing
+        document.getElementById('transcriptionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (selectedFiles.length === 0) {
+                showStatus('אנא בחר קבצים לתמלול', 'error');
+                return;
+            }
+
+            const totalMinutes = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
+            if (totalMinutes > currentUser.remainingMinutes) {
+                showStatus('אין מספיק דקות בחשבון. אנא רכוש דקות נוספות', 'error');
+                return;
+            }
+
+            const language = document.getElementById('language').value;
+            const submitBtn = document.getElementById('submitBtn');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ מעבד...';
+            document.getElementById('progressBar').style.display = 'block';
+            
+            showStatus(`
+                <div class="spinner"></div>
+                <strong>מעבד ${selectedFiles.length} קבצים עם Gemini 2.5 Pro...</strong><br>
+                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 תמלול מלא ומותאם לעברית</small><br>
+                <small>📧 התוצאות יישלחו למייל ${currentUser.email}</small>
+            `, 'processing');
+
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 3;
+                if (progress > 85) progress = 85;
+                updateProgress(progress);
+            }, 2000);
+
+            try {
+                const formData = new FormData();
+                selectedFiles.forEach((item, index) => {
+                    formData.append('files', item.file);
+                });
+                formData.append('email', currentUser.email);
+                formData.append('language', language);
+
+                const response = await fetch(`${API_BASE}/transcribe`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                clearInterval(progressInterval);
+                updateProgress(100);
+
+                if (data.success) {
+                    currentUser.remainingMinutes -= data.estimatedMinutes || totalMinutes;
+                    currentUser.totalTranscribed += data.estimatedMinutes || totalMinutes;
+                    
+                    updateDashboard();
+                    showStatus(`
+                        ✅ <strong>התמלול התחיל בהצלחה!</strong><br>
+                        📄 ${selectedFiles.length} קבצי Word מעוצבים יישלחו למייל <strong>${currentUser.email}</strong><br>
+                        ⏱️ נוצלו ${data.estimatedMinutes || totalMinutes} דקות מהחשבון<br>
+                        💰 יתרה נוכחית: <strong>${currentUser.remainingMinutes} דקות</strong><br>
+                        🕒 זמן עיבוד משוער: <strong>3-8 דקות</strong><br>
+                        🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית
+                    `, 'success');
+                    
+                    selectedFiles = [];
+                    selectedFilesDiv.innerHTML = '';
+                    updateCostEstimate();
+                    fileInput.value = '';
+                } else {
+                    throw new Error(data.error || 'שגיאה בעיבוד');
+                }
+
+            } catch (error) {
+                clearInterval(progressInterval);
+                showStatus(`❌ <strong>שגיאה:</strong> ${error.message}<br><small>אנא נסה שוב או צור קשר לתמיכה</small>`, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🚀 התחל תמלול מלא';
+                setTimeout(() => {
+                    document.getElementById('progressBar').style.display = 'none';
+                    updateProgress(0);
+                }, 3000);
+            }
+        });
+
+        // Payment functions
+        function selectPaymentOption(element, minutes, price) {
+            document.querySelectorAll('.payment-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            element.classList.add('selected');
+            
+            selectedPayment = { minutes, price };
+            document.getElementById('purchaseBtn').disabled = false;
+        }
+
+        function processPurchase() {
+            if (!selectedPayment) return;
+            
+            showStatus('<div class="spinner"></div>מעבד תשלום...', 'processing');
+            
+            setTimeout(() => {
+                currentUser.remainingMinutes += selectedPayment.minutes;
+                updateDashboard();
+                
+                document.querySelectorAll('.payment-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                const minutes = selectedPayment.minutes;
+                selectedPayment = null;
+                document.getElementById('purchaseBtn').disabled = true;
+                
+                showStatus(`✅ התשלום בוצע בהצלחה!<br>נוספו ${minutes} דקות לחשבון`, 'success');
+            }, 2000);
+        }
+
+        // History functions
+        function loadHistory() {
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            
+            if (!currentUser || !currentUser.history || currentUser.history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">אין היסטוריה עדיין</td></tr>';
+                return;
+            }
+            
+            currentUser.history.reverse().forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.date}</td>
+                    <td>${item.fileName}</td>
+                    <td>${item.duration} דקות</td>
+                    <td>${getLanguageName(item.language)}</td>
+                    <td><span class="status-badge status-${item.status}">${getStatusName(item.status)}</span></td>
+                    <td>
+                        ${item.status === 'completed' ? 
+                          `<button class="btn-secondary" onclick="downloadFile('${item.downloadUrl}')">📥 הורדה</button>` : 
+                          '⏳ בעיבוד'
+                        }
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function getLanguageName(code) {
+            const languages = {
+                'he': 'עברית',
+                'en': 'אנגלית',
+                'ar': 'עברית',
+                'es': 'ספרדית',
+                'fr': 'צרפתית',
+                'de': 'גרמנית',
+                'auto': 'זיהוי אוטומטי'
+            };
+            return languages[code] || code;
+        }
+
+        function getStatusName(status) {
+            const statuses = {
+                'completed': 'הושלם',
+                'processing': 'בעיבוד',
+                'failed': 'נכשל'
+            };
+            return statuses[status] || status;
+        }
+
+        function downloadFile(url) {
+            showStatus('⬇️ ההורדה תתחיל תוך רגע...', 'success');
+        }
+
+        // Initialize app
+        updateSubmitButton();
+        
+        // Test API when page loads
+        window.addEventListener('load', testAPI);
+    </script>
+</body>
+</html>
