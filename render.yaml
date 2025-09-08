@@ -2,16 +2,73 @@ services:
   - type: web
     name: transcription-app
     env: node
-    plan: standard # Or your specific plan
-    buildCommand: "npm install && apt-get update && apt-get install -y ffmpeg"
+    plan: standard # או Pro אם צריך יותר משאבים לקבצים גדולים
+    
+    # 🔥 Build command מעודכן עם FFmpeg
+    buildCommand: |
+      npm install && 
+      apt-get update && 
+      apt-get install -y ffmpeg && 
+      echo "✅ FFmpeg installed successfully" &&
+      ffmpeg -version | head -1
+    
     startCommand: "npm start"
+    
+    # Health check endpoint
     healthCheckPath: /health
+    
+    # 🔥 משאבים מוגדלים לעיבוד קבצים גדולים
+    numCpus: 2      # 2 CPUs לעיבוד מהיר יותר
+    memoryGB: 4     # 4GB RAM לקבצים גדולים
+    
+    # 🔥 אחסון זמני לקטעי אודיו
+    disk:
+      name: temp-audio-storage
+      mountPath: /tmp/audio-chunks
+      sizeGB: 10    # 10GB לאחסון זמני של קטעי אודיו
+    
+    # Environment variables
     envVars:
       - key: NODE_ENV
         value: production
       - key: GEMINI_API_KEY
-        sync: false
+        sync: false  # הגדר בדשבורד של Render
       - key: EMAIL_USER
-        sync: false
+        sync: false  # הגדר בדשבורד של Render
       - key: EMAIL_PASS
-        sync: false
+        sync: false  # הגדר בדשבורד של Render
+      - key: PORT
+        value: "3000"
+    
+    # 🔥 הגדרות רשת מתקדמות
+    autoDeploy: true
+    
+    # 🔥 הגדרות timeout מוגדלות לקבצים גדולים
+    # (אלה יוגדרו ברמת השרת, לא ב-render.yaml)
+    
+    # 🔥 Pre-deploy hooks (אופציונלי)
+    preDeployCommand: |
+      echo "🚀 Starting enhanced transcription app deployment..." &&
+      echo "📊 Checking system resources..." &&
+      df -h &&
+      free -h &&
+      echo "🔧 Verifying FFmpeg installation..." &&
+      which ffmpeg || echo "⚠️ FFmpeg not found during pre-deploy"
+    
+    # 🔥 הגדרות logging מתקדמות
+    # Render יטפל בזה אוטומטי, אבל אפשר להוסיף:
+    # logLevel: info
+
+# 🔥 הגדרות נוספות (אופציונליות)
+# אם תרצה מסד נתונים בעתיד:
+# databases:
+#   - name: transcription-db
+#     databaseName: transcription
+#     user: transcription_user
+#     plan: starter  # או free
+
+# 🔥 הגדרות Cron jobs אם תרצה ניקוי אוטומטי
+# cronjobs:
+#   - name: cleanup-temp-files
+#     schedule: "0 2 * * *"  # כל יום ב-2:00 בלילה
+#     command: "find /tmp/audio-chunks -type f -mtime +1 -delete"
