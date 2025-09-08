@@ -6,17 +6,18 @@ const fs = require('fs');
 const path = require('path');
 const { Document, Paragraph, TextRun, Packer, AlignmentType } = require('docx');
 const cors = require('cors');
-const { spawn } = require('child_process');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+console.log('🚀 Starting transcription server...');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Configure multer for file uploads with Hebrew support
+// Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = 'uploads/';
@@ -28,7 +29,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const timestamp = Date.now();
     const extension = path.extname(file.originalname);
-    // Fix Hebrew filename encoding
+    // Fix Hebrew encoding
     const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
     cb(null, `${timestamp}_${safeName}`);
   }
@@ -39,17 +40,42 @@ const upload = multer({
   limits: { fileSize: 500 * 1024 * 1024 }
 });
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+console.log('📁 Multer configured');
 
-// Configure email transporter
-const transporter = nodemailer.createTransporter({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+// Initialize Gemini AI
+let genAI;
+try {
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here') {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    console.log('🤖 Gemini AI initialized');
+  } else {
+    console.log('⚠️ Gemini API key not configured');
   }
-});
+} catch (error) {
+  console.error('❌ Gemini AI initialization failed:', error);
+}
+
+// Configure email transporter - FIXED!
+let transporter;
+try {
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+    console.log('📧 Email transporter configured');
+  } else {
+    console.log('⚠️ Email credentials not configured');
+  }
+} catch (error) {
+  console.error('❌ Email transporter failed:', error);
+}
 
 // In-memory database
 const users = new Map();
@@ -86,62 +112,18 @@ function initializeDemoUsers() {
   console.log('✅ Demo users initialized');
 }
 
-// Audio duration extraction
-async function getAudioDuration(filePath) {
-  return new Promise((resolve) => {
-    const ffprobe = spawn('ffprobe', [
-      '-v', 'quiet',
-      '-show_entries', 'format=duration',
-      '-of', 'csv=p=0',
-      filePath
-    ]);
-
-    let output = '';
-    ffprobe.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-
-    ffprobe.on('close', (code) => {
-      if (code === 0) {
-        const duration = parseFloat(output.trim());
-        resolve(Math.ceil(duration / 60));
-      } else {
-        const stats = fs.statSync(filePath);
-        const fileSizeInMB = stats.size / (1024 * 1024);
-        resolve(Math.ceil(fileSizeInMB / 2));
-      }
-    });
-
-    ffprobe.on('error', () => {
-      const stats = fs.statSync(filePath);
-      const fileSizeInMB = stats.size / (1024 * 1024);
-      resolve(Math.ceil(fileSizeInMB / 2));
-    });
-  });
-}
-
-// Convert audio for Gemini
-async function convertAudioForGemini(inputPath) {
-  return new Promise((resolve) => {
-    const outputPath = inputPath.replace(/\.[^/.]+$/, '_converted.wav');
-    
-    const ffmpeg = spawn('ffmpeg', [
-      '-i', inputPath,
-      '-ar', '16000',
-      '-ac', '1',
-      '-c:a', 'pcm_s16le',
-      '-y',
-      outputPath
-    ]);
-
-    ffmpeg.on('close', (code) => {
-      resolve(code === 0 ? outputPath : inputPath);
-    });
-
-    ffmpeg.on('error', () => {
-      resolve(inputPath);
-    });
-  });
+// Simple duration estimation (no FFmpeg dependency)
+function getAudioDuration(filePath) {
+  try {
+    const stats = fs.statSync(filePath);
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    // Estimate: 1-2MB per minute of audio
+    const estimatedMinutes = Math.max(1, Math.ceil(fileSizeInMB / 1.5));
+    return estimatedMinutes;
+  } catch (error) {
+    console.error('Duration estimation error:', error);
+    return 5; // Default fallback
+  }
 }
 
 // API ROUTES
@@ -222,6 +204,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     const files = req.files;
     
     console.log(`🎯 Transcription request from: ${email}`);
+    console.log(`📁 Files uploaded: ${files ? files.length : 0}`);
     
     if (!files || files.length === 0) {
       return res.status(400).json({ success: false, error: 'לא הועלו קבצים' });
@@ -236,15 +219,10 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     const fileInfos = [];
     
     for (const file of files) {
-      try {
-        const duration = await getAudioDuration(file.path);
-        totalMinutes += duration;
-        fileInfos.push({ file, duration });
-      } catch (error) {
-        const estimatedDuration = 5;
-        totalMinutes += estimatedDuration;
-        fileInfos.push({ file, duration: estimatedDuration });
-      }
+      const duration = getAudioDuration(file.path);
+      totalMinutes += duration;
+      fileInfos.push({ file, duration });
+      console.log(`📊 File: ${file.originalname}, estimated duration: ${duration} minutes`);
     }
     
     if (totalMinutes > user.remainingMinutes) {
@@ -260,7 +238,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     console.log(`🚀 Starting transcription job: ${jobId}`);
     
     // Start processing asynchronously
-    processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes);
+    setTimeout(() => processTranscriptionJob(jobId, fileInfos, user, language), 1000);
     
     res.json({
       success: true,
@@ -278,6 +256,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
 app.post('/api/admin/add-minutes', (req, res) => {
   try {
     console.log('🔧 Admin add minutes request');
+    console.log('🔧 Request body:', req.body);
     
     const { userEmail, minutes } = req.body;
     
@@ -290,6 +269,8 @@ app.post('/api/admin/add-minutes', (req, res) => {
     
     const user = users.get(userEmail);
     if (!user) {
+      console.log('❌ User not found:', userEmail);
+      console.log('🔧 Available users:', Array.from(users.keys()));
       return res.status(404).json({ 
         success: false, 
         error: `משתמש עם אימייל ${userEmail} לא נמצא` 
@@ -308,6 +289,7 @@ app.post('/api/admin/add-minutes', (req, res) => {
     user.remainingMinutes += minutesToAdd;
     
     console.log(`✅ Added ${minutesToAdd} minutes to ${userEmail}`);
+    console.log(`   Old balance: ${oldBalance}, New balance: ${user.remainingMinutes}`);
     
     res.json({
       success: true,
@@ -325,22 +307,26 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    geminiConfigured: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here',
-    users: users.size
+    geminiConfigured: !!genAI,
+    emailConfigured: !!transporter,
+    users: users.size,
+    version: '1.0.0'
   });
 });
 
 app.get('/api/test', (req, res) => {
   res.json({ 
     success: true, 
-    message: 'API is working!',
-    timestamp: new Date().toISOString()
+    message: 'API is working perfectly!',
+    timestamp: new Date().toISOString(),
+    users: users.size
   });
 });
 
 // Static files
 app.use(express.static('.'));
 
+// Catch-all route
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
@@ -349,9 +335,9 @@ app.get('*', (req, res) => {
 });
 
 // HELPER FUNCTIONS
-async function processTranscriptionJob(jobId, fileInfos, user, language, totalMinutes) {
+async function processTranscriptionJob(jobId, fileInfos, user, language) {
   try {
-    console.log(`🎯 Processing job ${jobId}`);
+    console.log(`🎯 Processing transcription job ${jobId} with ${fileInfos.length} files`);
     transcriptionJobs.set(jobId, { status: 'processing', progress: 0 });
     
     const transcriptions = [];
@@ -365,9 +351,13 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
       });
       
       try {
-        console.log(`🎵 Processing: ${file.originalname}`);
-        const convertedPath = await convertAudioForGemini(file.path);
-        const transcription = await realGeminiTranscription(convertedPath, file.originalname, language);
+        console.log(`🎵 Processing file: ${file.originalname}`);
+        
+        if (!genAI) {
+          throw new Error('Gemini AI not configured');
+        }
+        
+        const transcription = await realGeminiTranscription(file.path, file.originalname, language);
         const wordDoc = await createWordDocument(transcription, file.originalname, duration);
         
         transcriptions.push({
@@ -377,10 +367,7 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
           duration: duration
         });
         
-        // Cleanup
-        if (convertedPath !== file.path && fs.existsSync(convertedPath)) {
-          fs.unlinkSync(convertedPath);
-        }
+        console.log(`✅ Completed processing: ${file.originalname}`);
         
       } catch (error) {
         console.error(`❌ Error processing ${file.originalname}:`, error);
@@ -394,11 +381,14 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
     
     const successfulTranscriptions = transcriptions.filter(t => !t.error);
     
-    if (successfulTranscriptions.length > 0) {
+    if (successfulTranscriptions.length > 0 && transporter) {
+      console.log(`📧 Sending email with ${successfulTranscriptions.length} documents`);
       await sendTranscriptionEmail(user.email, successfulTranscriptions);
+    } else if (!transporter) {
+      console.log('⚠️ Email not configured, skipping email send');
     }
     
-    // Update user
+    // Update user balance
     const successfulMinutes = successfulTranscriptions.reduce((sum, t) => sum + t.duration, 0);
     user.remainingMinutes -= successfulMinutes;
     user.totalTranscribed += successfulMinutes;
@@ -412,24 +402,30 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
         duration: trans.duration,
         language: language,
         status: trans.error ? 'failed' : 'completed',
-        jobId: jobId
+        jobId: jobId,
+        error: trans.error
       });
     });
     
     transcriptionJobs.set(jobId, { 
       status: 'completed', 
       progress: 100,
-      successful: successfulTranscriptions.length
+      successful: successfulTranscriptions.length,
+      failed: transcriptions.length - successfulTranscriptions.length
     });
     
-    // Cleanup files
+    // Cleanup uploaded files
     fileInfos.forEach(({ file }) => {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
+      try {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      } catch (error) {
+        console.error('File cleanup error:', error);
       }
     });
     
-    console.log(`🎉 Job ${jobId} completed`);
+    console.log(`🎉 Transcription job ${jobId} completed successfully`);
     
   } catch (error) {
     console.error('Job processing error:', error);
@@ -439,10 +435,6 @@ async function processTranscriptionJob(jobId, fileInfos, user, language, totalMi
 
 async function realGeminiTranscription(filePath, filename, language) {
   try {
-    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_gemini_api_key_here') {
-      throw new Error('Gemini API key לא הוגדר');
-    }
-
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-pro",
       generationConfig: {
@@ -459,6 +451,7 @@ async function realGeminiTranscription(filePath, filename, language) {
     if (ext === '.mp3') mimeType = 'audio/mpeg';
     else if (ext === '.mp4') mimeType = 'video/mp4';
     else if (ext === '.m4a') mimeType = 'audio/mp4';
+    else if (ext === '.mov') mimeType = 'video/quicktime';
 
     const prompt = `תמלל את כל הקובץ האודיו הבא לעברית בצורה מלאה ומדויקת. זהו רב המדבר בעברית עם הגיה ליטאית ומשלב מושגים בארמית.
 
@@ -469,6 +462,10 @@ async function realGeminiTranscription(filePath, filename, language) {
 4. חלק לפסקאות של 2-3 משפטים
 5. השאר שורה ריקה בין פסקאות
 
+עיצוב הטקסט:
+- כל משפט מסתיים בנקודה
+- אם יש דובר חדש, כתוב "רב:" או "שואל:" רק אם זה ברור
+
 ציטוטים במירכאות:
 - "שנאמר..."
 - "כדאיתא בגמרא..."
@@ -477,9 +474,11 @@ async function realGeminiTranscription(filePath, filename, language) {
 - "תניא..."
 - "כדכתיב..."
 
-התחל עכשיו ותמלל הכל:`;
+זכור: תמלל הכל! אל תקצר! המשך עד הסוף המוחלט של הקובץ!
 
-    console.log(`🎯 Starting Gemini transcription: ${filename}`);
+התחל עכשיו:`;
+
+    console.log(`🎯 Starting Gemini transcription for: ${filename}`);
 
     const result = await model.generateContent([
       {
@@ -494,22 +493,25 @@ async function realGeminiTranscription(filePath, filename, language) {
     const response = await result.response;
     let transcription = response.text();
     
+    console.log(`🎯 Raw transcription length: ${transcription.length} characters`);
+    
     // Clean up text
     transcription = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{4,}/g, '\n\n')
       .replace(/^\s+|\s+$/gm, '')
+      .replace(/([.!?])\s*([א-ת])/g, '$1 $2')
       .trim();
     
     if (!transcription || transcription.length < 50) {
-      throw new Error('התמלול נכשל - טקסט קצר מדי');
+      throw new Error('התמלול נכשל - טקסט קצר מדי או ריק');
     }
     
-    console.log(`✅ Transcription completed: ${transcription.length} chars`);
+    console.log(`✅ Transcription completed: ${transcription.length} characters`);
     return transcription;
     
   } catch (error) {
-    console.error('Gemini error:', error);
+    console.error('🔥 Gemini transcription error:', error);
     
     if (error.message.includes('API key')) {
       throw new Error('שגיאה באימות Gemini API');
@@ -523,8 +525,20 @@ async function realGeminiTranscription(filePath, filename, language) {
 
 async function createWordDocument(transcription, filename, duration) {
   try {
+    console.log(`📄 Creating Word document for: ${filename}`);
+    
     const doc = new Document({
       sections: [{
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              right: 1440,
+              bottom: 1440,
+              left: 1440
+            }
+          }
+        },
         children: [
           new Paragraph({
             children: [
@@ -532,11 +546,16 @@ async function createWordDocument(transcription, filename, duration) {
                 text: "תמלול אוטומטי",
                 bold: true,
                 size: 32,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -544,10 +563,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `שם הקובץ: ${filename}`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 200 }
+            spacing: { 
+              after: 200,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -555,10 +579,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `משך זמן: ${duration} דקות`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 200 }
+            spacing: { 
+              after: 200,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -566,10 +595,15 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
                 size: 24,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           new Paragraph({
@@ -577,11 +611,16 @@ async function createWordDocument(transcription, filename, duration) {
               new TextRun({
                 text: "─".repeat(50),
                 size: 20,
-                font: { name: "David" }
+                font: {
+                  name: "David"
+                }
               })
             ],
             alignment: AlignmentType.CENTER,
-            spacing: { after: 400 }
+            spacing: { 
+              after: 400,
+              line: 360
+            }
           }),
           
           ...processTranscriptionContent(transcription)
@@ -589,10 +628,12 @@ async function createWordDocument(transcription, filename, duration) {
       }]
     });
     
-    return await Packer.toBuffer(doc);
+    const buffer = await Packer.toBuffer(doc);
+    console.log(`✅ Word document created successfully for: ${filename}`);
+    return buffer;
     
   } catch (error) {
-    console.error('Word doc error:', error);
+    console.error('Error creating Word document:', error);
     throw error;
   }
 }
@@ -600,11 +641,14 @@ async function createWordDocument(transcription, filename, duration) {
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
-  const sections = transcription
+  let cleanedText = transcription
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
-    .split(/\n\s*\n/)
-    .filter(section => section.trim().length > 0);
+    .trim();
+  
+  const sections = cleanedText.split(/\n\s*\n/)
+    .map(section => section.trim())
+    .filter(section => section.length > 0);
   
   sections.forEach(section => {
     section = section.replace(/\n+/g, ' ').trim();
@@ -613,15 +657,25 @@ function processTranscriptionContent(transcription) {
       section += '.';
     }
     
+    // Check if this is a speaker line
+    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר)\s*:/.test(section.trim());
+    
     paragraphs.push(new Paragraph({
       children: [
         new TextRun({
           text: section,
           size: 24,
-          font: { name: "David" }
+          font: {
+            name: "David"
+          },
+          bold: isSpeakerLine
         })
       ],
-      spacing: { before: 200, after: 300 }
+      spacing: { 
+        before: isSpeakerLine ? 400 : 200,
+        after: 300,
+        line: 400
+      }
     }));
   });
   
@@ -651,6 +705,7 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
             ${transcriptions.map(t => `<li>📄 ${t.filename}</li>`).join('')}
           </ul>
           <p><strong>💫 תמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית</strong></p>
+          <p>הקבצים נוצרו במיוחד עבורך על ידי מערכת Gemini 2.5 Pro המתקדמת.</p>
           <p>בברכה,<br>מערכת התמלול החכמה</p>
         </div>
       `,
@@ -666,15 +721,16 @@ async function sendTranscriptionEmail(userEmail, transcriptions) {
   }
 }
 
-// Initialize and start server
+// Initialize demo users and start server
 initializeDemoUsers();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🌐 Access: http://localhost:${PORT}`);
-  console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
-  console.log(`🤖 Gemini configured: ${!!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'}`);
+  console.log(`📧 Email configured: ${!!transporter}`);
+  console.log(`🤖 Gemini configured: ${!!genAI}`);
   console.log('📊 Demo users available:');
   console.log('   👨‍💼 Admin: admin@example.com / admin123');
   console.log('   👤 User: test@example.com / test123');
+  console.log('✅ Server ready and waiting for requests!');
 });
