@@ -761,8 +761,8 @@ if (combinedSection.length > 300) {
         new TextRun({
           text: combinedSection,
           size: 22,  // Good readable size - not too big, not too small
-        font: { name: "Times New Roman" }
-          bold: isSpeakerLine
+       font: { name: "Times New Roman" },
+bold: isSpeakerLine
         })
     alignment: AlignmentType.RIGHT,
 spacing: { 
@@ -1192,6 +1192,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
