@@ -651,15 +651,19 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
 // Async transcription processing
 async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes) {
   console.log(`🎯 Starting async transcription for ${files.length} files`);
+  console.log(`📧 Processing for user: ${userEmail}`);
   
-  const user = users.find(u => u.email === userEmail);
-  if (!user) return;
+  const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+  if (!user) {
+    console.error('❌ User not found during async processing:', userEmail);
+    return;
+  }
 
   try {
     const transcriptions = [];
     
     for (const file of files) {
-      console.log(`🎵 Processing: ${file.filename}`);
+      console.log(`🎵 Processing file: ${file.filename}`);
       
       try {
         const transcription = await realGeminiTranscription(file.path, file.filename, language);
@@ -671,15 +675,16 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           wordDoc
         });
         
-        console.log(`✅ Completed: ${cleanFilename(file.filename)}`);
+        console.log(`✅ Completed processing: ${cleanFilename(file.filename)}`);
       } catch (fileError) {
         console.error(`❌ Failed to process ${file.filename}:`, fileError);
       } finally {
         // Clean up file
         try {
           fs.unlinkSync(file.path);
+          console.log(`🗑️ Cleaned up file: ${file.path}`);
         } catch (e) {
-          console.warn('Could not delete file:', file.path);
+          console.warn('Could not delete file:', file.path, e.message);
         }
       }
     }
@@ -692,6 +697,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       user.totalTranscribed += estimatedMinutes;
       
       console.log(`🎉 All transcriptions completed for: ${userEmail}`);
+      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
     } else {
       console.error(`❌ No successful transcriptions for: ${userEmail}`);
     }
