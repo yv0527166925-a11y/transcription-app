@@ -763,7 +763,7 @@ if (combinedSection.length > 300) {
           size: 22,  // Good readable size - not too big, not too small
        font: { name: "Times New Roman" },
 bold: isSpeakerLine
-        })
+      }),
     alignment: AlignmentType.RIGHT,
 spacing: { 
   after: 120,
@@ -1192,6 +1192,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
