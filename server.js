@@ -705,7 +705,49 @@ function processTranscriptionContent(transcription) {
   sections.forEach((section, index) => {
     // Clean up the section but keep line breaks within it
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    let combinedSection = lines.join(' ').trim();
+  let combinedSection = lines.join(' ').trim();
+
+// Split long sections into shorter paragraphs
+if (combinedSection.length > 300) {
+  const sentences = combinedSection.split(/(?<=[.!?])\s+/);
+  let currentPara = '';
+  
+  for (const sentence of sentences) {
+    if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
+      // Create paragraph with current content
+      paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: currentPara.trim(),
+            size: 24,
+            font: { name: "Times New Roman" }
+          })
+        ],
+        alignment: AlignmentType.RIGHT,
+        spacing: { after: 120, line: 360 }
+      }));
+      currentPara = sentence + ' ';
+    } else {
+      currentPara += sentence + ' ';
+    }
+  }
+  
+  // Add remaining content
+  if (currentPara.trim()) {
+    paragraphs.push(new Paragraph({
+      children: [
+        new TextRun({
+          text: currentPara.trim(),
+          size: 24,
+          font: { name: "Times New Roman" }
+        })
+      ],
+      alignment: AlignmentType.RIGHT,
+      spacing: { after: 120, line: 360 }
+    }));
+  }
+  return paragraphs; // Early return for long sections
+}
     
     if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
       combinedSection += '.';
@@ -719,31 +761,32 @@ function processTranscriptionContent(transcription) {
         new TextRun({
           text: combinedSection,
           size: 22,  // Good readable size - not too big, not too small
-          font: {
-            name: "Arial Unicode MS"
-          },
+        font: { name: "Times New Roman" }
           bold: isSpeakerLine
         })
-      ],
-      spacing: { 
-        before: isSpeakerLine ? 360 : 240,  // Moderate space before speaker lines
-        after: 240,   // Moderate space after each paragraph
-        line: 400     // Comfortable line spacing (1.2x)
-      }
+    alignment: AlignmentType.RIGHT,
+spacing: { 
+  after: 120,
+  line: 360
+}
     }));
     
     // Add modest extra spacing every 3 paragraphs
     if ((index + 1) % 3 === 0 && index < sections.length - 1) {
       paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: "",
-            size: 16
-          })
-        ],
-        spacing: { 
-          after: 240  // Small additional break
-        }
+      children: [
+  new TextRun({
+    text: combinedSection,
+    size: 24,
+    font: { name: "Times New Roman" },
+    bold: isSpeakerLine
+  })
+],
+alignment: AlignmentType.RIGHT,
+spacing: { 
+  after: 120,
+  line: 360
+}
       }));
     }
   });
@@ -1149,6 +1192,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
