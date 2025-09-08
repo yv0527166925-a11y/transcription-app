@@ -756,20 +756,21 @@ if (combinedSection.length > 300) {
     // Detect speaker lines
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
-    paragraphs.push(new Paragraph({
-      children: [
-        new TextRun({
-          text: combinedSection,
-          size: 22,  // Good readable size - not too big, not too small
-       font: { name: "Times New Roman" },
-bold: isSpeakerLine
-      }),
-    alignment: AlignmentType.RIGHT,
-spacing: { 
-  after: 120,
-  line: 360
-}
-    }));
+   paragraphs.push(new Paragraph({
+  children: [
+    new TextRun({
+      text: combinedSection,
+      size: 24,
+      font: { name: "Times New Roman" },
+      bold: isSpeakerLine
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  spacing: { 
+    after: 120,
+    line: 360
+  }
+}));
     
     // Add modest extra spacing every 3 paragraphs
     if ((index + 1) % 3 === 0 && index < sections.length - 1) {
@@ -1192,6 +1193,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
