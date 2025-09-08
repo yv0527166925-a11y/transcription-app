@@ -670,8 +670,7 @@ async function createWordDocument(transcription, filename, duration) {
               after: 480,   // Moderate space after title
               line: 480     // Normal line spacing
             }
-          }),
-          
+          }), 
           
           // Content with balanced spacing
           ...processTranscriptionContent(transcription)
@@ -1150,6 +1149,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
