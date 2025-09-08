@@ -358,13 +358,13 @@ async function createWordDocument(transcription, filename, duration) {
   }
 }
 
-// 🔥 FIX: Better spaced content processing
+// 🔥 FIX: Much more generous spacing in content
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\n{4,}/g, '\n\n\n')  // Keep some paragraph breaks
+    .replace(/\n{4,}/g, '\n\n\n')
     .trim();
   
   // Split by double line breaks to preserve paragraph structure
@@ -375,7 +375,7 @@ function processTranscriptionContent(transcription) {
   sections.forEach((section, index) => {
     // Clean up the section but keep line breaks within it
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    const combinedSection = lines.join(' ').trim();
+    let combinedSection = lines.join(' ').trim();
     
     if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
       combinedSection += '.';
@@ -388,7 +388,7 @@ function processTranscriptionContent(transcription) {
       children: [
         new TextRun({
           text: combinedSection,
-          size: 28,  // Larger text size
+          size: 32,  // Much larger text
           font: {
             name: "Arial Unicode MS"
           },
@@ -396,14 +396,14 @@ function processTranscriptionContent(transcription) {
         })
       ],
       spacing: { 
-        before: isSpeakerLine ? 720 : 480,  // More space before speaker lines
-        after: 480,   // More space after each paragraph
-        line: 600     // More line spacing (1.5x)
+        before: isSpeakerLine ? 1440 : 720,  // 1 inch before speaker, 0.5 before regular
+        after: 720,   // 0.5 inch after each paragraph
+        line: 720     // Double line spacing
       }
     }));
     
-    // Add extra spacing every few paragraphs for better readability
-    if ((index + 1) % 4 === 0 && index < sections.length - 1) {
+    // Add extra spacing every 2 paragraphs for better readability
+    if ((index + 1) % 2 === 0 && index < sections.length - 1) {
       paragraphs.push(new Paragraph({
         children: [
           new TextRun({
@@ -412,7 +412,7 @@ function processTranscriptionContent(transcription) {
           })
         ],
         spacing: { 
-          after: 360
+          after: 720  // Extra half inch break
         }
       }));
     }
