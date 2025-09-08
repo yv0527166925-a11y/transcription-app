@@ -28,7 +28,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
-// 🔥 SIMPLE: Store files with timestamp + safe name
+// Simple file storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadsDir = 'uploads';
@@ -39,32 +39,14 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
-    
-    // For now, just store with timestamp - we'll handle Hebrew in display function
     const ext = path.extname(file.originalname);
-    const finalName = `${timestamp}_original${ext}`;
-    
-    console.log(`📁 Storing as: ${finalName}`);
-    console.log(`📁 Original was: ${file.originalname}`);
-    
-    // Store the original name for later use
-    req.originalFileName = file.originalname;
-    
-    cb(null, finalName);
+    cb(null, `${timestamp}_audio${ext}`);
   }
 });
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/i;
-    if (allowedTypes.test(file.originalname) || file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('סוג קובץ לא נתמך'), false);
-    }
-  }
+  limits: { fileSize: 100 * 1024 * 1024 }
 });
 
 // Mock database
@@ -76,8 +58,7 @@ let users = [
     password: 'admin123',
     isAdmin: true,
     remainingMinutes: 1000,
-    totalTranscribed: 0,
-    history: []
+    totalTranscribed: 0
   },
   {
     id: 2,
@@ -86,46 +67,36 @@ let users = [
     password: 'test123',
     isAdmin: false,
     remainingMinutes: 30,
-    totalTranscribed: 0,
-    history: []
+    totalTranscribed: 0
   }
 ];
 
-// 🔥 SIMPLE: Get a nice display name for the file
-function getDisplayName(originalName, storedName) {
-  console.log(`🔍 Creating display name from: "${originalName}"`);
-  
+// Get nice display name for files
+function getDisplayName(originalName) {
   if (!originalName) {
     return 'קובץ_אודיו';
   }
   
-  // Remove file extension
   let name = originalName.replace(/\.[^/.]+$/, '');
   
-  // If it already has Hebrew, use it
+  // If has Hebrew, use it
   if (name.match(/[\u0590-\u05FF]/)) {
-    console.log(`✅ Found Hebrew in original name: "${name}"`);
     return name;
   }
   
-  // If it's still problematic, create a generic name with timestamp
-  const timestamp = storedName.match(/^(\d+)_/);
-  if (timestamp) {
-    const time = new Date(parseInt(timestamp[1]));
-    const timeStr = time.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
-    return `קובץ_אודיו_${timeStr}`;
-  }
-  
-  return 'קובץ_אודיו';
+  // Create time-based name
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  return `קובץ_אודיו_${timeStr}`;
 }
 
-// 🔥 ULTIMATE: Multiple phase transcription for COMPLETE results
-async function transcribeCompletely(filePath, originalName, storedName) {
+// Complete transcription with multiple attempts
+async function transcribeCompletely(filePath, originalName) {
   const stats = fs.statSync(filePath);
   const fileSizeMB = stats.size / (1024 * 1024);
-  const displayName = getDisplayName(originalName, storedName);
+  const displayName = getDisplayName(originalName);
   
-  console.log(`🎯 COMPLETE TRANSCRIPTION START`);
+  console.log(`🎯 Starting complete transcription`);
   console.log(`📊 File: ${displayName} (${fileSizeMB.toFixed(1)} MB)`);
   
   const model = genAI.getGenerativeModel({ 
@@ -144,34 +115,26 @@ async function transcribeCompletely(filePath, originalName, storedName) {
   if (ext === '.mp3') mimeType = 'audio/mpeg';
   else if (ext === '.mp4') mimeType = 'video/mp4';
   else if (ext === '.m4a') mimeType = 'audio/mp4';
-  else if (ext === '.mov') mimeType = 'video/quicktime';
 
-  // 🔥 PHASE 1: Ultra demanding complete transcription
-  console.log(`🚨 PHASE 1: Ultra demanding approach`);
+  // PHASE 1: Ultra aggressive
+  console.log('🚨 PHASE 1: Ultra aggressive');
   try {
-    const phase1Prompt = `🚨🚨🚨 CRITICAL MISSION: תמלל את כל הקובץ האודיו הזה במלואו!
+    const prompt1 = `🚨🚨🚨 CRITICAL: תמלל את כל הקובץ האודיו הזה!
 
-📋 MISSION DETAILS:
-- File: ${displayName}
-- Size: ${fileSizeMB.toFixed(1)} MB
-- REQUIREMENT: COMPLETE transcription from start to finish
+File: ${displayName} (${fileSizeMB.toFixed(1)} MB)
 
-🔥 ABSOLUTE REQUIREMENTS:
+ABSOLUTE REQUIREMENTS:
 1. תמלל מהשנייה הראשונה עד השנייה האחרונה
 2. אם הקובץ ארוך 30 דקות - תמלל את כל 30 הדקות
-3. אם הקובץ ארוך 45 דקות - תמלל את כל 45 הדקות  
-4. אם הקובץ ארוך 60 דקות - תמלל את כל 60 הדקות
-5. אסור לעצור באמצע! תמלל עד שהאודיו נגמר
-6. אם יש הפסקות - כתוב [שתיקה] והמשך
-7. זה המקום האחרון - תמלל הכל!
+3. אם הקובץ ארוך 45 דקות - תמלל את כל 45 הדקות
+4. אל תעצור באמצע! תמלל עד שהאודיו נגמר
+5. אם יש שתיקות - כתוב [שתיקה] והמשך
 
-📝 FORMAT:
-- פסקאות של 2-3 משפטים
-- זיהוי דוברים: "רב:", "שואל:"
-- ציטוטים במירכאות
+פסקאות של 2-3 משפטים
+זיהוי דוברים: "רב:", "שואל:"
 
-🚨 THIS IS ${fileSizeMB.toFixed(1)} MB - I EXPECT A VERY LONG TRANSCRIPTION!
-START NOW AND DON'T STOP UNTIL THE AUDIO ENDS:`;
+THIS IS ${fileSizeMB.toFixed(1)} MB - COMPLETE TRANSCRIPTION REQUIRED!
+START NOW:`;
 
     const result1 = await Promise.race([
       model.generateContent([
@@ -181,10 +144,10 @@ START NOW AND DON'T STOP UNTIL THE AUDIO ENDS:`;
             data: base64Audio
           }
         },
-        phase1Prompt
+        prompt1
       ]),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Phase 1 timeout')), 900000) // 15 minutes
+        setTimeout(() => reject(new Error('Phase 1 timeout')), 900000)
       )
     ]);
 
@@ -197,14 +160,12 @@ START NOW AND DON'T STOP UNTIL THE AUDIO ENDS:`;
       .trim();
     
     const words1 = transcription1.split(/\s+/).length;
-    const expectedWords = fileSizeMB * 20; // 20 words per MB
+    const expectedWords = fileSizeMB * 20;
     
-    console.log(`📊 Phase 1 result: ${transcription1.length} chars, ${words1} words`);
-    console.log(`📊 Expected minimum: ${expectedWords} words`);
+    console.log(`📊 Phase 1: ${transcription1.length} chars, ${words1} words`);
     
-    // If phase 1 gave us a good result, return it
     if (words1 >= expectedWords * 0.6) {
-      console.log(`✅ Phase 1 SUCCESS - good transcription achieved!`);
+      console.log(`✅ Phase 1 SUCCESS!`);
       return transcription1;
     }
     
@@ -213,23 +174,22 @@ START NOW AND DON'T STOP UNTIL THE AUDIO ENDS:`;
     console.log(`❌ Phase 1 failed: ${error.message}`);
   }
   
-  // 🔥 PHASE 2: Different approach with longer timeout
-  console.log(`🔄 PHASE 2: Extended professional approach`);
+  // PHASE 2: Professional
+  console.log('💼 PHASE 2: Professional');
   try {
-    const phase2Prompt = `PROFESSIONAL TRANSCRIPTIONIST TASK:
+    const prompt2 = `PROFESSIONAL TRANSCRIPTIONIST TASK:
 
-🎯 Assignment: Complete transcription of ${displayName}
-📊 File size: ${fileSizeMB.toFixed(1)} MB
+Assignment: Complete transcription of ${displayName}
+File size: ${fileSizeMB.toFixed(1)} MB
 
-💼 As a professional transcriptionist, I MUST:
+As a professional transcriptionist, I MUST:
 1. Transcribe EVERY WORD from beginning to end
 2. Never skip any portion of the audio
 3. Work through the ENTIRE file systematically
 4. Continue until the audio completely ends
-5. Produce a transcription worthy of professional standards
 
-📝 The file is ${fileSizeMB.toFixed(1)} MB - this requires extensive work.
-I will transcribe everything from start to finish:`;
+The file is ${fileSizeMB.toFixed(1)} MB - extensive work required.
+Complete transcription starting now:`;
 
     const result2 = await Promise.race([
       model.generateContent([
@@ -239,10 +199,10 @@ I will transcribe everything from start to finish:`;
             data: base64Audio
           }
         },
-        phase2Prompt
+        prompt2
       ]),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Phase 2 timeout')), 1200000) // 20 minutes
+        setTimeout(() => reject(new Error('Phase 2 timeout')), 1200000)
       )
     ]);
 
@@ -255,7 +215,7 @@ I will transcribe everything from start to finish:`;
       .trim();
     
     const words2 = transcription2.split(/\s+/).length;
-    console.log(`📊 Phase 2 result: ${transcription2.length} chars, ${words2} words`);
+    console.log(`📊 Phase 2: ${transcription2.length} chars, ${words2} words`);
     
     if (words2 >= expectedWords * 0.5) {
       console.log(`✅ Phase 2 SUCCESS!`);
@@ -267,16 +227,15 @@ I will transcribe everything from start to finish:`;
     console.log(`❌ Phase 2 failed: ${error.message}`);
   }
   
-  // 🔥 PHASE 3: Last resort with maximum timeout
-  console.log(`🆘 PHASE 3: Last resort maximum effort`);
+  // PHASE 3: Last resort
+  console.log('🆘 PHASE 3: Last resort');
   try {
-    const phase3Prompt = `FINAL ATTEMPT - TRANSCRIBE EVERYTHING:
+    const prompt3 = `FINAL ATTEMPT - TRANSCRIBE EVERYTHING:
 
 ${displayName} (${fileSizeMB.toFixed(1)} MB)
 
 This is the final chance. Transcribe the entire audio file.
 Don't stop until you reach the very end.
-Work through every minute of the audio.
 
 Start transcribing now:`;
 
@@ -288,10 +247,10 @@ Start transcribing now:`;
             data: base64Audio
           }
         },
-        phase3Prompt
+        prompt3
       ]),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Phase 3 timeout')), 1500000) // 25 minutes
+        setTimeout(() => reject(new Error('Phase 3 timeout')), 1500000)
       )
     ]);
 
@@ -304,10 +263,10 @@ Start transcribing now:`;
       .trim();
     
     const words3 = transcription3.split(/\s+/).length;
-    console.log(`📊 Phase 3 result: ${transcription3.length} chars, ${words3} words`);
+    console.log(`📊 Phase 3: ${transcription3.length} chars, ${words3} words`);
     
     if (transcription3.length > 50) {
-      console.log(`✅ Phase 3 completed - using final result`);
+      console.log(`✅ Phase 3 completed`);
       return transcription3;
     }
     
@@ -318,106 +277,97 @@ Start transcribing now:`;
   throw new Error('כל השלבים נכשלו');
 }
 
-// Word document creation
-async function createWordDocument(transcription, originalName, storedName) {
-  try {
-    const displayName = getDisplayName(originalName, storedName);
-    console.log(`📄 Creating Word document for: ${displayName}`);
-    
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
-            margin: {
-              top: 2160,
-              right: 1800,
-              bottom: 2160,
-              left: 1800
-            }
+// Create Word document
+async function createWordDocument(transcription, originalName) {
+  const displayName = getDisplayName(originalName);
+  
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          margin: {
+            top: 2160,
+            right: 1800,
+            bottom: 2160,
+            left: 1800
           }
-        },
-        children: [
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "תמלול אוטומטי מלא",
-                bold: true,
-                size: 36,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { 
-              after: 480,
-              line: 480
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `שם הקובץ: ${displayName}`,
-                size: 24,     
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 240,
-              line: 360
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
-                size: 24,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            spacing: { 
-              after: 480,
-              line: 360
-            }
-          }),
-          
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: "═".repeat(50),
-                size: 20,
-                font: {
-                  name: "Arial Unicode MS"
-                }
-              })
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { 
-              before: 240,
-              after: 480,
-              line: 360
-            }
-          }),
-          
-          ...processTranscriptionContent(transcription)
-        ]
-      }]
-    });
-    
-    const buffer = await Packer.toBuffer(doc);
-    console.log(`✅ Word document created successfully`);
-    return buffer;
-    
-  } catch (error) {
-    console.error('Error creating Word document:', error);
-    throw error;
-  }
+        }
+      },
+      children: [
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "תמלול אוטומטי מלא",
+              bold: true,
+              size: 36,
+              font: {
+                name: "Arial Unicode MS"
+              }
+            })
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { 
+            after: 480,
+            line: 480
+          }
+        }),
+        
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `שם הקובץ: ${displayName}`,
+              size: 24,
+              font: {
+                name: "Arial Unicode MS"
+              }
+            })
+          ],
+          spacing: { 
+            after: 240,
+            line: 360
+          }
+        }),
+        
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `תאריך: ${new Date().toLocaleDateString('he-IL')}`,
+              size: 24,
+              font: {
+                name: "Arial Unicode MS"
+              }
+            })
+          ],
+          spacing: { 
+            after: 480,
+            line: 360
+          }
+        }),
+        
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: "═".repeat(50),
+              size: 20,
+              font: {
+                name: "Arial Unicode MS"
+              }
+            })
+          ],
+          alignment: AlignmentType.CENTER,
+          spacing: { 
+            before: 240,
+            after: 480,
+            line: 360
+          }
+        }),
+        
+        ...processTranscriptionContent(transcription)
+      ]
+    }]
+  });
+  
+  return await Packer.toBuffer(doc);
 }
 
 function processTranscriptionContent(transcription) {
@@ -478,154 +428,121 @@ function processTranscriptionContent(transcription) {
   return paragraphs;
 }
 
-// Enhanced email
-async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
-  try {
-    console.log(`📧 Preparing email for: ${userEmail}`);
-    
-    const attachments = transcriptions.map(trans => {
-      const displayName = getDisplayName(trans.originalName, trans.storedName);
-      return {
-        filename: `תמלול_מלא_${displayName}.docx`,
-        content: trans.wordDoc,
-        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      };
-    });
+// Send email
+async function sendTranscriptionEmail(userEmail, transcriptions) {
+  const attachments = transcriptions.map(trans => {
+    const displayName = getDisplayName(trans.originalName);
+    return {
+      filename: `תמלול_מלא_${displayName}.docx`,
+      content: trans.wordDoc,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+  });
 
-    const successList = transcriptions.map(t => {
-      const displayName = getDisplayName(t.originalName, t.storedName);
-      const wordCount = t.transcription.split(/\s+/).length;
-      return `<li>📄 <strong>${displayName}</strong> <small>(${wordCount} מילים)</small></li>`;
-    }).join('');
+  const successList = transcriptions.map(t => {
+    const displayName = getDisplayName(t.originalName);
+    const wordCount = t.transcription.split(/\s+/).length;
+    return `<li>📄 <strong>${displayName}</strong> <small>(${wordCount} מילים)</small></li>`;
+  }).join('');
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: userEmail,
-      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מצורפים`,
-      html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
-            <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: userEmail,
+    subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מצורפים`,
+    html: `
+      <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
+          <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
+        </div>
+        
+        <div style="background: #f8f9ff; padding: 30px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 16px;">שלום וברכה,</p>
+          
+          <p style="font-size: 16px;">
+            התמלול המלא והמפורט שלך הושלם! 
+            מצורפים קבצי Word מעוצבים עם תמלול שלם:
+          </p>
+          
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #4caf50;">
+            <h3 style="color: #2e7d32;">✅ קבצים מושלמים:</h3>
+            <ul>${successList}</ul>
           </div>
           
-          <div style="background: #f8f9ff; padding: 30px; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px;">שלום וברכה,</p>
-            
-            <p style="font-size: 16px;">
-              התמלול המלא והמפורט שלך הושלם! 
-              מצורפים קבצי Word מעוצבים עם תמלול שלם מההתחלה עד הסוף:
+          <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
+            <h3 style="color: #1565c0;">🔥 מערכת תמלול 3-שלבית:</h3>
+            <ul style="color: #1565c0;">
+              <li>🚨 <strong>שלב 1:</strong> תמלול אגרסיבי (15 דקות)</li>
+              <li>💼 <strong>שלב 2:</strong> גישה מקצועית (20 דקות)</li>
+              <li>🆘 <strong>שלב 3:</strong> מאמץ מקסימלי (25 דקות)</li>
+              <li>✨ <strong>Gemini 2.5 Pro</strong> - דיוק מקסימלי</li>
+            </ul>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <p style="font-size: 18px; color: #667eea; font-weight: bold;">
+              תודה שבחרת במערכת התמלול המתקדמת!
             </p>
-            
-            <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #4caf50;">
-              <h3 style="color: #2e7d32;">✅ קבצים מושלמים:</h3>
-              <ul>${successList}</ul>
-            </div>
-            
-            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
-              <h3 style="color: #1565c0;">🔥 מערכת תמלול 3-שלבית:</h3>
-              <ul style="color: #1565c0;">
-                <li>🚨 <strong>שלב 1:</strong> תמלול אגרסיבי מלא (15 דקות)</li>
-                <li>💼 <strong>שלב 2:</strong> גישה מקצועית מורחבת (20 דקות)</li>
-                <li>🆘 <strong>שלב 3:</strong> מאמץ מקסימלי אחרון (25 דקות)</li>
-                <li>✨ <strong>Gemini 2.5 Pro</strong> - דיוק מקסימלי</li>
-                <li>📖 <strong>עיצוב Word מקצועי</strong> - נוח לקריאה</li>
-                <li>🎓 <strong>מותאם לעברית</strong> - מושגים דתיים מדויקים</li>
-              </ul>
-            </div>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <p style="font-size: 18px; color: #667eea; font-weight: bold;">
-                תודה שבחרת במערכת התמלול המתקדמת!
-              </p>
-            </div>
           </div>
         </div>
-      `,
-      attachments: attachments
-    };
+      </div>
+    `,
+    attachments: attachments
+  };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to: ${userEmail}`);
-    
-  } catch (error) {
-    console.error('Email sending error:', error);
-    throw error;
-  }
+  await transporter.sendMail(mailOptions);
+  console.log(`✅ Email sent successfully to: ${userEmail}`);
 }
 
-// Enhanced transcription processing
+// Process transcription
 async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes) {
   console.log(`🎯 Starting 3-phase transcription for ${files.length} files`);
   
   const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
   if (!user) {
-    console.error('❌ User not found during async processing:', userEmail);
+    console.error('❌ User not found');
     return;
   }
 
-  try {
-    const transcriptions = [];
+  const transcriptions = [];
+  
+  for (const file of files) {
+    console.log(`🎵 Processing: ${file.filename}`);
+    console.log(`📧 Original: ${file.originalname}`);
     
-    for (const file of files) {
-      console.log(`🎵 Processing file: ${file.filename}`);
-      console.log(`📊 File size: ${(fs.statSync(file.path).size / (1024 * 1024)).toFixed(1)} MB`);
-      console.log(`📧 Original name: ${file.originalname}`);
+    try {
+      const transcription = await transcribeCompletely(file.path, file.originalname);
+      const wordDoc = await createWordDocument(transcription, file.originalname);
       
+      transcriptions.push({
+        originalName: file.originalname,
+        transcription,
+        wordDoc
+      });
+      
+      const displayName = getDisplayName(file.originalname);
+      console.log(`✅ Successfully processed: ${displayName}`);
+      console.log(`📊 Result: ${transcription.length} chars, ${transcription.split(/\s+/).length} words`);
+      
+    } catch (error) {
+      console.error(`❌ Failed: ${error.message}`);
+    } finally {
       try {
-        const transcription = await transcribeCompletely(file.path, file.originalname, file.filename);
-        const wordDoc = await createWordDocument(transcription, file.originalname, file.filename);
-        
-        transcriptions.push({
-          originalName: file.originalname,
-          storedName: file.filename,
-          transcription,
-          wordDoc
-        });
-        
-        const displayName = getDisplayName(file.originalname, file.filename);
-        console.log(`✅ Successfully processed: ${displayName}`);
-        console.log(`📊 Final transcription: ${transcription.length} characters, ${transcription.split(/\s+/).length} words`);
-        
-      } catch (fileError) {
-        console.error(`❌ Failed to process ${file.filename}:`, fileError);
-        
-        transcriptions.push({
-          originalName: file.originalname,
-          storedName: file.filename,
-          transcription: `שגיאה בתמלול הקובץ: ${fileError.message}`,
-          wordDoc: null,
-          failed: true
-        });
-      } finally {
-        try {
-          fs.unlinkSync(file.path);
-          console.log(`🗑️ Cleaned up file: ${file.path}`);
-        } catch (e) {
-          console.warn('Could not delete file:', file.path);
-        }
+        fs.unlinkSync(file.path);
+      } catch (e) {
+        // Ignore cleanup errors
       }
     }
+  }
+  
+  if (transcriptions.length > 0) {
+    await sendTranscriptionEmail(userEmail, transcriptions);
     
-    if (transcriptions.length > 0) {
-      const successfulTranscriptions = transcriptions.filter(t => !t.failed);
-      const failedTranscriptions = transcriptions.filter(t => t.failed);
-      
-      if (successfulTranscriptions.length > 0) {
-        await sendTranscriptionEmail(userEmail, successfulTranscriptions, failedTranscriptions);
-        console.log(`📧 Email sent with ${successfulTranscriptions.length} successful transcriptions`);
-      }
-      
-      const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
-      user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
-      user.totalTranscribed += actualMinutesUsed;
-      
-      console.log(`🎉 3-phase transcription completed for: ${userEmail}`);
-      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
-      console.log(`📊 Success rate: ${successfulTranscriptions.length}/${transcriptions.length} files`);
-    }
+    const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
+    user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
+    user.totalTranscribed += actualMinutesUsed;
     
-  } catch (error) {
-    console.error('Async transcription batch error:', error);
+    console.log(`🎉 Completed for: ${userEmail}`);
+    console.log(`💰 Balance: ${user.remainingMinutes} minutes`);
   }
 }
 
@@ -643,11 +560,8 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// Authentication routes
 app.post('/api/login', (req, res) => {
   try {
-    console.log('🔐 Login attempt:', req.body);
-    
     const { email, password } = req.body;
     
     if (!email || !password) {
@@ -655,17 +569,13 @@ app.post('/api/login', (req, res) => {
     }
     
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    console.log('🔍 User found:', user ? 'Yes' : 'No');
     
     if (user) {
-      console.log('✅ Login successful for:', user.email);
       res.json({ success: true, user: { ...user, password: undefined } });
     } else {
-      console.log('❌ Login failed for:', email);
       res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
     }
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ success: false, error: 'שגיאה בשרת' });
   }
 });
@@ -690,21 +600,16 @@ app.post('/api/register', (req, res) => {
       phone: phone || '',
       isAdmin: false,
       remainingMinutes: 30,
-      totalTranscribed: 0,
-      history: []
+      totalTranscribed: 0
     };
     
     users.push(newUser);
-    console.log('✅ User registered successfully:', newUser.email);
-    
     res.json({ success: true, user: { ...newUser, password: undefined } });
   } catch (error) {
-    console.error('Registration error:', error);
     res.status(500).json({ success: false, error: 'שגיאה בהרשמה' });
   }
 });
 
-// Admin route
 app.post('/api/admin/add-minutes', (req, res) => {
   try {
     const { userEmail, minutes } = req.body;
@@ -728,8 +633,6 @@ app.post('/api/admin/add-minutes', (req, res) => {
     user.remainingMinutes += minutes;
     const newBalance = user.remainingMinutes;
     
-    console.log(`✅ Added ${minutes} minutes to ${userEmail}: ${oldBalance} → ${newBalance}`);
-    
     res.json({ 
       success: true, 
       message: `נוספו ${minutes} דקות לחשבון ${userEmail}`,
@@ -739,7 +642,6 @@ app.post('/api/admin/add-minutes', (req, res) => {
     });
     
   } catch (error) {
-    console.error('Admin add-minutes error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'שגיאה בהוספת דקות' 
@@ -747,14 +649,54 @@ app.post('/api/admin/add-minutes', (req, res) => {
   }
 });
 
-// Transcription route
 app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   try {
     console.log('🎯 Transcription request received');
-    console.log('📁 Files uploaded:', req.files?.length || 0);
     
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ success: false, error: 'לא נבחרו קבצים' });
     }
 
     const { email, language } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'אימייל נדרש' });
+    }
+    
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user) {
+      return res.status(400).json({ success: false, error: `משתמש לא נמצא: ${email}` });
+    }
+
+    const estimatedMinutes = req.files.reduce((total, file) => {
+      return total + Math.ceil(file.size / (1024 * 1024 * 2));
+    }, 0);
+
+    if (estimatedMinutes > user.remainingMinutes) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `אין מספיק דקות בחשבון. נדרש: ${estimatedMinutes}, זמין: ${user.remainingMinutes}` 
+      });
+    }
+
+    processTranscriptionAsync(req.files, email, language, estimatedMinutes);
+    
+    res.json({ 
+      success: true, 
+      message: 'התמלול התחיל',
+      estimatedMinutes 
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔑 Gemini API: ${!!process.env.GEMINI_API_KEY}`);
+  console.log(`📧 Email: ${!!process.env.EMAIL_USER}`);
+  console.log(`🎯 3-PHASE TRANSCRIPTION READY!`);
+  console.log(`💡 Phase 1: 15 min | Phase 2: 20 min | Phase 3: 25 min`);
+});
