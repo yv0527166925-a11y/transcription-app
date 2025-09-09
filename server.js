@@ -681,6 +681,8 @@ function processTranscriptionForTemplate(transcription) {
       </w:p>`;
   });
   
+ console.log('DEBUG - Final XML content length:', xmlContent.length);
+  console.log('DEBUG - XML preview:', xmlContent.substring(0, 200));
   return xmlContent;
 }
 
@@ -1318,6 +1320,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
