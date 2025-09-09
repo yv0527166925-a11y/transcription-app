@@ -777,16 +777,17 @@ if (combinedSection.length > 300) {
     // Detect speaker lines
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
-   paragraphs.push(new Paragraph({
+  paragraphs.push(new Paragraph({
   children: [
     new TextRun({
       text: combinedSection,
       size: 24,
-   font: { name: "Arial" },
+      font: { name: "Arial" },
       bold: isSpeakerLine
     })
   ],
   alignment: AlignmentType.RIGHT,
+  bidirectional: true,
   spacing: { 
     after: 120,
     line: 360
@@ -1216,6 +1217,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
