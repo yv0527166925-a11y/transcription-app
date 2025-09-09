@@ -712,11 +712,17 @@ async function createWordDocument(transcription, filename, duration) {
       
       const documentXml = await zip.file('word/document.xml').async('string');
       
-      // הכן תוכן
+     // הכן תוכן
       const title = cleanName;
       const content = processTranscriptionForTemplate(transcription);
       
-    // החלף placeholders
+      console.log('🔍 DEBUG: Template processing...');
+      console.log('📝 Title to insert:', title);
+      console.log('📝 Content length:', content.length);
+      console.log('🔍 REPLACETITLE found in XML:', documentXml.includes('REPLACETITLE'));
+      console.log('🔍 REPLACECONTENT found in XML:', documentXml.includes('REPLACECONTENT'));
+      
+      // החלף placeholders
       let newDocumentXml = documentXml
         .replace(/REPLACETITLE/g, escapeXml(title))
         .replace(/REPLACECONTENT/g, content);
@@ -1309,6 +1315,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
