@@ -719,6 +719,7 @@ async function createWordDocument(transcription, filename, duration) {
       console.log('🔍 DEBUG: Template processing...');
       console.log('📝 Title to insert:', title);
       console.log('📝 Content length:', content.length);
+      console.log('📝 Content preview (first 200 chars):', content.substring(0, 200));
       console.log('🔍 REPLACETITLE found in XML:', documentXml.includes('REPLACETITLE'));
       console.log('🔍 REPLACECONTENT found in XML:', documentXml.includes('REPLACECONTENT'));
       
@@ -1315,6 +1316,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
