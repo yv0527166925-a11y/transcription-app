@@ -716,10 +716,10 @@ async function createWordDocument(transcription, filename, duration) {
       const title = cleanName;
       const content = processTranscriptionForTemplate(transcription);
       
-      // החלף placeholders
+    // החלף placeholders
       let newDocumentXml = documentXml
-        .replace('{{TITLE}}', escapeXml(title))
-        .replace('{{CONTENT}}', content);
+        .replace(/REPLACETITLE/g, escapeXml(title))
+        .replace(/REPLACECONTENT/g, content);
       
       zip.file('word/document.xml', newDocumentXml);
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -1309,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
