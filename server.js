@@ -646,7 +646,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
   }
 }
 
-}
+
 
 // 🔥 NEW: פונקציה לעיבוד טקסט לתבנית
 function processTranscriptionForTemplate(transcription) {
@@ -1309,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
