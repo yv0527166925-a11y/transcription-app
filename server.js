@@ -792,6 +792,23 @@ styles: {
     }
   ]
 },
+  paragraphStyles: [
+    {
+      id: "HebrewParagraph",
+      name: "Hebrew Paragraph",
+      basedOn: "Normal",
+      paragraph: {
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true
+      },
+      run: {
+        rightToLeft: true,
+        languageComplexScript: "he-IL",
+        font: "Arial"
+      }
+    }
+  ]
+},
 sections: [{
   properties: {
  page: {
@@ -867,12 +884,20 @@ function processTranscriptionContent(transcription) {
       
       for (const sentence of sentences) {
         if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
-         paragraphs.push(new Paragraph({
-  children: [/* התוכן */],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  spacing: { after: 120, line: 360 }
-}));
+          paragraphs.push(new Paragraph({
+            children: [
+              new TextRun({
+                text: currentPara.trim(),
+                size: 24,
+                font: { name: "Arial" },
+                rightToLeft: true,
+                languageComplexScript: "he-IL"
+              })
+            ],
+            alignment: AlignmentType.RIGHT,
+            bidirectional: true,
+            spacing: { after: 120, line: 360 }
+          }));
           currentPara = sentence + ' ';
         } else {
           currentPara += sentence + ' ';
@@ -904,24 +929,24 @@ function processTranscriptionContent(transcription) {
     
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
-   paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-      font: { name: "Arial" },
-      bold: isSpeakerLine,
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  spacing: { 
-    after: 120,
-    line: 360
-  }
-}));
+    paragraphs.push(new Paragraph({
+      children: [
+        new TextRun({
+          text: combinedSection,
+          size: 24,
+          font: { name: "Arial" },
+          bold: isSpeakerLine,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        })
+      ],
+      alignment: AlignmentType.RIGHT,
+      bidirectional: true,
+      spacing: { 
+        after: 120,
+        line: 360
+      }
+    }));
   });
   
   return paragraphs;
