@@ -824,23 +824,13 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
     console.log(`📧 Preparing enhanced email for: ${userEmail}`);
     console.log(`📊 Successful: ${transcriptions.length}, Failed: ${failedTranscriptions.length}`);
     
-  const attachments = [];
-transcriptions.forEach(trans => {
+const attachments = transcriptions.map(trans => {
   const cleanName = cleanFilename(trans.filename);
-  
-  // Word document
-  attachments.push({
+  return {
     filename: `תמלול_מלא_${cleanName}.docx`,
     content: trans.wordDoc,
     contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  });
-  
-  // Text file
-  attachments.push({
-    filename: `תמלול_מלא_${cleanName}.txt`,
-    content: Buffer.from(`${cleanName}\n\n${trans.transcription}`, 'utf8'),
-    contentType: 'text/plain; charset=utf-8'
-  });
+  };
 });
 
     const successList = transcriptions.map(t => {
@@ -1226,6 +1216,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
