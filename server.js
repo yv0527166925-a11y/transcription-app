@@ -858,17 +858,20 @@ if (combinedSection.length > 300) {
   
   // Add remaining content
   if (currentPara.trim()) {
-    paragraphs.push(new Paragraph({
-      children: [
-        new TextRun({
-          text: currentPara.trim(),
-          size: 24,
-          font: { name: "Arial" },
-        })
-      ],
-      alignment: AlignmentType.RIGHT,
-      spacing: { after: 120, line: 360 }
-    }));
+  paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: currentPara.trim(),
+            size: 24,
+            font: { name: "Arial" },
+            rightToLeft: true,
+            languageComplexScript: "he-IL"
+          })
+        ],
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true,
+        spacing: { after: 120, line: 360 }
+      }));
   }
   return paragraphs; // Early return for long sections
 }
@@ -880,13 +883,15 @@ if (combinedSection.length > 300) {
     // Detect speaker lines
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
-  paragraphs.push(new Paragraph({
+ paragraphs.push(new Paragraph({
   children: [
     new TextRun({
       text: combinedSection,
       size: 24,
       font: { name: "Arial" },
-      bold: isSpeakerLine
+      bold: isSpeakerLine,
+      rightToLeft: true,
+      languageComplexScript: "he-IL"
     })
   ],
   alignment: AlignmentType.RIGHT,
@@ -1320,6 +1325,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
