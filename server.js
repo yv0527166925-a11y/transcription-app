@@ -764,13 +764,33 @@ styles: {
     document: {
       run: {
         font: "Arial",
-        size: 24
+        size: 24,
+        rightToLeft: true,
+        languageComplexScript: "he-IL"
       },
       paragraph: {
-        alignment: AlignmentType.RIGHT
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true,
+        rtl: true
       }
     }
-  }
+  },
+  paragraphStyles: [
+    {
+      id: "HebrewParagraph",
+      name: "Hebrew Paragraph",
+      basedOn: "Normal",
+      paragraph: {
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true
+      },
+      run: {
+        rightToLeft: true,
+        languageComplexScript: "he-IL",
+        font: "Arial"
+      }
+    }
+  ]
 },
 sections: [{
   properties: {
@@ -1312,6 +1332,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
