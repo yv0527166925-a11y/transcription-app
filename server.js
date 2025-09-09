@@ -751,102 +751,90 @@ console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
     // 🔥 אם אין תבנית - השתמש בקוד הישן
     console.log('⚠️ No template found, using programmatic creation');
     
- const doc = new Document({
+// החלף את הקטע בשורות 635-677 בקוד הזה:
+
+const doc = new Document({
   creator: "תמלול חכם",
-language: "he-IL",
-defaultRunProperties: {
-  font: "Times New Roman",
-  size: 24,
-rtl: true
-},
-styles: {
-  default: {
-    document: {
-      run: {
-        font: "Arial",
-        size: 24
-      },
-      paragraph: {
-        alignment: AlignmentType.RIGHT
-      }
-    }
-  }
-},
-  paragraphStyles: [
-    {
-      id: "HebrewParagraph",
-      name: "Hebrew Paragraph",
-      basedOn: "Normal",
-      paragraph: {
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true
-      },
-      run: {
-        rightToLeft: true,
-        languageComplexScript: "he-IL",
-        font: "Arial"
-      }
-    }
-  ]
-},
-  paragraphStyles: [
-    {
-      id: "HebrewParagraph",
-      name: "Hebrew Paragraph",
-      basedOn: "Normal",
-      paragraph: {
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true
-      },
-      run: {
-        rightToLeft: true,
-        languageComplexScript: "he-IL",
-        font: "Arial"
-      }
-    }
-  ]
-},
-sections: [{
-  properties: {
- page: {
-  margin: {
-    top: 2160,
-    right: 1800,
-    bottom: 2160,
-    left: 1800
+  language: "he-IL",
+  defaultRunProperties: {
+    font: "Times New Roman",
+    size: 24,
+    rtl: true
   },
-  textDirection: "rtl"
-},
-   rtlGutter: true,
-    bidi: true,
-    textDirection: "rtl"
+  styles: {
+    default: {
+      document: {
+        run: {
+          font: "Arial",
+          size: 24,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        },
+        paragraph: {
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true
+        }
+      }
+    },
+    paragraphStyles: [
+      {
+        id: "HebrewParagraph",
+        name: "Hebrew Paragraph",
+        basedOn: "Normal",
+        paragraph: {
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true
+        },
+        run: {
+          rightToLeft: true,
+          languageComplexScript: "he-IL",
+          font: "Arial"
+        }
+      }
+    ]
   },
+  sections: [{
+    properties: {
+      page: {
+        margin: {
+          top: 2160,
+          right: 1800,
+          bottom: 2160,
+          left: 1800
+        },
+        textDirection: "rtl"
+      },
+      rtlGutter: true,
+      bidi: true,
+      textDirection: "rtl"
+    },
+    children: [
+      // Title with moderate spacing
+      new Paragraph({
         children: [
-          // Title with moderate spacing
-new Paragraph({
-  children: [
-    new TextRun({
-      text: cleanName,
-      bold: true,
-      size: 36,
-      font: { name: "Arial" },
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  spacing: { 
-    after: 480,
-    line: 480
-  }
-})
-          
-          // Content with balanced spacing
-          ...processTranscriptionContent(transcription)
-        ]
-      }]
-    });
+          new TextRun({
+            text: cleanName,
+            bold: true,
+            size: 36,
+            font: { name: "Arial" },
+            rightToLeft: true,
+            languageComplexScript: "he-IL"
+          })
+        ],
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true,
+        style: "HebrewParagraph",
+        spacing: { 
+          after: 480,
+          line: 480
+        }
+      }),
+      
+      // Content with balanced spacing
+      ...processTranscriptionContent(transcription)
+    ]
+  }]
+});
     
     const buffer = await Packer.toBuffer(doc);
     console.log(`✅ Word document created successfully for: ${cleanName}`);
@@ -1346,6 +1334,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
