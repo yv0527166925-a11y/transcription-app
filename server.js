@@ -662,10 +662,15 @@ function processTranscriptionForTemplate(transcription) {
     console.log('🔍 DEBUG - First paragraph sample:', paragraphs[0].substring(0, 100));
   }
   
-  let xmlContent = '';
-  paragraphs.forEach(paragraph => {
+ let xmlContent = '';
+  paragraphs.forEach((paragraph, index) => {
+    console.log(`DEBUG - Processing paragraph ${index + 1}:`, paragraph.substring(0, 50) + '...');
+    
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
     const boldTag = isSpeakerLine ? '<w:b/>' : '';
+    
+    console.log(`DEBUG - isSpeakerLine: ${isSpeakerLine}, boldTag: ${boldTag}`);
+    console.log(`DEBUG - About to add XML for paragraph ${index + 1}`);
     
   xmlContent += `
       <w:p>
@@ -1321,6 +1326,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
