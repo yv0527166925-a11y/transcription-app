@@ -835,12 +835,54 @@ function processTranscriptionContent(transcription) {
     .map(section => section.trim())
     .filter(section => section.length > 0);
   
-  sections.forEach((section) => {
+  sections.forEach((section, index) => {
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     let combinedSection = lines.join(' ').trim();
 
-    // תיקון רווחים בעברית
-    combinedSection = fixHebrewSpacing(combinedSection);
+    if (combinedSection.length > 300) {
+      const sentences = combinedSection.split(/(?<=[.!?])\s+/);
+      let currentPara = '';
+      
+      for (const sentence of sentences) {
+        if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
+          paragraphs.push(new Paragraph({
+            children: [
+              new TextRun({
+                text: currentPara.trim(),
+                size: 24,
+                font: { name: "Arial" },
+                rightToLeft: true,
+                languageComplexScript: "he-IL"
+              })
+            ],
+            alignment: AlignmentType.RIGHT,
+            bidirectional: true,
+            spacing: { after: 120, line: 360 }
+          }));
+          currentPara = sentence + ' ';
+        } else {
+          currentPara += sentence + ' ';
+        }
+      }
+      
+      if (currentPara.trim()) {
+        paragraphs.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: currentPara.trim(),
+              size: 24,
+              font: { name: "Arial" },
+              rightToLeft: true,
+              languageComplexScript: "he-IL"
+            })
+          ],
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true,
+          spacing: { after: 120, line: 360 }
+        }));
+      }
+      return;
+    }
     
     if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
       combinedSection += '.';
@@ -856,13 +898,11 @@ function processTranscriptionContent(transcription) {
           font: { name: "Arial" },
           bold: isSpeakerLine,
           rightToLeft: true,
-          languageComplexScript: "he-IL",
-          bidi: true
+          languageComplexScript: "he-IL"
         })
       ],
       alignment: AlignmentType.RIGHT,
       bidirectional: true,
-      rtl: true,
       spacing: { 
         after: 120,
         line: 360
@@ -1270,6 +1310,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
