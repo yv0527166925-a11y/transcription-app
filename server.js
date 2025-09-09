@@ -701,7 +701,7 @@ async function createWordDocument(transcription, filename, duration) {
     console.log(`📄 Creating Word document from template for: ${cleanName}`);
     
     // 🔥 NEW: נסה תחילה עם תבנית
-   const templatePath = path.join(__dirname, 'template-new.docx');
+  const templatePath = path.join(__dirname, 'simple-template.docx');
     
     if (fs.existsSync(templatePath)) {
       console.log('📋 Using template file');
@@ -725,8 +725,8 @@ async function createWordDocument(transcription, filename, duration) {
       
       // החלף placeholders
       let newDocumentXml = documentXml
-        .replace(/REPLACETITLE/g, escapeXml(title))
-        .replace(/REPLACECONTENT/g, content);
+      .replace(/TITLE/g, escapeXml(title))
+.replace(/CONTENT/g, content);
       
       zip.file('word/document.xml', newDocumentXml);
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -1316,6 +1316,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
