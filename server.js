@@ -7,8 +7,8 @@ const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
+const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 require('dotenv').config();
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -269,7 +269,7 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language) {
   try {
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 32768
@@ -491,7 +491,7 @@ async function realGeminiTranscription(filePath, filename, language) {
 async function directGeminiTranscription(filePath, filename, language) {
   try {
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 65536
@@ -650,7 +650,38 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`📄 Creating Word document for: ${cleanName}`);
+    console.log(`📄 Creating Word document from template for: ${cleanName}`);
+    
+    // 🔥 NEW: נסה תחילה עם תבנית
+    const templatePath = path.join(__dirname, 'template.docx');
+    
+    if (fs.existsSync(templatePath)) {
+      console.log('📋 Using template file');
+      
+      const templateBuffer = fs.readFileSync(templatePath);
+      const zip = new JSZip();
+      await zip.loadAsync(templateBuffer);
+      
+      const documentXml = await zip.file('word/document.xml').async('string');
+      
+      // הכן תוכן
+      const title = cleanName;
+      const content = processTranscriptionForTemplate(transcription);
+      
+      // החלף placeholders
+      let newDocumentXml = documentXml
+        .replace('{{TITLE}}', escapeXml(title))
+        .replace('{{CONTENT}}', content);
+      
+      zip.file('word/document.xml', newDocumentXml);
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+      
+      console.log(`✅ Word document created from template for: ${cleanName}`);
+      return buffer;
+    }
+    
+    // 🔥 אם אין תבנית - השתמש בקוד הישן
+    console.log('⚠️ No template found, using programmatic creation');
     
  const doc = new Document({
   creator: "תמלול חכם",
@@ -1230,6 +1261,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
