@@ -681,9 +681,9 @@ sections: [{
             text: cleanName,
                 bold: true,
                 size: 36,  // Good readable size
-                font: {
-                  name: "David"
-                }
+             font: {
+  name: "Arial"
+}
               })
             ],
             alignment: AlignmentType.CENTER,
@@ -741,7 +741,7 @@ if (combinedSection.length > 300) {
           new TextRun({
             text: currentPara.trim(),
             size: 24,
-            font: { name: "Times New Roman" }
+            font: { name: "Arial" },
           })
         ],
         alignment: AlignmentType.RIGHT,
@@ -760,7 +760,7 @@ if (combinedSection.length > 300) {
         new TextRun({
           text: currentPara.trim(),
           size: 24,
-          font: { name: "Times New Roman" }
+          font: { name: "Arial" },
         })
       ],
       alignment: AlignmentType.RIGHT,
@@ -782,7 +782,7 @@ if (combinedSection.length > 300) {
     new TextRun({
       text: combinedSection,
       size: 24,
-      font: { name: "Times New Roman" },
+   font: { name: "Arial" },
       bold: isSpeakerLine
     })
   ],
@@ -800,7 +800,7 @@ if (combinedSection.length > 300) {
     new TextRun({
       text: combinedSection,
       size: 24,
-      font: { name: "Times New Roman" },
+    font: { name: "Arial" },
       bold: isSpeakerLine,
       rightToLeft: true
     })
@@ -1216,6 +1216,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
