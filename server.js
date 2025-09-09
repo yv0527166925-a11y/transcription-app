@@ -774,16 +774,18 @@ styles: {
 },
 sections: [{
   properties: {
-    page: {
-      margin: {
-        top: 2160,    // 1.5 inches - reasonable margins
-        right: 1800,  // 1.25 inches
-        bottom: 2160, // 1.5 inches
-        left: 1800    // 1.25 inches
-      }
-    },
-    rtlGutter: true,
-    bidi: true
+ page: {
+  margin: {
+    top: 2160,
+    right: 1800,
+    bottom: 2160,
+    left: 1800
+  },
+  textDirection: "rtl"
+},
+   rtlGutter: true,
+    bidi: true,
+    textDirection: "rtl"
   },
         children: [
           // Title with moderate spacing
@@ -1310,6 +1312,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
