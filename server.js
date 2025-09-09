@@ -672,7 +672,7 @@ function processTranscriptionForTemplate(transcription) {
     console.log(`DEBUG - isSpeakerLine: ${isSpeakerLine}, boldTag: ${boldTag}`);
     console.log(`DEBUG - About to add XML for paragraph ${index + 1}`);
     
-  xmlContent += `
+xmlContent += `
       <w:p>
         <w:pPr>
           <w:jc w:val="right"/>
@@ -1326,6 +1326,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
