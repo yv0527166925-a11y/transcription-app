@@ -787,7 +787,7 @@ sections: [{
   },
         children: [
           // Title with moderate spacing
-        new Paragraph({
+new Paragraph({
   children: [
     new TextRun({
       text: cleanName,
@@ -804,7 +804,7 @@ sections: [{
     after: 480,
     line: 480
   }
-})
+}),
           
           // Content with balanced spacing
           ...processTranscriptionContent(transcription)
@@ -1310,6 +1310,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
