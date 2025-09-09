@@ -822,7 +822,6 @@ new Paragraph({
   ],
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
-  style: "HebrewParagraph",  // הוסף את השורה הזו
   spacing: { 
     after: 480,
     line: 480
@@ -872,7 +871,6 @@ function processTranscriptionContent(transcription) {
   children: [/* התוכן */],
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
-  style: "HebrewParagraph",  // הוסף רק את זה
   spacing: { after: 120, line: 360 }
 }));
           currentPara = sentence + ' ';
@@ -919,7 +917,6 @@ function processTranscriptionContent(transcription) {
   ],
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
-  style: "HebrewParagraph",  // הוסף את השורה הזו
   spacing: { 
     after: 120,
     line: 360
@@ -1327,6 +1324,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
