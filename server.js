@@ -787,23 +787,24 @@ sections: [{
   },
         children: [
           // Title with moderate spacing
-          new Paragraph({
-            children: [
-              new TextRun({
-            text: cleanName,
-                bold: true,
-                size: 36,  // Good readable size
-             font: {
-  name: "Arial"
-}
-              })
-            ],
-           alignment: AlignmentType.RIGHT,
-            spacing: { 
-              after: 480,   // Moderate space after title
-              line: 480     // Normal line spacing
-            }
-          }), 
+        new Paragraph({
+  children: [
+    new TextRun({
+      text: cleanName,
+      bold: true,
+      size: 36,
+      font: { name: "Arial" },
+      rightToLeft: true,
+      languageComplexScript: "he-IL"
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  bidirectional: true,
+  spacing: { 
+    after: 480,
+    line: 480
+  }
+})
           
           // Content with balanced spacing
           ...processTranscriptionContent(transcription)
@@ -1309,6 +1310,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
