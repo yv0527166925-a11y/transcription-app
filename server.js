@@ -764,17 +764,14 @@ styles: {
     document: {
       run: {
         font: "Arial",
-        size: 24,
-        rightToLeft: true,
-        languageComplexScript: "he-IL"
+        size: 24
       },
       paragraph: {
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-        rtl: true
+        alignment: AlignmentType.RIGHT
       }
     }
-  },
+  }
+},
   paragraphStyles: [
     {
       id: "HebrewParagraph",
@@ -1349,6 +1346,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
