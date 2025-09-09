@@ -646,6 +646,54 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
   }
 }
 
+}
+
+// 🔥 NEW: פונקציה לעיבוד טקסט לתבנית
+function processTranscriptionForTemplate(transcription) {
+  const paragraphs = transcription
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .split(/\n\s*\n/)
+    .filter(p => p.length > 0);
+  
+  let xmlContent = '';
+  paragraphs.forEach(paragraph => {
+    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
+    const boldTag = isSpeakerLine ? '<w:b/>' : '';
+    
+    xmlContent += `
+      <w:p>
+        <w:pPr>
+          <w:jc w:val="right"/>
+          <w:bidi/>
+        </w:pPr>
+        <w:r>
+          <w:rPr>
+            <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+            <w:sz w:val="24"/>
+            <w:lang w:val="he-IL"/>
+            <w:rtl/>
+            ${boldTag}
+          </w:rPr>
+          <w:t>${escapeXml(paragraph)}</w:t>
+        </w:r>
+      </w:p>`;
+  });
+  
+  return xmlContent;
+}
+
+// 🔥 NEW: פונקציה לניטרול XML
+function escapeXml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Word document creation (same as before)
 async function createWordDocument(transcription, filename, duration) {
   try {
@@ -1261,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
