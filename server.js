@@ -654,8 +654,13 @@ function processTranscriptionForTemplate(transcription) {
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-    .split(/\n\s*\n/)
+ .split(/\n\s*\n/)
     .filter(p => p.length > 0);
+  
+  console.log('🔍 DEBUG - Number of paragraphs:', paragraphs.length);
+  if (paragraphs.length > 0) {
+    console.log('🔍 DEBUG - First paragraph sample:', paragraphs[0].substring(0, 100));
+  }
   
   let xmlContent = '';
   paragraphs.forEach(paragraph => {
@@ -1316,6 +1321,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
