@@ -658,7 +658,20 @@ language: "he-IL",
 defaultRunProperties: {
   font: "Times New Roman",
   size: 24,
-  rtl: true
+rtl: true
+},
+styles: {
+  default: {
+    document: {
+      run: {
+        font: "Arial",
+        size: 24
+      },
+      paragraph: {
+        alignment: AlignmentType.RIGHT
+      }
+    }
+  }
 },
 sections: [{
   properties: {
@@ -1217,6 +1230,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
