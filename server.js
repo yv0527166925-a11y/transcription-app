@@ -818,115 +818,90 @@ function processTranscriptionContent(transcription) {
   
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')    // Reduce excessive line breaks
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
   
-  // Split by double line breaks to preserve paragraph structure
   const sections = cleanedText.split(/\n\s*\n/)
     .map(section => section.trim())
     .filter(section => section.length > 0);
   
   sections.forEach((section, index) => {
-    // Clean up the section but keep line breaks within it
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  let combinedSection = lines.join(' ').trim();
+    let combinedSection = lines.join(' ').trim();
 
-// Split long sections into shorter paragraphs
-if (combinedSection.length > 300) {
-  const sentences = combinedSection.split(/(?<=[.!?])\s+/);
-  let currentPara = '';
-  
-  for (const sentence of sentences) {
-    if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
-      // Create paragraph with current content
-      paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: currentPara.trim(),
-            size: 24,
-            font: { name: "Arial" },
-          })
-        ],
-        alignment: AlignmentType.RIGHT,
-        spacing: { after: 120, line: 360 }
-      }));
-      currentPara = sentence + ' ';
-    } else {
-      currentPara += sentence + ' ';
+    if (combinedSection.length > 300) {
+      const sentences = combinedSection.split(/(?<=[.!?])\s+/);
+      let currentPara = '';
+      
+      for (const sentence of sentences) {
+        if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
+          paragraphs.push(new Paragraph({
+            children: [
+              new TextRun({
+                text: currentPara.trim(),
+                size: 24,
+                font: { name: "Arial" },
+                rightToLeft: true,
+                languageComplexScript: "he-IL"
+              })
+            ],
+            alignment: AlignmentType.RIGHT,
+            bidirectional: true,
+            spacing: { after: 120, line: 360 }
+          }));
+          currentPara = sentence + ' ';
+        } else {
+          currentPara += sentence + ' ';
+        }
+      }
+      
+      if (currentPara.trim()) {
+        paragraphs.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: currentPara.trim(),
+              size: 24,
+              font: { name: "Arial" },
+              rightToLeft: true,
+              languageComplexScript: "he-IL"
+            })
+          ],
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true,
+          spacing: { after: 120, line: 360 }
+        }));
+      }
+      return;
     }
-  }
-  
-  // Add remaining content
-  if (currentPara.trim()) {
-  paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: currentPara.trim(),
-            size: 24,
-            font: { name: "Arial" },
-            rightToLeft: true,
-            languageComplexScript: "he-IL"
-          })
-        ],
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-        spacing: { after: 120, line: 360 }
-      }));
-  }
-  return paragraphs; // Early return for long sections
-}
     
     if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
       combinedSection += '.';
     }
     
-    // Detect speaker lines
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
- paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-      font: { name: "Arial" },
-      bold: isSpeakerLine,
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  spacing: { 
-    after: 120,
-    line: 360
-  }
-}));
-    
-    // Add modest extra spacing every 3 paragraphs
-    if ((index + 1) % 3 === 0 && index < sections.length - 1) {
     paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-    font: { name: "Arial" },
-      bold: isSpeakerLine,
-      rightToLeft: true
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  spacing: { 
-    after: 120,
-    line: 360
-  },
-  bidirectional: true
-}));
-    }
+      children: [
+        new TextRun({
+          text: combinedSection,
+          size: 24,
+          font: { name: "Arial" },
+          bold: isSpeakerLine,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        })
+      ],
+      alignment: AlignmentType.RIGHT,
+      bidirectional: true,
+      spacing: { 
+        after: 120,
+        line: 360
+      }
+    }));
   });
   
   return paragraphs;
 }
-
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
@@ -1325,6 +1300,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
