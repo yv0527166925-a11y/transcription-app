@@ -822,11 +822,12 @@ new Paragraph({
   ],
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
+  style: "HebrewParagraph",  // הוסף את השורה הזו
   spacing: { 
     after: 480,
     line: 480
   }
-}),
+})
           
           // Content with balanced spacing
           ...processTranscriptionContent(transcription)
@@ -867,20 +868,13 @@ function processTranscriptionContent(transcription) {
       
       for (const sentence of sentences) {
         if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
-          paragraphs.push(new Paragraph({
-            children: [
-              new TextRun({
-                text: currentPara.trim(),
-                size: 24,
-                font: { name: "Arial" },
-                rightToLeft: true,
-                languageComplexScript: "he-IL"
-              })
-            ],
-            alignment: AlignmentType.RIGHT,
-            bidirectional: true,
-            spacing: { after: 120, line: 360 }
-          }));
+         paragraphs.push(new Paragraph({
+  children: [/* התוכן */],
+  alignment: AlignmentType.RIGHT,
+  bidirectional: true,
+  style: "HebrewParagraph",  // הוסף רק את זה
+  spacing: { after: 120, line: 360 }
+}));
           currentPara = sentence + ' ';
         } else {
           currentPara += sentence + ' ';
@@ -912,24 +906,25 @@ function processTranscriptionContent(transcription) {
     
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
     
-    paragraphs.push(new Paragraph({
-      children: [
-        new TextRun({
-          text: combinedSection,
-          size: 24,
-          font: { name: "Arial" },
-          bold: isSpeakerLine,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        })
-      ],
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-      spacing: { 
-        after: 120,
-        line: 360
-      }
-    }));
+   paragraphs.push(new Paragraph({
+  children: [
+    new TextRun({
+      text: combinedSection,
+      size: 24,
+      font: { name: "Arial" },
+      bold: isSpeakerLine,
+      rightToLeft: true,
+      languageComplexScript: "he-IL"
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  bidirectional: true,
+  style: "HebrewParagraph",  // הוסף את השורה הזו
+  spacing: { 
+    after: 120,
+    line: 360
+  }
+}));
   });
   
   return paragraphs;
@@ -1332,6 +1327,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
