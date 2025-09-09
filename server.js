@@ -705,7 +705,7 @@ async function createWordDocument(transcription, filename, duration) {
     // 🔥 NEW: נסה תחילה עם תבנית
   const templatePath = path.join(__dirname, 'simple-template.docx');
     
-    if (fs.existsSync(templatePath)) {
+   if (false) {
       console.log('📋 Using template file');
       
       const templateBuffer = fs.readFileSync(templatePath);
@@ -1320,6 +1320,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
