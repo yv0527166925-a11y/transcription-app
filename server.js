@@ -662,7 +662,7 @@ function processTranscriptionForTemplate(transcription) {
     const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
     const boldTag = isSpeakerLine ? '<w:b/>' : '';
     
-    xmlContent += `
+  xmlContent += `
       <w:p>
         <w:pPr>
           <w:jc w:val="right"/>
@@ -1309,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
