@@ -654,25 +654,15 @@ function processTranscriptionForTemplate(transcription) {
     .replace(/\r\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
- .split(/\n\s*\n/)
+    .split(/\n\s*\n/)
     .filter(p => p.length > 0);
   
-  console.log('🔍 DEBUG - Number of paragraphs:', paragraphs.length);
-  if (paragraphs.length > 0) {
-    console.log('🔍 DEBUG - First paragraph sample:', paragraphs[0].substring(0, 100));
-  }
-  
- let xmlContent = '';
-  paragraphs.forEach((paragraph, index) => {
-    console.log(`DEBUG - Processing paragraph ${index + 1}:`, paragraph.substring(0, 50) + '...');
-    
-    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
+  let xmlContent = '';
+  paragraphs.forEach(paragraph => {
+    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשيב|התلמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
     const boldTag = isSpeakerLine ? '<w:b/>' : '';
     
-    console.log(`DEBUG - isSpeakerLine: ${isSpeakerLine}, boldTag: ${boldTag}`);
-    console.log(`DEBUG - About to add XML for paragraph ${index + 1}`);
-    
-xmlContent += `
+    xmlContent += `
       <w:p>
         <w:pPr>
           <w:jc w:val="right"/>
@@ -1326,6 +1316,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
