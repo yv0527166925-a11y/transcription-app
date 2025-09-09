@@ -678,7 +678,7 @@ sections: [{
           new Paragraph({
             children: [
               new TextRun({
-                text: "תמלול אוטומטי מלא",
+            text: cleanName,
                 bold: true,
                 size: 36,  // Good readable size
                 font: {
@@ -1216,6 +1216,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
