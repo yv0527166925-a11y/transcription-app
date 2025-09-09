@@ -712,21 +712,23 @@ async function createWordDocument(transcription, filename, duration) {
       
       const documentXml = await zip.file('word/document.xml').async('string');
       
-     // הכן תוכן
+   // הכן תוכן
       const title = cleanName;
       const content = processTranscriptionForTemplate(transcription);
       
-      console.log('🔍 DEBUG: Template processing...');
-      console.log('📝 Title to insert:', title);
-      console.log('📝 Content length:', content.length);
-      console.log('📝 Content preview (first 200 chars):', content.substring(0, 200));
-      console.log('🔍 REPLACETITLE found in XML:', documentXml.includes('REPLACETITLE'));
-      console.log('🔍 REPLACECONTENT found in XML:', documentXml.includes('REPLACECONTENT'));
+      console.log('🔍 About to replace in XML...');
+      console.log('🔍 XML contains REPLACETITLE:', documentXml.includes('REPLACETITLE'));
+      console.log('🔍 XML contains REPLACECONTENT:', documentXml.includes('REPLACECONTENT'));
+      console.log('🔍 Content length to insert:', content.length);
       
       // החלף placeholders
       let newDocumentXml = documentXml
-      .replace(/TITLE/g, escapeXml(title))
-.replace(/CONTENT/g, content);
+        .replace(/REPLACETITLE/g, escapeXml(title))
+        .replace(/REPLACECONTENT/g, content);
+        
+      console.log('🔍 After replacement:');
+      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
+      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
       
       zip.file('word/document.xml', newDocumentXml);
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
@@ -1316,6 +1318,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
