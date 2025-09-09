@@ -654,18 +654,25 @@ async function createWordDocument(transcription, filename, duration) {
     
  const doc = new Document({
   creator: "תמלול חכם",
-  language: "he-IL",
-  sections: [{
-    properties: {
-      page: {
-            margin: {
-              top: 2160,    // 1.5 inches - reasonable margins
-              right: 1800,  // 1.25 inches  
-              bottom: 2160, // 1.5 inches
-              left: 1800    // 1.25 inches
-            }
-          }
-        },
+language: "he-IL",
+defaultRunProperties: {
+  font: "Times New Roman",
+  size: 24,
+  rtl: true
+},
+sections: [{
+  properties: {
+    page: {
+      margin: {
+        top: 2160,    // 1.5 inches - reasonable margins
+        right: 1800,  // 1.25 inches
+        bottom: 2160, // 1.5 inches
+        left: 1800    // 1.25 inches
+      }
+    },
+    rtlGutter: true,
+    bidi: true
+  },
         children: [
           // Title with moderate spacing
           new Paragraph({
@@ -1209,6 +1216,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
