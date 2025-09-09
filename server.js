@@ -892,7 +892,7 @@ function processTranscriptionContent(transcription) {
     paragraphs.push(new Paragraph({
       children: [
         new TextRun({
-          text: combinedSection,
+        text: fixHebrewSpacing(combinedSection),
           size: 24,
           font: { name: "Arial" },
           bold: isSpeakerLine,
@@ -1309,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
