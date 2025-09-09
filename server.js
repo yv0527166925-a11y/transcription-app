@@ -696,6 +696,15 @@ function escapeXml(text) {
     .replace(/'/g, '&#39;');
 }
 
+// 🔥 NEW: פונקציה לתיקון רווחים בעברית
+function fixHebrewSpacing(text) {
+  return text
+    .replace(/([.!?])([א-ת])/g, '$1 $2')  // רווח אחרי נקודה לפני אות עברית
+    .replace(/([,;])([א-ת])/g, '$1 $2')   // רווח אחרי פסיק לפני אות עברית
+    .replace(/\s+/g, ' ')                 // נקה רווחים כפולים
+    .trim();
+}
+
 // Word document creation (same as before)
 async function createWordDocument(transcription, filename, duration) {
   try {
@@ -789,7 +798,7 @@ sections: [{
 }
               })
             ],
-            alignment: AlignmentType.CENTER,
+           alignment: AlignmentType.RIGHT,
             spacing: { 
               after: 480,   // Moderate space after title
               line: 480     // Normal line spacing
@@ -1300,6 +1309,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
