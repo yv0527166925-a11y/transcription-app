@@ -652,10 +652,12 @@ async function createWordDocument(transcription, filename, duration) {
     const cleanName = cleanFilename(filename);
     console.log(`📄 Creating Word document for: ${cleanName}`);
     
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: {
+ const doc = new Document({
+  creator: "תמלול חכם",
+  language: "he-IL",
+  sections: [{
+    properties: {
+      page: {
             margin: {
               top: 2160,    // 1.5 inches - reasonable margins
               right: 1800,  // 1.25 inches  
@@ -786,21 +788,23 @@ if (combinedSection.length > 300) {
     
     // Add modest extra spacing every 3 paragraphs
     if ((index + 1) % 3 === 0 && index < sections.length - 1) {
-      paragraphs.push(new Paragraph({
-      children: [
-  new TextRun({
-    text: combinedSection,
-    size: 24,
-    font: { name: "Times New Roman" },
-    bold: isSpeakerLine
-  })
-],
-alignment: AlignmentType.RIGHT,
-spacing: { 
-  after: 120,
-  line: 360
-}
-      }));
+    paragraphs.push(new Paragraph({
+  children: [
+    new TextRun({
+      text: combinedSection,
+      size: 24,
+      font: { name: "Times New Roman" },
+      bold: isSpeakerLine,
+      rightToLeft: true
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  spacing: { 
+    after: 120,
+    line: 360
+  },
+  bidirectional: true
+}));
     }
   });
   
@@ -1205,6 +1209,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
