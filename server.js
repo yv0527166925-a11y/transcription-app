@@ -858,6 +858,15 @@ function processTranscriptionContent(transcription) {
     const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
     let combinedSection = lines.join(' ').trim();
 
+// תיקון רווחים סביב סימני פיסוק
+combinedSection = combinedSection
+  .replace(/\s*\.\s*/g, '. ')  // נקודה + רווח יחיד
+  .replace(/\s*,\s*/g, ', ')   // פסיק + רווח יחיד
+  .replace(/\s*!\s*/g, '! ')   // קריאה + רווח יחיד
+  .replace(/\s*\?\s*/g, '? ')  // שאלה + רווח יחיד
+  .replace(/\s*:\s*/g, ': ')   // נקודתיים + רווח יחיד
+  .replace(/\s+/g, ' ')        // רווחים כפולים לרווח יחיד
+  .trim();
     if (combinedSection.length > 300) {
       const sentences = combinedSection.split(/(?<=[.!?])\s+/);
       let currentPara = '';
@@ -1331,6 +1340,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
