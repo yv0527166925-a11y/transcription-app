@@ -760,13 +760,14 @@ async function createWordDocument(transcription, filename, duration) {
       
       // התחלת יצירת הקובץ
       docx.generate();
-    });
+  });
     
   } catch (error) {
     console.error('Error creating RTL Word document:', error);
     throw error;
   }
 }
+// Enhanced email with failure reporting
 }
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
@@ -1166,6 +1167,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
