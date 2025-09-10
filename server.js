@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
+const officegen = require('officegen');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -704,234 +704,69 @@ function fixHebrewSpacing(text) {
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`📄 Creating Word document from template for: ${cleanName}`);
+    console.log(`📄 Creating RTL Word document for: ${cleanName}`);
     
-    // 🔥 NEW: נסה תחילה עם תבנית
-  const templatePath = path.join(__dirname, 'simple-template.docx');
-    
-   if (false) {
-      console.log('📋 Using template file');
+    return new Promise((resolve, reject) => {
+      // יצירת מסמך Word עם RTL
+      const docx = officegen('docx');
       
-      const templateBuffer = fs.readFileSync(templatePath);
-      const zip = new JSZip();
-      await zip.loadAsync(templateBuffer);
+      // הגדרות RTL למסמך
+      docx.setDocumentOptions({
+        direction: 'rtl',
+        lang: 'he-IL'
+      });
       
-      const documentXml = await zip.file('word/document.xml').async('string');
+      // הוספת כותרת
+      const title = docx.createP();
+      title.options.align = 'right';
+      title.addText(cleanName, {
+        font_face: 'Arial',
+        font_size: 18,
+        bold: true
+      });
       
-   // הכן תוכן
-      const title = cleanName;
-      const content = processTranscriptionForTemplate(transcription);
+      // הוספת רווח אחרי כותרת
+      docx.createP();
       
-      console.log('🔍 About to replace in XML...');
-     console.log('XML contains TITLE:', documentXml.includes('TITLE'));
-console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
-      console.log('🔍 Content length to insert:', content.length);
+      // עיבוד התמלול
+      const paragraphs = transcription
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+        .split(/\n\s*\n/)
+        .filter(p => p.length > 0);
       
-      // החלף placeholders
-      let newDocumentXml = documentXml
-  .replace(/TITLE/g, escapeXml(title))
-  .replace(/CONTENT/g, content);
-        
-      console.log('🔍 After replacement:');
-      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
-      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
-      
-      zip.file('word/document.xml', newDocumentXml);
-      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-      
-      console.log(`✅ Word document created from template for: ${cleanName}`);
-      return buffer;
-    }
-    
-    // 🔥 אם אין תבנית - השתמש בקוד הישן
-    console.log('⚠️ No template found, using programmatic creation');
-    
-// החלף את הקטע בשורות 635-677 בקוד הזה:
-
-const doc = new Document({
-  creator: "תמלול חכם",
-  language: "he-IL",
-  defaultRunProperties: {
-    font: "Times New Roman",
-    size: 24,
-    rtl: true
-  },
-  styles: {
-    default: {
-      document: {
-        run: {
-          font: "Arial",
-          size: 24,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        },
-        paragraph: {
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true
+      // הוספת פסקאות עם RTL
+      paragraphs.forEach(paragraph => {
+        if (paragraph.trim()) {
+          const p = docx.createP();
+          p.options.align = 'right';
+          p.addText(paragraph.trim(), {
+            font_face: 'Arial',
+            font_size: 12
+          });
         }
-      }
-    },
-    paragraphStyles: [
-      {
-        id: "HebrewParagraph",
-        name: "Hebrew Paragraph",
-        basedOn: "Normal",
-        paragraph: {
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true
-        },
-        run: {
-          rightToLeft: true,
-          languageComplexScript: "he-IL",
-          font: "Arial"
-        }
-      }
-    ]
-  },
-  sections: [{
-    properties: {
-      page: {
-        margin: {
-          top: 2160,
-          right: 1800,
-          bottom: 2160,
-          left: 1800
-        },
-        textDirection: "rtl"
-      },
-      rtlGutter: true,
-      bidi: true,
-      textDirection: "rtl"
-    },
-    children: [
-      // Title with moderate spacing
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: cleanName,
-            bold: true,
-            size: 36,
-            font: { name: "Arial" },
-            rightToLeft: true,
-            languageComplexScript: "he-IL"
-          })
-        ],
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-        style: "HebrewParagraph",
-        spacing: { 
-          after: 480,
-          line: 480
-        }
-      }),
+      });
       
-      // Content with balanced spacing
-      ...processTranscriptionContent(transcription)
-    ]
-  }]
-});
-    
-    const buffer = await Packer.toBuffer(doc);
-    console.log(`✅ Word document created successfully for: ${cleanName}`);
-    return buffer;
+      // יצירת buffer
+      let chunks = [];
+      docx.on('data', chunk => chunks.push(chunk));
+      docx.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        console.log(`✅ RTL Word document created for: ${cleanName}`);
+        resolve(buffer);
+      });
+      docx.on('error', reject);
+      
+      // התחלת יצירת הקובץ
+      docx.generate();
+    });
     
   } catch (error) {
-    console.error('Error creating Word document:', error);
+    console.error('Error creating RTL Word document:', error);
     throw error;
   }
 }
-
-// Process transcription content for Word document
-function processTranscriptionContent(transcription) {
-  const paragraphs = [];
-  
-  let cleanedText = transcription
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  
-  const sections = cleanedText.split(/\n\s*\n/)
-    .map(section => section.trim())
-    .filter(section => section.length > 0);
-  
-  sections.forEach((section, index) => {
-    const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    let combinedSection = lines.join(' ').trim();
-
-    if (combinedSection.length > 300) {
-      const sentences = combinedSection.split(/(?<=[.!?])\s+/);
-      let currentPara = '';
-      
-      for (const sentence of sentences) {
-        if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
-          paragraphs.push(new Paragraph({
-            children: [
-              new TextRun({
-                text: currentPara.trim(),
-                size: 24,
-                font: { name: "Arial" },
-                rightToLeft: true,
-                languageComplexScript: "he-IL"
-              })
-            ],
-            alignment: AlignmentType.RIGHT,
-            bidirectional: true,
-            spacing: { after: 120, line: 360 }
-          }));
-          currentPara = sentence + ' ';
-        } else {
-          currentPara += sentence + ' ';
-        }
-      }
-      
-      if (currentPara.trim()) {
-        paragraphs.push(new Paragraph({
-          children: [
-            new TextRun({
-              text: currentPara.trim(),
-              size: 24,
-              font: { name: "Arial" },
-              rightToLeft: true,
-              languageComplexScript: "he-IL"
-            })
-          ],
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          spacing: { after: 120, line: 360 }
-        }));
-      }
-      return;
-    }
-    
-    if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
-      combinedSection += '.';
-    }
-    
-    // ללא בדיקת דוברים - פשוט יצירת פסקה רגילה
-paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-      font: { 
-        name: "Arial"
-      },
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-      // ללא bold, ללא color
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  style: "HebrewParagraph",
-  spacing: { 
-    after: 120,
-    line: 360
-  }
-}));
-  });
-  
-  return paragraphs;
 }
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
@@ -1331,6 +1166,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
