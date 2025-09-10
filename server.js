@@ -850,8 +850,12 @@ const doc = new Document({
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
+  // 🔥 החדש: ניקוי מתקדם של הטקסט
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
+    .replace(/\[/g, '')                    // 🆕 הסר [
+    .replace(/\]/g, '')                    // 🆕 הסר ]
+    .replace(/\{dir="rtl"\}/g, '')         // 🆕 הסר RTL tags
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   
@@ -881,6 +885,7 @@ function processTranscriptionContent(transcription) {
             ],
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
+            style: "HebrewParagraph",        // 🆕 הוסף סגנון
             spacing: { after: 120, line: 360 }
           }));
           currentPara = sentence + ' ';
@@ -902,6 +907,7 @@ function processTranscriptionContent(transcription) {
           ],
           alignment: AlignmentType.RIGHT,
           bidirectional: true,
+          style: "HebrewParagraph",          // 🆕 הוסף סגנון
           spacing: { after: 120, line: 360 }
         }));
       }
@@ -927,6 +933,7 @@ function processTranscriptionContent(transcription) {
       ],
       alignment: AlignmentType.RIGHT,
       bidirectional: true,
+      style: "HebrewParagraph",              // 🆕 הוסף סגנון
       spacing: { 
         after: 120,
         line: 360
@@ -1334,6 +1341,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
