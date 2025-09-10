@@ -109,19 +109,9 @@ let users = [
     id: 1,
     name: 'מנהל המערכת',
     email: 'admin@example.com',
-    password: 'admin123',
+    password: 'S3cur3P@ssw0rd_Adm!n25', // הסיסמה החזקה שקבענו
     isAdmin: true,
     remainingMinutes: 1000,
-    totalTranscribed: 0,
-    history: []
-  },
-  {
-    id: 2,
-    name: 'משתמש בדיקה',
-    email: 'test@example.com',
-    password: 'test123',
-    isAdmin: false,
-    remainingMinutes: 30,
     totalTranscribed: 0,
     history: []
   }
@@ -1340,6 +1330,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
