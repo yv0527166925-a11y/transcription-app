@@ -969,27 +969,28 @@ function processTranscriptionContent(transcription) {
       combinedSection += '.';
     }
     
-    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
-    
-    paragraphs.push(new Paragraph({
-      children: [
-        new TextRun({
-          text: combinedSection,
-          size: 24,
-          font: { name: "Arial" },
-          bold: isSpeakerLine,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        })
-      ],
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-      style: "HebrewParagraph",              // 🆕 הוסף סגנון
-      spacing: { 
-        after: 120,
-        line: 360
-      }
-    }));
+   // ללא בדיקת דוברים - פשוט יצירת פסקה רגילה
+paragraphs.push(new Paragraph({
+  children: [
+    new TextRun({
+      text: combinedSection,
+      size: 24,
+      font: { 
+        name: "Arial"
+      },
+      rightToLeft: true,
+      languageComplexScript: "he-IL"
+      // ללא bold, ללא color
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  bidirectional: true,
+  style: "HebrewParagraph",
+  spacing: { 
+    after: 120,
+    line: 360
+  }
+}));
   });
   
   return paragraphs;
@@ -1392,6 +1393,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
