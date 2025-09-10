@@ -403,88 +403,56 @@ function mergeTranscriptionChunks(chunks) {
 }
 
 // Helper function to clean filename for display
-// החלף את הפונקציה cleanFilename בקובץ server.js:
-
 function cleanFilename(filename) {
   console.log(`🔍 Original filename: "${filename}"`);
   
-  // הסר timestamp prefix
+  // Remove timestamp prefix (numbers followed by underscore)
   let withoutTimestamp = filename.replace(/^\d+_/, '');
   console.log(`📝 After removing timestamp: "${withoutTimestamp}"`);
   
+  // Try multiple decoding approaches
   let cleaned = withoutTimestamp;
   
-  // 🔥 תיקון אגרסיבי לבעיות encoding עברית
+  // Method 1: Try URL decoding if contains %
+  if (cleaned.includes('%')) {
+    try {
+      cleaned = decodeURIComponent(cleaned);
+      console.log(`🔄 After URL decode: "${cleaned}"`);
+    } catch (e) {
+      console.log('URL decode failed');
+    }
+  }
+  
+  // Method 2: Try Buffer conversion for Hebrew encoding issues
   try {
-    // בדיקה אם יש תווי encoding מקולקלים
-    if (cleaned.includes('×') || cleaned.includes('Ã') || cleaned.includes('â') || cleaned.includes('ª')) {
-      console.log('🔧 Detected severe encoding issues, applying aggressive fix...');
-      
-      // נסה פתרונות שונים
-      const fixes = [
-        // תיקון 1: Buffer conversion
-        () => {
-          const buffer = Buffer.from(cleaned, 'latin1');
-          return buffer.toString('utf8');
-        },
-        
-        // תיקון 2: URL decode
-        () => {
-          return decodeURIComponent(escape(cleaned));
-        },
-        
-        // תיקון 3: ניסיון ידני לתווים נפוצים
-        () => {
-          return cleaned
-            .replace(/×ª/g, 'ת')
-            .replace(/××/g, 'מ')
-            .replace(/×/g, 'ל')
-            .replace(/×©/g, 'ש')
-            .replace(/××¢/g, 'ע')
-            .replace(/×/g, 'ו')
-            .replace(/×¨/g, 'ר')
-            .replace(/Â/g, '')
-            .replace(/ª/g, 'ה')
-            .replace(/Ã/g, '');
-        },
-        
-        // תיקון 4: החלפה מלאה אם כלום לא עובד
-        () => {
-          return 'שיעור_תורה_חדש';
-        }
-      ];
-      
-      for (let i = 0; i < fixes.length; i++) {
-        try {
-          const result = fixes[i]();
-          console.log(`🔧 Fix attempt ${i + 1}: "${result}"`);
-          
-          // בדוק אם יש עברית או לפחות טקסט רגיל
-          if (result.match(/[\u0590-\u05FF]/) || (result.length > 5 && !result.includes('×'))) {
-            cleaned = result;
-            console.log(`✅ Successfully fixed with method ${i + 1}: "${cleaned}"`);
-            break;
-          }
-        } catch (e) {
-          console.log(`❌ Fix method ${i + 1} failed:`, e.message);
-        }
+    // Convert from latin1 to utf8 if it looks like Hebrew encoding issue
+    if (cleaned.includes('Ã') || cleaned.includes('Â') || cleaned.includes('ª') || cleaned.charCodeAt(0) > 127) {
+      const buffer = Buffer.from(cleaned, 'latin1');
+      const utf8String = buffer.toString('utf8');
+      if (utf8String.match(/[\u0590-\u05FF]/)) {
+        cleaned = utf8String;
+        console.log(`🔄 After Buffer conversion: "${cleaned}"`);
       }
     }
   } catch (e) {
-    console.log('All encoding fixes failed, using fallback');
-    cleaned = 'שיעור_תורה';
+    console.log('Buffer conversion failed');
   }
   
-  // הסר סיומת קובץ
+  // Method 3: If still has encoding issues, try original filename from multipart
+  if (!cleaned.match(/[\u0590-\u05FF]/) && cleaned.includes('Ã')) {
+    // Fallback to a simple clean version
+    cleaned = cleaned.replace(/[^\u0020-\u007E\u0590-\u05FF]/g, '');
+  }
+  
+  // Remove file extension
   cleaned = cleaned.replace(/\.[^/.]+$/, '');
   
-  // ניקוי תווים לא חוקיים
+  // Final cleanup - remove any remaining weird characters but keep Hebrew
   cleaned = cleaned.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
   
-  // ודא שיש לנו שם תקין
+  // If we still don't have good Hebrew text, use a generic name
   if (!cleaned || cleaned.length < 2) {
-    const now = new Date();
-    cleaned = `שיעור_${now.getDate()}_${now.getMonth() + 1}`;
+    cleaned = 'קובץ_אודיו';
   }
   
   console.log(`✅ Final cleaned filename: "${cleaned}"`);
@@ -785,21 +753,14 @@ console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
     
 // החלף את הקטע בשורות 635-677 בקוד הזה:
 
-// החלף את קטע יצירת ה-Document בפונקציה createWordDocument:
-
 const doc = new Document({
   creator: "תמלול חכם",
   language: "he-IL",
-  
-  // 🔥 הוספת properties נוספים לעברית
   defaultRunProperties: {
-    font: "Arial",
+    font: "Times New Roman",
     size: 24,
-    rightToLeft: true,
-    languageComplexScript: "he-IL",
-    complexScript: true
+    rtl: true
   },
-  
   styles: {
     default: {
       document: {
@@ -807,14 +768,11 @@ const doc = new Document({
           font: "Arial",
           size: 24,
           rightToLeft: true,
-          languageComplexScript: "he-IL",
-          complexScript: true,
-          bidi: true
+          languageComplexScript: "he-IL"
         },
         paragraph: {
           alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          rightToLeft: true
+          bidirectional: true
         }
       }
     },
@@ -825,21 +783,16 @@ const doc = new Document({
         basedOn: "Normal",
         paragraph: {
           alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          rightToLeft: true,
-          textDirection: "rtl"
+          bidirectional: true
         },
         run: {
           rightToLeft: true,
           languageComplexScript: "he-IL",
-          font: "Arial",
-          complexScript: true,
-          bidi: true
+          font: "Arial"
         }
       }
     ]
   },
-  
   sections: [{
     properties: {
       page: {
@@ -853,11 +806,10 @@ const doc = new Document({
       },
       rtlGutter: true,
       bidi: true,
-      textDirection: "rtl",
-      rightToLeft: true
+      textDirection: "rtl"
     },
     children: [
-      // כותרת משופרת
+      // Title with moderate spacing
       new Paragraph({
         children: [
           new TextRun({
@@ -866,14 +818,11 @@ const doc = new Document({
             size: 36,
             font: { name: "Arial" },
             rightToLeft: true,
-            languageComplexScript: "he-IL",
-            complexScript: true,
-            bidi: true
+            languageComplexScript: "he-IL"
           })
         ],
         alignment: AlignmentType.RIGHT,
         bidirectional: true,
-        rightToLeft: true,
         style: "HebrewParagraph",
         spacing: { 
           after: 480,
@@ -881,7 +830,7 @@ const doc = new Document({
         }
       }),
       
-      // תוכן משופר
+      // Content with balanced spacing
       ...processTranscriptionContent(transcription)
     ]
   }]
@@ -901,12 +850,8 @@ const doc = new Document({
 function processTranscriptionContent(transcription) {
   const paragraphs = [];
   
-  // 🔥 החדש: ניקוי מתקדם של הטקסט
   let cleanedText = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\[/g, '')                    // 🆕 הסר [
-    .replace(/\]/g, '')                    // 🆕 הסר ]
-    .replace(/\{dir="rtl"\}/g, '')         // 🆕 הסר RTL tags
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   
@@ -936,7 +881,6 @@ function processTranscriptionContent(transcription) {
             ],
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
-            style: "HebrewParagraph",        // 🆕 הוסף סגנון
             spacing: { after: 120, line: 360 }
           }));
           currentPara = sentence + ' ';
@@ -958,7 +902,6 @@ function processTranscriptionContent(transcription) {
           ],
           alignment: AlignmentType.RIGHT,
           bidirectional: true,
-          style: "HebrewParagraph",          // 🆕 הוסף סגנון
           spacing: { after: 120, line: 360 }
         }));
       }
@@ -969,28 +912,26 @@ function processTranscriptionContent(transcription) {
       combinedSection += '.';
     }
     
-   // ללא בדיקת דוברים - פשוט יצירת פסקה רגילה
-paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-      font: { 
-        name: "Arial"
-      },
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-      // ללא bold, ללא color
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  style: "HebrewParagraph",
-  spacing: { 
-    after: 120,
-    line: 360
-  }
-}));
+    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשיב|התלמיד|השואל|מרצה|דובר|מורה)\s*:/.test(combinedSection);
+    
+    paragraphs.push(new Paragraph({
+      children: [
+        new TextRun({
+          text: combinedSection,
+          size: 24,
+          font: { name: "Arial" },
+          bold: isSpeakerLine,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        })
+      ],
+      alignment: AlignmentType.RIGHT,
+      bidirectional: true,
+      spacing: { 
+        after: 120,
+        line: 360
+      }
+    }));
   });
   
   return paragraphs;
@@ -1393,9 +1334,6 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
-
-
-
 
 
 
