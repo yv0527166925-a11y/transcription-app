@@ -304,10 +304,8 @@ ${contextPrompt}
 
 📝 הנחיות עיצוב:
 - חלק לפסקאות של 2-3 משפטים
-- זיהוי דוברים: "רב:", "שואל:", "תלמיד:"
 - ציטוטים במירכאות: "שנאמר", "כדאיתא"
 - שמור על רציפות טבעית
-
 תתחיל עכשיו עם התמלול:`;
 
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks}...`);
@@ -537,9 +535,7 @@ async function directGeminiTranscription(filePath, filename, language) {
 🎯 תמלל לעברית תקנית:
 - מושגים דתיים מדויקים
 - ציטוטים במירכאות: "כמו שכתוב", "אמרו חכמים", "תניא"
-- זיהוי דוברים: "רב:", "שואל:", "תלמיד:"
 - פסקאות של 2-4 משפטים עם שורה ריקה
-
 🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
 תתחיל עכשיו ותמלל הכל ללא חריגות:`;
 
@@ -1335,6 +1331,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
