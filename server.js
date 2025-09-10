@@ -1016,9 +1016,16 @@ const attachments = transcriptions.map(trans => {
               </ul>
             </div>
             
-            <div style="text-align: center; margin: 30px 0;">
+           <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
                 🎉 תמלול מלא ושלם - אפילו לקבצים של שעות!
+              </p>
+            </div>
+            
+            <div style="background: #fff9c4; padding: 15px 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #fdd835;">
+              <h3 style="color: #5f4300; margin-top: 0; margin-bottom: 10px; font-size: 16px;">לתשומת לב:</h3>
+              <p style="margin: 0; font-size: 14px; color: #5f4300;">
+                אם הטקסט בקובץ אינו מיושר לימין, יש לבחור את כל התוכן (Ctrl+A) וללחוץ על כפתור 'ישר לימין' בתוכנת ה-Word.
               </p>
             </div>
             
@@ -1330,6 +1337,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
