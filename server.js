@@ -658,9 +658,8 @@ function processTranscriptionForTemplate(transcription) {
     .filter(p => p.length > 0);
   
   let xmlContent = '';
-  paragraphs.forEach(paragraph => {
-    const isSpeakerLine = /^(רב|הרב|שואל|תשובה|שאלה|המשيב|התلמיד|השואל|מרצה|דובר|מורה)\s*:/.test(paragraph);
-    const boldTag = isSpeakerLine ? '<w:b/>' : '';
+paragraphs.forEach(paragraph => {
+    const boldTag = '';
     
     xmlContent += `
       <w:p>
@@ -1336,6 +1335,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
