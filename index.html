@@ -1067,6 +1067,12 @@
             showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
             
             for (const file of validFiles) {
+                // בדיקה למניעת כפילויות
+                if (selectedFiles.some(f => f.file.name === file.name && f.file.size === file.size)) {
+                    console.log(`File already selected: ${file.name}`);
+                    continue; // דלג על קובץ שכבר נבחר
+                }
+
                 try {
                     const duration = await getAudioDuration(file);
                     selectedFiles.push({
@@ -1084,6 +1090,15 @@
                     await displayFile(file, estimatedDuration);
                 }
             }
+            
+            updateSubmitButton();
+            updateCostEstimate();
+            hideStatus();
+
+            // 🔥 הוספת השורה הזו היא הפתרון
+            // איפוס שדה הקלט כדי לאפשר בחירה נוספת של קבצים
+            fileInput.value = ''; 
+        }
             
             updateSubmitButton();
             updateCostEstimate();
@@ -1407,6 +1422,7 @@
     </script>
 </body>
 </html>
+
 
 
 
