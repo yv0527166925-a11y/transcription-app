@@ -744,6 +744,7 @@ const doc = new Document({
   defaultRunProperties: {
     font: "Times New Roman",
     size: 24,
+    rightToLeft: true,
     rtl: true
   },
   styles: {
@@ -768,7 +769,8 @@ const doc = new Document({
         basedOn: "Normal",
         paragraph: {
           alignment: AlignmentType.RIGHT,
-          bidirectional: true
+          bidirectional: true,
+          rightToLeft: true,
         },
         run: {
           rightToLeft: true,
@@ -790,6 +792,7 @@ const doc = new Document({
         textDirection: "rtl"
       },
       rtlGutter: true,
+      rightToLeft: true,
       bidi: true,
       textDirection: "rtl"
     },
@@ -808,6 +811,7 @@ const doc = new Document({
         ],
         alignment: AlignmentType.RIGHT,
         bidirectional: true,
+        rightToLeft: true,
         style: "HebrewParagraph",
         spacing: { 
           after: 480,
@@ -875,6 +879,7 @@ combinedSection = combinedSection
             ],
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
+            rightToLeft: true,
             spacing: { after: 120, line: 360 }
           }));
           currentPara = sentence + ' ';
@@ -896,6 +901,7 @@ combinedSection = combinedSection
           ],
           alignment: AlignmentType.RIGHT,
           bidirectional: true,
+          rightToLeft: true,
           spacing: { after: 120, line: 360 }
         }));
       }
@@ -922,6 +928,7 @@ paragraphs.push(new Paragraph({
   ],
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
+  rightToLeft: true,
   style: "HebrewParagraph",
   spacing: { 
     after: 120,
@@ -1295,53 +1302,34 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
       return res.status(400).json({ success: false, error: `משתמש לא נמצא: ${email}` });
     }
 
-   // Calculate total estimated minutes ACCURATELY
-    let totalDurationSeconds = 0;
-    for (const file of req.files) {
-        try {
-            // Use the accurate function from line 212
-            const duration = await getAudioDuration(file.path); 
-            totalDurationSeconds += duration;
-        } catch (error) {
-            console.error(`Could not get duration for ${file.filename}, falling back to size estimate.`, error);
-            // Fallback for safety
-            totalDurationSeconds += (file.size / (1024 * 1024 * 2)) * 60;
-        }
+    // Calculate total estimated minutes
+    const estimatedMinutes = req.files.reduce((total, file) => {
+      return total + Math.ceil(file.size / (1024 * 1024 * 2)); // Rough estimate
+    }, 0);
+    
+    console.log(`⏱️ Estimated minutes: ${estimatedMinutes}, User balance: ${user.remainingMinutes}`);
+
+    if (estimatedMinutes > user.remainingMinutes) {
+      console.log('❌ Insufficient minutes');
+      return res.status(400).json({ 
+        success: false, 
+        error: `אין מספיק דקות בחשבון. נדרש: ${estimatedMinutes}, זמין: ${user.remainingMinutes}` 
+      });
     }
 
-    // Convert total seconds to minutes and round up
-    const accurateMinutes = Math.ceil(totalDurationSeconds / 60);
-
-    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.remainingMinutes}`);
-
-    if (accurateMinutes > user.remainingMinutes) {
-        console.log('❌ Insufficient minutes, deleting uploaded files.');
-        // Clean up files immediately if not enough minutes
-        for (const file of req.files) {
-            try {
-                fs.unlinkSync(file.path);
-            } catch (e) {
-                console.warn(`Could not delete file ${file.path} after failed check.`)
-            }
-        }
-        return res.status(400).json({
-            success: false,
-            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.remainingMinutes}`
-        });
-    }
-
-    // Start enhanced async processing with the ACCURATE minutes
-    processTranscriptionAsync(req.files, email, language, accurateMinutes);
-
-    console.log('✅ Enhanced transcription started successfully with accurate minute count.');
-    res.json({
-        success: true,
-        message: ffmpegAvailable ?
-            'התמלול המתקדם התחיל - קבצים גדולים יתחלקו למקטעים אוטומטית' :
-            'התמלול התחיל - ללא חלוקה למקטעים (FFmpeg לא זמין)',
-        estimatedMinutes: accurateMinutes, // Return the accurate count to the client
-        chunkingEnabled: ffmpegAvailable
+    // Start enhanced async processing with chunking
+    processTranscriptionAsync(req.files, email, language, estimatedMinutes);
+    
+    console.log('✅ Enhanced transcription started successfully');
+    res.json({ 
+      success: true, 
+      message: ffmpegAvailable ? 
+        'התמלול המתקדם התחיל - קבצים גדולים יתחלקו למקטעים אוטומטית' :
+        'התמלול התחיל - ללא חלוקה למקטעים (FFmpeg לא זמין)',
+      estimatedMinutes,
+      chunkingEnabled: ffmpegAvailable
     });
+
   } catch (error) {
     console.error('Enhanced transcription error:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -1356,7 +1344,6 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
-
 
 
 
