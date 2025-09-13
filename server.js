@@ -8,6 +8,7 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
+const sqlite3 = require('sqlite3').verbose(); // 🔥 NEW: For persistent database
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -103,19 +104,106 @@ const upload = multer({
   }
 });
 
-// Mock database
-let users = [
-  {
-    id: 1,
-    name: 'מנהל המערכת',
-    email: 'admin@example.com',
-    password: 'S3cur3P@ssw0rd_Adm!n25', // הסיסמה החזקה שקבענו
-    isAdmin: true,
-    remainingMinutes: 1000,
-    totalTranscribed: 0,
-    history: []
-  }
-];
+// 🔥 NEW: Persistent Database Setup
+const dbPath = path.join(__dirname, 'transcription.db');
+const db = new sqlite3.Database(dbPath);
+
+// Initialize database tables
+db.serialize(() => {
+  // Users table
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    phone TEXT,
+    isAdmin BOOLEAN DEFAULT 0,
+    remainingMinutes INTEGER DEFAULT 30,
+    totalTranscribed INTEGER DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  // Transcription history table
+  db.run(`CREATE TABLE IF NOT EXISTS transcription_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER,
+    filename TEXT NOT NULL,
+    fileSize INTEGER,
+    duration REAL,
+    transcriptionLength INTEGER,
+    status TEXT DEFAULT 'completed',
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users (id)
+  )`);
+
+  // Insert default admin user if not exists
+  db.get("SELECT COUNT(*) as count FROM users WHERE email = 'admin@example.com'", (err, row) => {
+    if (err) {
+      console.error('Error checking admin user:', err);
+    } else if (row.count === 0) {
+      db.run(`INSERT INTO users (name, email, password, isAdmin, remainingMinutes) 
+              VALUES ('מנהל המערכת', 'admin@example.com', 'S3cur3P@ssw0rd_Adm!n25', 1, 1000)`, (err) => {
+        if (err) {
+          console.error('Error creating admin user:', err);
+        } else {
+          console.log('✅ Default admin user created');
+        }
+      });
+    }
+  });
+});
+
+// Helper functions for database operations
+function getUserByEmail(email) {
+  return new Promise((resolve, reject) => {
+    db.get("SELECT * FROM users WHERE email = ?", [email.toLowerCase()], (err, row) => {
+      if (err) reject(err);
+      else resolve(row);
+    });
+  });
+}
+
+function getAllUsers() {
+  return new Promise((resolve, reject) => {
+    db.all("SELECT id, name, email, phone, isAdmin, remainingMinutes, totalTranscribed, createdAt FROM users", (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+function updateUserMinutes(email, minutes) {
+  return new Promise((resolve, reject) => {
+    db.run("UPDATE users SET remainingMinutes = remainingMinutes + ?, updatedAt = CURRENT_TIMESTAMP WHERE email = ?", 
+           [minutes, email.toLowerCase()], function(err) {
+      if (err) reject(err);
+      else resolve({ changes: this.changes });
+    });
+  });
+}
+
+function addTranscriptionHistory(userId, filename, fileSize, duration, transcriptionLength, status = 'completed') {
+  return new Promise((resolve, reject) => {
+    db.run(`INSERT INTO transcription_history (userId, filename, fileSize, duration, transcriptionLength, status) 
+            VALUES (?, ?, ?, ?, ?, ?)`, 
+           [userId, filename, fileSize, duration, transcriptionLength, status], function(err) {
+      if (err) reject(err);
+      else resolve({ id: this.lastID });
+    });
+  });
+}
+
+function getUserHistory(userId) {
+  return new Promise((resolve, reject) => {
+    db.all("SELECT * FROM transcription_history WHERE userId = ? ORDER BY createdAt DESC", [userId], (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
+  });
+}
+
+console.log('✅ Database initialized successfully');
 
 // 🔥 NEW: FFmpeg and chunking functions
 function checkFFmpegAvailability() {
@@ -742,10 +830,10 @@ const doc = new Document({
   creator: "תמלול חכם",
   language: "he-IL",
   defaultRunProperties: {
-    font: "Times New Roman",
+    font: "Arial",
     size: 24,
     rightToLeft: true,
-    rtl: true
+    languageComplexScript: "he-IL"
   },
   styles: {
     default: {
@@ -758,7 +846,8 @@ const doc = new Document({
         },
         paragraph: {
           alignment: AlignmentType.RIGHT,
-          bidirectional: true
+          bidirectional: true,
+          rightToLeft: true
         }
       }
     },
@@ -771,6 +860,7 @@ const doc = new Document({
           alignment: AlignmentType.RIGHT,
           bidirectional: true,
           rightToLeft: true,
+          textDirection: "rtl"
         },
         run: {
           rightToLeft: true,
@@ -880,6 +970,7 @@ combinedSection = combinedSection
             alignment: AlignmentType.RIGHT,
             bidirectional: true,
             rightToLeft: true,
+            textDirection: "rtl",
             spacing: { after: 120, line: 360 }
           }));
           currentPara = sentence + ' ';
@@ -902,6 +993,7 @@ combinedSection = combinedSection
           alignment: AlignmentType.RIGHT,
           bidirectional: true,
           rightToLeft: true,
+          textDirection: "rtl",
           spacing: { after: 120, line: 360 }
         }));
       }
@@ -929,6 +1021,7 @@ paragraphs.push(new Paragraph({
   alignment: AlignmentType.RIGHT,
   bidirectional: true,
   rightToLeft: true,
+  textDirection: "rtl",
   style: "HebrewParagraph",
   spacing: { 
     after: 120,
@@ -1061,7 +1154,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
   console.log(`📧 Processing for user: ${userEmail}`);
   
-  const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+  const user = await getUserByEmail(userEmail);
   if (!user) {
     console.error('❌ User not found during async processing:', userEmail);
     return;
@@ -1118,11 +1211,35 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       
       // Update user stats only for successful transcriptions
       const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
-      user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
-      user.totalTranscribed += actualMinutesUsed;
+      const newBalance = Math.max(0, user.remainingMinutes - actualMinutesUsed);
+      const newTotalTranscribed = user.totalTranscribed + actualMinutesUsed;
+      
+      // Update user in database
+      await new Promise((resolve, reject) => {
+        db.run("UPDATE users SET remainingMinutes = ?, totalTranscribed = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", 
+               [newBalance, newTotalTranscribed, user.id], (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      // Add transcription history for each successful transcription
+      for (const trans of transcriptions) {
+        try {
+          await addTranscriptionHistory(
+            user.id, 
+            trans.filename, 
+            fs.statSync(trans.filename).size, 
+            estimatedMinutes / files.length, 
+            trans.transcription.length
+          );
+        } catch (e) {
+          console.warn('Could not add transcription history:', e.message);
+        }
+      }
       
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
-      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
+      console.log(`💰 Updated balance: ${newBalance} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
@@ -1153,7 +1270,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Authentication routes
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   try {
     console.log('🔐 Login attempt:', req.body);
     
@@ -1163,13 +1280,13 @@ app.post('/api/login', (req, res) => {
       return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
     }
     
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    const user = await getUserByEmail(email);
     console.log('🔍 User found:', user ? 'Yes' : 'No');
-    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
     
-    if (user) {
+    if (user && user.password === password) {
       console.log('✅ Login successful for:', user.email);
-      res.json({ success: true, user: { ...user, password: undefined } });
+      const { password: _, ...userWithoutPassword } = user;
+      res.json({ success: true, user: userWithoutPassword });
     } else {
       console.log('❌ Login failed for:', email);
       res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
@@ -1180,7 +1297,7 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body);
     
@@ -1190,28 +1307,32 @@ app.post('/api/register', (req, res) => {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
     }
     
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
       console.log('❌ User already exists:', email);
       return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
     
-    const newUser = {
-      id: users.length + 1,
-      name,
-      email: email.toLowerCase(),
-      password,
-      phone: phone || '',
-      isAdmin: false,
-      remainingMinutes: 30, // 30 free minutes
-      totalTranscribed: 0,
-      history: []
-    };
+    const newUser = await new Promise((resolve, reject) => {
+      db.run(`INSERT INTO users (name, email, password, phone, isAdmin, remainingMinutes, totalTranscribed) 
+              VALUES (?, ?, ?, ?, 0, 30, 0)`, 
+             [name, email.toLowerCase(), password, phone || ''], function(err) {
+        if (err) reject(err);
+        else resolve({
+          id: this.lastID,
+          name,
+          email: email.toLowerCase(),
+          phone: phone || '',
+          isAdmin: false,
+          remainingMinutes: 30,
+          totalTranscribed: 0
+        });
+      });
+    });
     
-    users.push(newUser);
     console.log('✅ User registered successfully:', newUser.email);
-    console.log('📋 Total users now:', users.length);
     
-    res.json({ success: true, user: { ...newUser, password: undefined } });
+    res.json({ success: true, user: newUser });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ success: false, error: 'שגיאה בהרשמה' });
@@ -1219,7 +1340,7 @@ app.post('/api/register', (req, res) => {
 });
 
 // Admin route to add minutes
-app.post('/api/admin/add-minutes', (req, res) => {
+app.post('/api/admin/add-minutes', async (req, res) => {
   try {
     console.log('🔧 Admin add-minutes endpoint called');
     console.log('🔧 Request body:', req.body);
@@ -1234,9 +1355,8 @@ app.post('/api/admin/add-minutes', (req, res) => {
       });
     }
     
-    const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    const user = await getUserByEmail(userEmail);
     console.log('🔍 User lookup result:', user ? 'Found' : 'Not found');
-    console.log('📋 Available users:', users.map(u => u.email));
     
     if (!user) {
       console.log('❌ User not found for email:', userEmail);
@@ -1247,17 +1367,18 @@ app.post('/api/admin/add-minutes', (req, res) => {
     }
     
     const oldBalance = user.remainingMinutes;
-    user.remainingMinutes += minutes;
-    const newBalance = user.remainingMinutes;
+    const result = await updateUserMinutes(userEmail, minutes);
+    const newBalance = oldBalance + minutes;
     
     console.log(`✅ Added ${minutes} minutes to ${userEmail}: ${oldBalance} → ${newBalance}`);
     
+    const { password: _, ...userWithoutPassword } = user;
     res.json({ 
       success: true, 
       message: `נוספו ${minutes} דקות לחשבון ${userEmail}`,
       oldBalance,
       newBalance,
-      user: { ...user, password: undefined }
+      user: { ...userWithoutPassword, remainingMinutes: newBalance }
     });
     
   } catch (error) {
@@ -1292,10 +1413,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
       console.warn('⚠️ FFmpeg not available - using fallback transcription only');
     }
     
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = await getUserByEmail(email);
     console.log('🔍 User lookup for transcription:', user ? 'Found' : 'Not found');
     console.log('📧 Looking for email:', email);
-    console.log('📋 Available users:', users.map(u => u.email));
     
     if (!user) {
       console.log('❌ User not found for transcription:', email);
