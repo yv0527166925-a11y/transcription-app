@@ -710,9 +710,14 @@ async function createWordDocument(transcription, filename, duration) {
         console.log('XML contains TITLE:', documentXml.includes('TITLE'));
         console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
         console.log('🔍 Content length to insert:', content.length);
-        let newDocumentXml = documentXml
-          .replace(/TITLE/g, escapeXml(title))
-          .replace(/CONTENT/g, content);
+        let newDocumentXml = documentXml.replace(/TITLE/g, escapeXml(title));
+        const contentParaRegex = /<w:p[^>]*>[\s\S]*?CONTENT[\s\S]*?<\/w:p>/;
+        if (contentParaRegex.test(newDocumentXml)) {
+          newDocumentXml = newDocumentXml.replace(contentParaRegex, content);
+        } else {
+          console.warn('⚠️ CONTENT paragraph not found as a block; falling back to simple token replace');
+          newDocumentXml = newDocumentXml.replace(/CONTENT/g, content);
+        }
         zip.file('word/document.xml', newDocumentXml);
         const buffer = await zip.generateAsync({ type: 'nodebuffer' });
         console.log(`✅ Word document created from template for: ${cleanName}`);
