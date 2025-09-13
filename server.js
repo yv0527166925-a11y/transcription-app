@@ -644,9 +644,8 @@ function processTranscriptionForTemplate(transcription) {
     .filter(p => p.length > 0);
   
   let xmlContent = '';
-paragraphs.forEach(paragraph => {
-    const boldTag = '';
-    
+  paragraphs.forEach(paragraph => {
+    // Each paragraph: right alignment + bidi
     xmlContent += `
       <w:p>
         <w:pPr>
@@ -659,9 +658,8 @@ paragraphs.forEach(paragraph => {
             <w:sz w:val="24"/>
             <w:lang w:val="he-IL"/>
             <w:rtl/>
-            ${boldTag}
           </w:rPr>
-          <w:t>${escapeXml(paragraph)}</w:t>
+          <w:t xml:space="preserve">${escapeXml(paragraph)}</w:t>
         </w:r>
       </w:p>`;
   });
@@ -696,45 +694,33 @@ async function createWordDocument(transcription, filename, duration) {
     const cleanName = cleanFilename(filename);
     console.log(`📄 Creating Word document from template for: ${cleanName}`);
     
-    // 🔥 NEW: נסה תחילה עם תבנית
-  const templatePath = path.join(__dirname, 'simple-template.docx');
-    
-   if (false) {
-      console.log('📋 Using template file');
-      
-      const templateBuffer = fs.readFileSync(templatePath);
-      const zip = new JSZip();
-      await zip.loadAsync(templateBuffer);
-      
-      const documentXml = await zip.file('word/document.xml').async('string');
-      
-   // הכן תוכן
-      const title = cleanName;
-      const content = processTranscriptionForTemplate(transcription);
-      
-      console.log('🔍 About to replace in XML...');
-     console.log('XML contains TITLE:', documentXml.includes('TITLE'));
-console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
-      console.log('🔍 Content length to insert:', content.length);
-      
-      // החלף placeholders
-      let newDocumentXml = documentXml
-  .replace(/TITLE/g, escapeXml(title))
-  .replace(/CONTENT/g, content);
-        
-      console.log('🔍 After replacement:');
-      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
-      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
-      
-      zip.file('word/document.xml', newDocumentXml);
-      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-      
-      console.log(`✅ Word document created from template for: ${cleanName}`);
-      return buffer;
+    // 🔥 NEW: Prefer template if present; fallback to programmatic creation
+    const templatePath = path.join(__dirname, 'simple-template.docx');
+    try {
+      if (fs.existsSync(templatePath)) {
+        console.log('📋 Using template file');
+        const templateBuffer = fs.readFileSync(templatePath);
+        const zip = new JSZip();
+        await zip.loadAsync(templateBuffer);
+        const documentXml = await zip.file('word/document.xml').async('string');
+        const title = cleanName;
+        const content = processTranscriptionForTemplate(transcription);
+        console.log('🔍 About to replace in XML...');
+        console.log('XML contains TITLE:', documentXml.includes('TITLE'));
+        console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
+        console.log('🔍 Content length to insert:', content.length);
+        let newDocumentXml = documentXml
+          .replace(/TITLE/g, escapeXml(title))
+          .replace(/CONTENT/g, content);
+        zip.file('word/document.xml', newDocumentXml);
+        const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+        console.log(`✅ Word document created from template for: ${cleanName}`);
+        return buffer;
+      }
+      console.log('⚠️ Template not found, using programmatic creation');
+    } catch (templateError) {
+      console.warn('⚠️ Template generation failed, falling back to programmatic creation:', templateError.message);
     }
-    
-    // 🔥 אם אין תבנית - השתמש בקוד הישן
-    console.log('⚠️ No template found, using programmatic creation');
     
 // החלף את הקטע בשורות 635-677 בקוד הזה:
 
