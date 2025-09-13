@@ -736,6 +736,23 @@ async function createWordDocument(transcription, filename, duration) {
         const zip = new JSZip();
         await zip.loadAsync(templateBuffer);
         const documentXml = await zip.file('word/document.xml').async('string');
+        // Also enforce RTL in styles.xml (Normal style)
+        if (zip.file('word/styles.xml')) {
+          try {
+            let stylesXml = await zip.file('word/styles.xml').async('string');
+            const normalStyleRegex = /(<w:style[^>]*w:styleId=\"Normal\"[^>]*>)[\s\S]*?(<\/w:style>)/;
+            if (normalStyleRegex.test(stylesXml)) {
+              stylesXml = stylesXml.replace(
+                normalStyleRegex,
+                (m, openTag, closeTag) =>
+                  `${openTag}<w:name w:val=\"Normal\"/><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr><w:rPr><w:lang w:val=\"he-IL\"/><w:rtl/></w:rPr>${closeTag}`
+              );
+              zip.file('word/styles.xml', stylesXml);
+            }
+          } catch (e) {
+            console.warn('Could not update styles.xml for RTL:', e.message);
+          }
+        }
         const title = cleanName;
         const content = processTranscriptionForTemplate(transcription);
         console.log('🔍 About to replace in XML...');
