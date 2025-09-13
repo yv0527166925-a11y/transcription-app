@@ -636,12 +636,44 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
 // 🔥 NEW: פונקציה לעיבוד טקסט לתבנית
 function processTranscriptionForTemplate(transcription) {
-  const paragraphs = transcription
+  // Normalize text
+  let normalized = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .split(/\n\s*\n/)
-    .filter(p => p.length > 0);
+    .replace(/\u200f/g, '') // remove existing RLM if any to avoid duplicates
+    .trim();
+
+  let paragraphs;
+  const hasBlankLines = /\n\s*\n/.test(normalized);
+  if (hasBlankLines) {
+    paragraphs = normalized
+      .replace(/\n{3,}/g, '\n\n')
+      .split(/\n\s*\n/)
+      .map(p => p.replace(/\s+/g, ' ').trim())
+      .filter(p => p.length > 0);
+  } else {
+    // No blank lines: split by sentences and group into readable paragraphs
+    const sentences = normalized
+      .replace(/\n+/g, ' ')
+      .split(/(?<=[.!?])\s+/);
+
+    paragraphs = [];
+    let current = '';
+    let countInPara = 0;
+    const maxLen = 350; // target max characters per paragraph
+    const maxSentences = 3; // target sentences per paragraph
+    for (const s of sentences) {
+      const next = current ? current + ' ' + s : s;
+      if (next.length > maxLen || countInPara >= maxSentences) {
+        if (current.trim().length) paragraphs.push(current.trim());
+        current = s;
+        countInPara = 1;
+      } else {
+        current = next;
+        countInPara += 1;
+      }
+    }
+    if (current.trim().length) paragraphs.push(current.trim());
+  }
   
   const RLM = '&#x200F;';
   let xmlContent = '';
