@@ -782,7 +782,41 @@ async function createWordDocument(transcription, filename, duration) {
           console.warn('⚠️ CONTENT paragraph not found as a block; falling back to simple token replace');
           newDocumentXml = newDocumentXml.replace(/CONTENT/g, content);
         }
+        // Ensure sectPr includes RTL-friendly settings for Word 2016
+        const sectRegex = /<w:sectPr[^>]*>[\s\S]*?<\/w:sectPr>/;
+        if (sectRegex.test(newDocumentXml)) {
+          newDocumentXml = newDocumentXml.replace(sectRegex, (m) => {
+            let s = m;
+            if (!/<w:bidi\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:bidi/></w:sectPr>');
+            if (!/<w:rtlGutter\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:rtlGutter/></w:sectPr>');
+            if (!/<w:mirrorMargins\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:mirrorMargins/></w:sectPr>');
+            if (!/<w:textDirection\b/.test(s)) s = s.replace('</w:sectPr>', '<w:textDirection w:val="rl"/></w:sectPr>');
+            return s;
+          });
+        }
         zip.file('word/document.xml', newDocumentXml);
+
+        // Harden settings.xml for RTL defaults on older Word
+        if (zip.file('word/settings.xml')) {
+          try {
+            let settingsXml = await zip.file('word/settings.xml').async('string');
+            if (!/<w:themeFontLang\b/.test(settingsXml)) {
+              settingsXml = settingsXml.replace(/<\/w:settings>/, '<w:themeFontLang w:bidi="he-IL"/></w:settings>');
+            } else {
+              settingsXml = settingsXml.replace(/<w:themeFontLang\b[^>]*>/, (tag) => {
+                return tag.includes('w:bidi=') ? tag : tag.replace('>', ' w:bidi="he-IL">');
+              });
+            }
+            if (!/<w:compat>/.test(settingsXml)) {
+              settingsXml = settingsXml.replace(/<\/w:settings>/, '<w:compat><w:useFELayout/></w:compat></w:settings>');
+            } else if (!/<w:useFELayout\/>/.test(settingsXml)) {
+              settingsXml = settingsXml.replace(/<w:compat>/, '<w:compat><w:useFELayout/>');
+            }
+            zip.file('word/settings.xml', settingsXml);
+          } catch (e) {
+            console.warn('Could not update settings.xml for RTL compatibility:', e.message);
+          }
+        }
         const buffer = await zip.generateAsync({ type: 'nodebuffer' });
         console.log(`✅ Word document created from template for: ${cleanName}`);
         return buffer;
