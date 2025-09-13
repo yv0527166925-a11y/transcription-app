@@ -817,7 +817,9 @@ async function createWordDocument(transcription, filename, duration) {
             console.warn('Could not update settings.xml for RTL compatibility:', e.message);
           }
         }
-        const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+        let buffer = await zip.generateAsync({ type: 'nodebuffer' });
+        // Final enforcement pass for RTL on the whole DOCX
+        buffer = await enforceRtlOnDocxBuffer(buffer);
         console.log(`✅ Word document created from template for: ${cleanName}`);
         return buffer;
       }
@@ -922,13 +924,93 @@ const doc = new Document({
   }]
 });
     
-    const buffer = await Packer.toBuffer(doc);
+    let buffer = await Packer.toBuffer(doc);
+    // Final enforcement pass for RTL on the whole DOCX
+    buffer = await enforceRtlOnDocxBuffer(buffer);
     console.log(`✅ Word document created successfully for: ${cleanName}`);
     return buffer;
     
   } catch (error) {
     console.error('Error creating Word document:', error);
     throw error;
+  }
+}
+
+// Final pass: open the DOCX and ensure every paragraph and global settings enforce RTL/right alignment
+async function enforceRtlOnDocxBuffer(docxBuffer) {
+  try {
+    const zip = new JSZip();
+    await zip.loadAsync(docxBuffer);
+    if (zip.file('word/document.xml')) {
+      let xml = await zip.file('word/document.xml').async('string');
+
+      // Ensure every paragraph has a pPr; if missing, inject with right/bidi
+      xml = xml.replace(/<w:p(\b[^>]*)>(?![\s\S]*?<w:pPr>)/g, (m) => {
+        return m + '<w:pPr><w:jc w:val="right"/><w:bidi/><w:pStyle w:val="Normal"/></w:pPr>';
+      });
+
+      // Ensure existing pPr blocks contain right/bidi
+      xml = xml.replace(/<w:pPr>([\s\S]*?)<\/w:pPr>/g, (m, inner) => {
+        let out = inner;
+        if (!/\b<w:jc\b[\s\S]*?\/>/.test(out)) out = `<w:jc w:val="right"/>` + out;
+        if (!/\b<w:bidi\/>/.test(out)) out = `<w:bidi/>` + out;
+        if (!/\b<w:pStyle\b/.test(out)) out = `<w:pStyle w:val="Normal"/>` + out;
+        return `<w:pPr>${out}</w:pPr>`;
+      });
+
+      // Ensure sectPr has RTL hints
+      xml = xml.replace(/<w:sectPr([^>]*)>([\s\S]*?)<\/w:sectPr>/, (m, attrs, inner) => {
+        let s = inner;
+        if (!/\b<w:bidi\/>/.test(s)) s = s + '<w:bidi/>';
+        if (!/\b<w:rtlGutter\/>/.test(s)) s = s + '<w:rtlGutter/>';
+        if (!/\b<w:mirrorMargins\/>/.test(s)) s = s + '<w:mirrorMargins/>';
+        if (!/\b<w:textDirection\b/.test(s)) s = s + '<w:textDirection w:val="rl"/>';
+        return `<w:sectPr${attrs}>${s}</w:sectPr>`;
+      });
+
+      zip.file('word/document.xml', xml);
+    }
+
+    // styles.xml defaults
+    if (zip.file('word/styles.xml')) {
+      let styles = await zip.file('word/styles.xml').async('string');
+      if (/<w:docDefaults>/.test(styles)) {
+        styles = styles.replace(
+          /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/,
+          '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="he-IL" w:bidi="he-IL"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults>'
+        );
+      } else {
+        styles = styles.replace(
+          /<\/w:styles>/,
+          '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="he-IL" w:bidi="he-IL"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>'
+        );
+      }
+      zip.file('word/styles.xml', styles);
+    }
+
+    // settings.xml compat/lang
+    if (zip.file('word/settings.xml')) {
+      let settings = await zip.file('word/settings.xml').async('string');
+      if (!/<w:themeFontLang\b/.test(settings)) {
+        settings = settings.replace(/<\/w:settings>/, '<w:themeFontLang w:bidi="he-IL"/></w:settings>');
+      } else {
+        settings = settings.replace(/<w:themeFontLang\b[^>]*>/, (tag) => {
+          return tag.includes('w:bidi=') ? tag : tag.replace('>', ' w:bidi="he-IL">');
+        });
+      }
+      if (!/<w:compat>/.test(settings)) {
+        settings = settings.replace(/<\/w:settings>/, '<w:compat><w:useFELayout/></w:compat></w:settings>');
+      } else if (!/<w:useFELayout\/>/.test(settings)) {
+        settings = settings.replace(/<w:compat>/, '<w:compat><w:useFELayout/>' );
+      }
+      zip.file('word/settings.xml', settings);
+    }
+
+    const out = await zip.generateAsync({ type: 'nodebuffer' });
+    return out;
+  } catch (e) {
+    console.warn('enforceRtlOnDocxBuffer failed, returning original buffer:', e.message);
+    return docxBuffer;
   }
 }
 
