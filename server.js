@@ -730,9 +730,10 @@ async function createWordDocument(transcription, filename, duration) {
     
     // 🔥 NEW: Prefer template if present; fallback to programmatic creation
     const templatePath = path.join(__dirname, 'simple-template.docx');
+    const useTemplate = process.env.USE_TEMPLATE === 'true';
     try {
-      if (fs.existsSync(templatePath)) {
-        console.log('📋 Using template file');
+      if (useTemplate && fs.existsSync(templatePath)) {
+        console.log('📋 Using template file (USE_TEMPLATE=true)');
         const templateBuffer = fs.readFileSync(templatePath);
         const zip = new JSZip();
         await zip.loadAsync(templateBuffer);
@@ -786,7 +787,7 @@ async function createWordDocument(transcription, filename, duration) {
         console.log(`✅ Word document created from template for: ${cleanName}`);
         return buffer;
       }
-      console.log('⚠️ Template not found, using programmatic creation');
+      console.log('⚠️ Template disabled or not found, using programmatic creation');
     } catch (templateError) {
       console.warn('⚠️ Template generation failed, falling back to programmatic creation:', templateError.message);
     }
@@ -853,8 +854,11 @@ const doc = new Document({
           right: 1800,
           bottom: 2160,
           left: 1800
-        }
-      }
+        },
+        rtlGutter: true,
+        textDirection: "rtl"
+      },
+      bidi: true
     },
     children: [
       // Title with moderate spacing
