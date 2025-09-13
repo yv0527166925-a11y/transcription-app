@@ -741,14 +741,13 @@ console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
 const doc = new Document({
   creator: "תמלול חכם",
   language: "he-IL",
-  defaultRunProperties: {
-    font: "Times New Roman",
-    size: 24,
-    rtl: true
-  },
   styles: {
-    default: {
-      document: {
+    // Enforce RTL and right alignment as the default (Normal)
+    paragraphStyles: [
+      {
+        id: "Normal",
+        name: "Normal",
+        basedOn: "Normal",
         run: {
           font: "Arial",
           size: 24,
@@ -759,21 +758,20 @@ const doc = new Document({
           alignment: AlignmentType.RIGHT,
           bidirectional: true
         }
-      }
-    },
-    paragraphStyles: [
+      },
       {
         id: "HebrewParagraph",
         name: "Hebrew Paragraph",
         basedOn: "Normal",
+        run: {
+          font: "Arial",
+          size: 24,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        },
         paragraph: {
           alignment: AlignmentType.RIGHT,
           bidirectional: true
-        },
-        run: {
-          rightToLeft: true,
-          languageComplexScript: "he-IL",
-          font: "Arial"
         }
       }
     ]
@@ -786,12 +784,8 @@ const doc = new Document({
           right: 1800,
           bottom: 2160,
           left: 1800
-        },
-        textDirection: "rtl"
-      },
-      rtlGutter: true,
-      bidi: true,
-      textDirection: "rtl"
+        }
+      }
     },
     children: [
       // Title with moderate spacing
