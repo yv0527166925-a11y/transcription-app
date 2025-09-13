@@ -749,6 +749,19 @@ async function createWordDocument(transcription, filename, duration) {
               );
               zip.file('word/styles.xml', stylesXml);
             }
+            // Ensure global defaults are RTL/right-aligned
+            if (/<w:docDefaults>/.test(stylesXml)) {
+              stylesXml = stylesXml.replace(
+                /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/,
+                '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val=\"he-IL\" w:bidi=\"he-IL\"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults>'
+              );
+            } else {
+              stylesXml = stylesXml.replace(
+                /<\/w:styles>/,
+                '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val=\"he-IL\" w:bidi=\"he-IL\"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>'
+              );
+            }
+            zip.file('word/styles.xml', stylesXml);
           } catch (e) {
             console.warn('Could not update styles.xml for RTL:', e.message);
           }
