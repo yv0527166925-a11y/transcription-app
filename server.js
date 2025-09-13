@@ -684,12 +684,13 @@ function processTranscriptionForTemplate(transcription) {
         <w:pPr>
           <w:jc w:val="right"/>
           <w:bidi/>
+          <w:pStyle w:val="Normal"/>
         </w:pPr>
         <w:r>
           <w:rPr>
             <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
             <w:sz w:val="24"/>
-            <w:lang w:val="he-IL"/>
+            <w:lang w:val="he-IL" w:bidi="he-IL"/>
             <w:rtl/>
           </w:rPr>
           <w:t xml:space="preserve">${RLM}${escapeXml(paragraph)}</w:t>
