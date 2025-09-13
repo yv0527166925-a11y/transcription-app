@@ -742,6 +742,20 @@ const doc = new Document({
   creator: "תמלול חכם",
   language: "he-IL",
   styles: {
+    default: {
+      document: {
+        run: {
+          font: "Arial",
+          size: 24,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        },
+        paragraph: {
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true
+        }
+      }
+    },
     // Enforce RTL and right alignment as the default (Normal)
     paragraphStyles: [
       {
