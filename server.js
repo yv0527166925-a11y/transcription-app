@@ -643,6 +643,7 @@ function processTranscriptionForTemplate(transcription) {
     .split(/\n\s*\n/)
     .filter(p => p.length > 0);
   
+  const RLM = '&#x200F;';
   let xmlContent = '';
   paragraphs.forEach(paragraph => {
     // Each paragraph: right alignment + bidi
@@ -659,7 +660,7 @@ function processTranscriptionForTemplate(transcription) {
             <w:lang w:val="he-IL"/>
             <w:rtl/>
           </w:rPr>
-          <w:t xml:space="preserve">${escapeXml(paragraph)}</w:t>
+          <w:t xml:space="preserve">${RLM}${escapeXml(paragraph)}</w:t>
         </w:r>
       </w:p>`;
   });
