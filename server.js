@@ -677,10 +677,10 @@ function processTranscriptionForTemplate(transcription) {
   
   const RLE = '&#x202B;'; // Right-To-Left Embedding
   const PDF = '&#x202C;'; // Pop Directional Formatting
-  let xmlContent = '';
+  let xmlParas = '';
   paragraphs.forEach(paragraph => {
     // Each paragraph: right alignment + bidi
-    xmlContent += `
+    xmlParas += `
       <w:p>
         <w:pPr>
           <w:jc w:val="right"/>
@@ -698,10 +698,30 @@ function processTranscriptionForTemplate(transcription) {
         </w:r>
       </w:p>`;
   });
-  
- console.log('DEBUG - Final XML content length:', xmlContent.length);
-  console.log('DEBUG - XML preview:', xmlContent.substring(0, 200));
-  return xmlContent;
+
+  // Wrap in single-cell RTL table to force right alignment in Word/Word Online
+  const xmlTableWrapper = `
+    <w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="0" w:type="auto"/>
+        <w:jc w:val="right"/>
+        <w:bidiVisual/>
+      </w:tblPr>
+      <w:tblGrid><w:gridCol w:w="9500"/></w:tblGrid>
+      <w:tr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="0" w:type="auto"/>
+            <w:rtl/>
+          </w:tcPr>
+          ${xmlParas}
+        </w:tc>
+      </w:tr>
+    </w:tbl>`;
+
+  console.log('DEBUG - Final XML content length:', xmlTableWrapper.length);
+  console.log('DEBUG - XML preview:', xmlTableWrapper.substring(0, 200));
+  return xmlTableWrapper;
 }
 
 // 🔥 NEW: פונקציה לניטרול XML
