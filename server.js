@@ -1152,24 +1152,55 @@ app.post('/api/login', (req, res) => {
     
     const { email, password } = req.body;
     
-    if (!email || !password) {
-      return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
+    if (!email) {
+      return res.json({ 
+        success: false, 
+        error: 'נא להזין כתובת אימייל',
+        errorType: 'missing_email'
+      });
     }
     
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    console.log('🔍 User found:', user ? 'Yes' : 'No');
-    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
-    
-    if (user) {
-      console.log('✅ Login successful for:', user.email);
-      res.json({ success: true, user: { ...user, password: undefined } });
-    } else {
-      console.log('❌ Login failed for:', email);
-      res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
+    if (!password) {
+      return res.json({ 
+        success: false, 
+        error: 'נא להזין סיסמה',
+        errorType: 'missing_password'
+      });
     }
+    
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    
+    if (!user) {
+      return res.json({ 
+        success: false, 
+        error: 'משתמש עם כתובת אימייל זו לא נמצא במערכת',
+        errorType: 'user_not_found',
+        suggestion: 'האם אתה בטוח שנרשמת? נסה להירשם מחדש'
+      });
+    }
+    
+    if (user.password !== password) {
+      return res.json({ 
+        success: false, 
+        error: 'הסיסמה שהוזנה אינה נכונה',
+        errorType: 'wrong_password',
+        suggestion: 'בדוק את הסיסמה ונסה שוב'
+      });
+    }
+    
+    console.log('✅ Login successful for:', user.email);
+    res.json({ 
+      success: true, 
+      user: { ...user, password: undefined },
+      message: 'התחברת בהצלחה!'
+    });
+    
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, error: 'שגיאה בשרת' });
+    console.error('Login system error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'שגיאה במערכת ההתחברות. נסה שוב מאוחר יותר'
+    });
   }
 });
 
@@ -1356,6 +1387,7 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
+
 
 
 
