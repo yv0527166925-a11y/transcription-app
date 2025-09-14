@@ -11,6 +11,8 @@ const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
+// Template toggle (default: true)
+const USE_TEMPLATE = (process.env.USE_TEMPLATE ? process.env.USE_TEMPLATE.toLowerCase() === 'true' : true);
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -699,7 +701,7 @@ async function createWordDocument(transcription, filename, duration) {
     // 🔥 NEW: נסה תחילה עם תבנית
   const templatePath = path.join(__dirname, 'simple-template.docx');
     
-   if (false) {
+   if (USE_TEMPLATE && fs.existsSync(templatePath)) {
       console.log('📋 Using template file');
       
       const templateBuffer = fs.readFileSync(templatePath);
