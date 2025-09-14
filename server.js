@@ -675,7 +675,8 @@ function processTranscriptionForTemplate(transcription) {
     if (current.trim().length) paragraphs.push(current.trim());
   }
   
-  const RLM = '&#x200F;';
+  const RLE = '&#x202B;'; // Right-To-Left Embedding
+  const PDF = '&#x202C;'; // Pop Directional Formatting
   let xmlContent = '';
   paragraphs.forEach(paragraph => {
     // Each paragraph: right alignment + bidi
@@ -693,7 +694,7 @@ function processTranscriptionForTemplate(transcription) {
             <w:lang w:val="he-IL" w:bidi="he-IL"/>
             <w:rtl/>
           </w:rPr>
-          <w:t xml:space="preserve">${RLM}${escapeXml(paragraph)}</w:t>
+          <w:t xml:space="preserve">${RLE}${escapeXml(paragraph)}${PDF}</w:t>
         </w:r>
       </w:p>`;
   });
@@ -958,13 +959,28 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
         return `<w:pPr>${out}</w:pPr>`;
       });
 
-      // Ensure sectPr has RTL hints
+      // Ensure sectPr has RTL hints and landscape if requested
       xml = xml.replace(/<w:sectPr([^>]*)>([\s\S]*?)<\/w:sectPr>/, (m, attrs, inner) => {
         let s = inner;
         if (!/\b<w:bidi\/>/.test(s)) s = s + '<w:bidi/>';
         if (!/\b<w:rtlGutter\/>/.test(s)) s = s + '<w:rtlGutter/>';
         if (!/\b<w:mirrorMargins\/>/.test(s)) s = s + '<w:mirrorMargins/>';
         if (!/\b<w:textDirection\b/.test(s)) s = s + '<w:textDirection w:val="rl"/>';
+        // Force landscape if query ?landscape=1
+        if (/landscape=1/.test((req && req.url) || '')) {
+          // set pgSz orient="landscape" and swap w/h if present
+          if (/<w:pgSz\b/.test(s)) {
+            s = s.replace(/<w:pgSz([^>]*)\/>/, (tag, a) => {
+              let attrs = a;
+              attrs = attrs.replace(/w:orient="[^"]*"/, '');
+              attrs += ' w:orient="landscape"';
+              // optionally swap if needed is tricky; leave as is, Word will rotate
+              return `<w:pgSz${attrs}/>`;
+            });
+          } else {
+            s = '<w:pgSz w:orient="landscape"/>' + s;
+          }
+        }
         return `<w:sectPr${attrs}>${s}</w:sectPr>`;
       });
 
