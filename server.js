@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -939,8 +939,20 @@ const doc = new Document({
         }
       }),
       
-      // Content with balanced spacing
-      ...processTranscriptionContent(transcription)
+      // Content wrapped in an RTL table (forces right alignment in Word Online)
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                children: processTranscriptionContent(transcription),
+                margins: { top: 0, bottom: 0, left: 0, right: 0 },
+              })
+            ]
+          })
+        ]
+      })
     ]
   }]
 });
