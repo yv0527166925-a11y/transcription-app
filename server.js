@@ -724,7 +724,7 @@ function fixHebrewSpacing(text) {
 }
 
 // Word document creation (same as before)
-async function createWordDocument(transcription, filename, duration) {
+async function createWordDocument(transcription, filename, duration, options = {}) {
   try {
     const cleanName = cleanFilename(filename);
     console.log(`📄 Creating Word document from template for: ${cleanName}`);
@@ -820,7 +820,7 @@ async function createWordDocument(transcription, filename, duration) {
         }
         let buffer = await zip.generateAsync({ type: 'nodebuffer' });
         // Final enforcement pass for RTL on the whole DOCX
-        buffer = await enforceRtlOnDocxBuffer(buffer);
+        buffer = await enforceRtlOnDocxBuffer(buffer, options);
         console.log(`✅ Word document created from template for: ${cleanName}`);
         return buffer;
       }
@@ -927,7 +927,7 @@ const doc = new Document({
     
     let buffer = await Packer.toBuffer(doc);
     // Final enforcement pass for RTL on the whole DOCX
-    buffer = await enforceRtlOnDocxBuffer(buffer);
+    buffer = await enforceRtlOnDocxBuffer(buffer, options);
     console.log(`✅ Word document created successfully for: ${cleanName}`);
     return buffer;
     
@@ -938,7 +938,7 @@ const doc = new Document({
 }
 
 // Final pass: open the DOCX and ensure every paragraph and global settings enforce RTL/right alignment
-async function enforceRtlOnDocxBuffer(docxBuffer) {
+async function enforceRtlOnDocxBuffer(docxBuffer, options = {}) {
   try {
     const zip = new JSZip();
     await zip.loadAsync(docxBuffer);
@@ -966,8 +966,8 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
         if (!/\b<w:rtlGutter\/>/.test(s)) s = s + '<w:rtlGutter/>';
         if (!/\b<w:mirrorMargins\/>/.test(s)) s = s + '<w:mirrorMargins/>';
         if (!/\b<w:textDirection\b/.test(s)) s = s + '<w:textDirection w:val="rl"/>';
-        // Force landscape if query ?landscape=1
-        if (/landscape=1/.test((req && req.url) || '')) {
+        // Force landscape if requested via options
+        if (options.landscape) {
           // set pgSz orient="landscape" and swap w/h if present
           if (/<w:pgSz\b/.test(s)) {
             s = s.replace(/<w:pgSz([^>]*)\/>/, (tag, a) => {
@@ -1361,7 +1361,7 @@ app.get('/debug/docx', async (req, res) => {
       'פסקה שנייה: בדיקה של כיוון מימין לשמאל ומספרים: 12345.',
       'פסקה שלישית: אם זה עדיין בשמאל, נבדוק את הסגנונות וההגדרות של Word.'
     ].join('\n\n');
-    const buf = await createWordDocument(sampleText, 'בדיקת_RTL.docx', 0);
+    const buf = await createWordDocument(sampleText, 'בדיקת_RTL.docx', 0, { landscape: req.query.landscape === '1' });
     res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.set('Content-Disposition', 'attachment; filename="debug_rtl.docx"');
     res.send(buf);
