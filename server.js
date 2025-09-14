@@ -11,8 +11,6 @@ const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
-// Template toggle (default: true)
-const USE_TEMPLATE = (process.env.USE_TEMPLATE ? process.env.USE_TEMPLATE.toLowerCase() === 'true' : true);
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -701,7 +699,7 @@ async function createWordDocument(transcription, filename, duration) {
     // 🔥 NEW: נסה תחילה עם תבנית
   const templatePath = path.join(__dirname, 'simple-template.docx');
     
-   if (USE_TEMPLATE && fs.existsSync(templatePath)) {
+   if (false) {
       console.log('📋 Using template file');
       
       const templateBuffer = fs.readFileSync(templatePath);
@@ -730,14 +728,9 @@ console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
       
       zip.file('word/document.xml', newDocumentXml);
       const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-      let processed = buffer;
-      try {
-        processed = await enforceRtlOnDocxBuffer(buffer);
-      } catch (e) {
-        console.warn('Post-process RTL failed (template path), returning original buffer');
-      }
+      
       console.log(`✅ Word document created from template for: ${cleanName}`);
-      return processed;
+      return buffer;
     }
     
     // 🔥 אם אין תבנית - השתמש בקוד הישן
@@ -829,14 +822,8 @@ const doc = new Document({
 });
     
     const buffer = await Packer.toBuffer(doc);
-    let processed = buffer;
-    try {
-      processed = await enforceRtlOnDocxBuffer(buffer);
-    } catch (e) {
-      console.warn('Post-process RTL failed (programmatic path), returning original buffer');
-    }
     console.log(`✅ Word document created successfully for: ${cleanName}`);
-    return processed;
+    return buffer;
     
   } catch (error) {
     console.error('Error creating Word document:', error);
@@ -944,95 +931,6 @@ paragraphs.push(new Paragraph({
   });
   
   return paragraphs;
-}
-
-// Enforce RTL and right alignment inside DOCX by editing XML parts
-async function enforceRtlOnDocxBuffer(docxBuffer) {
-  const zip = await JSZip.loadAsync(docxBuffer);
-  // document.xml
-  if (zip.file('word/document.xml')) {
-    let docXml = await zip.file('word/document.xml').async('string');
-    // Ensure runs have RTL and Hebrew language
-    docXml = docXml.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (m, inner) => {
-      let updated = inner;
-      if (!/\b<w:rtl\/>/.test(updated)) {
-        updated += '<w:rtl/>';
-      }
-      if (!/w:lang[^>]*w:bidi="he"/.test(updated)) {
-        if (/w:lang[^>]*\/>/.test(updated)) {
-          updated = updated.replace(/<w:lang[^>]*\/>/, '<w:lang w:val="he" w:bidi="he"/>' );
-        } else {
-          updated += '<w:lang w:val="he" w:bidi="he"/>';
-        }
-      }
-      return `<w:rPr>${updated}</w:rPr>`;
-    });
-    // Strengthen section-level RTL
-    docXml = docXml.replace(/<w:sectPr([\s\S]*?)<\/w:sectPr>/g, (m, inner) => {
-      let body = inner;
-      if (!/\b<w:bidi\/>/.test(body)) body += '<w:bidi/>';
-      if (!/\b<w:rtlGutter\/>/.test(body)) body += '<w:rtlGutter/>';
-      if (!/w:textDirection[^>]*w:val="rl"/.test(body)) body += '<w:textDirection w:val="rl"/>';
-      if (!/\b<w:mirrorMargins\/>/.test(body)) body += '<w:mirrorMargins/>';
-      return `<w:sectPr${body}</w:sectPr>`;
-    });
-    // Ensure paragraphs default to right via pPr blocks (light touch)
-    docXml = docXml.replace(/<w:pPr>([\s\S]*?)<\/w:pPr>/g, (m, inner) => {
-      let updated = inner;
-      if (!/w:jc[^>]*w:val="right"/.test(updated)) updated += '<w:jc w:val="right"/>';
-      if (!/\b<w:bidi\/>/.test(updated)) updated += '<w:bidi/>';
-      return `<w:pPr>${updated}</w:pPr>`;
-    });
-    zip.file('word/document.xml', docXml);
-  }
-  // styles.xml
-  if (zip.file('word/styles.xml')) {
-    let stylesXml = await zip.file('word/styles.xml').async('string');
-    if (/<w:docDefaults[\s\S]*?<\/w:docDefaults>/.test(stylesXml)) {
-      stylesXml = stylesXml.replace(/<w:docDefaults[\s\S]*?<\/w:docDefaults>/, (
-        '<w:docDefaults>' +
-        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he" w:bidi="he"/></w:rPr></w:rPrDefault>' +
-        '<w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr></w:pPrDefault>' +
-        '</w:docDefaults>'
-      ));
-    } else {
-      stylesXml = stylesXml.replace(/<w:styles[^>]*>/, (m) => (
-        m +
-        '<w:docDefaults>' +
-        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he" w:bidi="he"/></w:rPr></w:rPrDefault>' +
-        '<w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr></w:pPrDefault>' +
-        '</w:docDefaults>'
-      ));
-    }
-    // Ensure default paragraph style has <w:bidi/>
-    stylesXml = stylesXml.replace(/(<w:style[^>]*w:type="paragraph"[^>]*w:default="1"[^>]*>)([\s\S]*?)(<\/w:style>)/, (full, start, inner, end) => {
-      let updatedInner = inner;
-      if (!/<w:pPr>[\s\S]*?<\/w:pPr>/.test(updatedInner)) {
-        updatedInner = '<w:pPr><w:bidi/><\/w:pPr>' + updatedInner;
-      } else if (!/<w:pPr>[\s\S]*?<w:bidi\/>[\s\S]*?<\/w:pPr>/.test(updatedInner)) {
-        updatedInner = updatedInner.replace(/<w:pPr>/, '<w:pPr><w:bidi/>' );
-      }
-      return start + updatedInner + end;
-    });
-    zip.file('word/styles.xml', stylesXml);
-  }
-  // settings.xml
-  if (zip.file('word/settings.xml')) {
-    let settingsXml = await zip.file('word/settings.xml').async('string');
-    if (!/w:themeFontLang[^>]*w:bidi=/.test(settingsXml)) {
-      settingsXml = settingsXml.replace(/<w:settings[^>]*>/, (m) => m + '<w:themeFontLang w:bidi="he"/>' );
-    }
-    if (!/<w:compat>[\s\S]*<w:useFELayout\/>[\s\S]*<\/w:compat>/.test(settingsXml)) {
-      if (/<w:compat\b[\s\S]*?<\/w:compat>/.test(settingsXml)) {
-        settingsXml = settingsXml.replace(/<w:compat\b[\s\S]*?<\/w:compat>/, (n) => n.replace(/<w:compat\b[^>]*>/, (h) => h) + '<w:useFELayout/>' );
-      } else {
-        settingsXml = settingsXml.replace(/<w:settings[^>]*>/, (m) => m + '<w:compat><w:useFELayout/></w:compat>');
-      }
-    }
-    zip.file('word/settings.xml', settingsXml);
-  }
-  const out = await zip.generateAsync({ type: 'nodebuffer' });
-  return out;
 }
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
