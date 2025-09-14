@@ -958,11 +958,11 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
       if (!/\b<w:rtl\/>/.test(updated)) {
         updated += '<w:rtl/>';
       }
-      if (!/w:lang[^>]*w:bidi="he-IL"/.test(updated)) {
+      if (!/w:lang[^>]*w:bidi="he"/.test(updated)) {
         if (/w:lang[^>]*\/>/.test(updated)) {
-          updated = updated.replace(/<w:lang[^>]*\/>/, '<w:lang w:val="he-IL" w:bidi="he-IL"/>');
+          updated = updated.replace(/<w:lang[^>]*\/>/, '<w:lang w:val="he" w:bidi="he"/>' );
         } else {
-          updated += '<w:lang w:val="he-IL" w:bidi="he-IL"/>';
+          updated += '<w:lang w:val="he" w:bidi="he"/>';
         }
       }
       return `<w:rPr>${updated}</w:rPr>`;
@@ -991,7 +991,7 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
     if (/<w:docDefaults[\s\S]*?<\/w:docDefaults>/.test(stylesXml)) {
       stylesXml = stylesXml.replace(/<w:docDefaults[\s\S]*?<\/w:docDefaults>/, (
         '<w:docDefaults>' +
-        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault>' +
+        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he" w:bidi="he"/></w:rPr></w:rPrDefault>' +
         '<w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr></w:pPrDefault>' +
         '</w:docDefaults>'
       ));
@@ -999,18 +999,28 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
       stylesXml = stylesXml.replace(/<w:styles[^>]*>/, (m) => (
         m +
         '<w:docDefaults>' +
-        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he-IL" w:bidi="he-IL"/></w:rPr></w:rPrDefault>' +
+        '<w:rPrDefault><w:rPr><w:rtl/><w:lang w:val="he" w:bidi="he"/></w:rPr></w:rPrDefault>' +
         '<w:pPrDefault><w:pPr><w:bidi/><w:jc w:val="right"/></w:pPr></w:pPrDefault>' +
         '</w:docDefaults>'
       ));
     }
+    // Ensure default paragraph style has <w:bidi/>
+    stylesXml = stylesXml.replace(/(<w:style[^>]*w:type="paragraph"[^>]*w:default="1"[^>]*>)([\s\S]*?)(<\/w:style>)/, (full, start, inner, end) => {
+      let updatedInner = inner;
+      if (!/<w:pPr>[\s\S]*?<\/w:pPr>/.test(updatedInner)) {
+        updatedInner = '<w:pPr><w:bidi/><\/w:pPr>' + updatedInner;
+      } else if (!/<w:pPr>[\s\S]*?<w:bidi\/>[\s\S]*?<\/w:pPr>/.test(updatedInner)) {
+        updatedInner = updatedInner.replace(/<w:pPr>/, '<w:pPr><w:bidi/>' );
+      }
+      return start + updatedInner + end;
+    });
     zip.file('word/styles.xml', stylesXml);
   }
   // settings.xml
   if (zip.file('word/settings.xml')) {
     let settingsXml = await zip.file('word/settings.xml').async('string');
     if (!/w:themeFontLang[^>]*w:bidi=/.test(settingsXml)) {
-      settingsXml = settingsXml.replace(/<w:settings[^>]*>/, (m) => m + '<w:themeFontLang w:bidi="he-IL"/>');
+      settingsXml = settingsXml.replace(/<w:settings[^>]*>/, (m) => m + '<w:themeFontLang w:bidi="he"/>' );
     }
     if (!/<w:compat>[\s\S]*<w:useFELayout\/>[\s\S]*<\/w:compat>/.test(settingsXml)) {
       if (/<w:compat\b[\s\S]*?<\/w:compat>/.test(settingsXml)) {
