@@ -1314,7 +1314,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    ffmpegAvailable: checkFFmpegAvailability()
+    ffmpegAvailable: checkFFmpegAvailability(),
+    useTemplate: process.env.USE_TEMPLATE === 'true'
   });
 });
 
@@ -1343,6 +1344,26 @@ app.get('/debug/docx', async (req, res) => {
   } catch (e) {
     console.error('Debug DOCX error:', e);
     res.status(500).send('Failed to generate debug DOCX');
+  }
+});
+
+// Debug endpoint: return the generated document.xml so we can inspect alignment flags
+app.get('/debug/docx-xml', async (req, res) => {
+  try {
+    const sampleText = [
+      'זהו מסמך בדיקה ל-RTL. המשפט הזה אמור להיות מיושר לימין.',
+      'פסקה שנייה: בדיקה של כיוון מימין לשמאל ומספרים: 12345.',
+      'פסקה שלישית: אם זה עדיין בשמאל, נבדוק את הסגנונות וההגדרות של Word.'
+    ].join('\n\n');
+    const buf = await createWordDocument(sampleText, 'בדיקת_RTL.docx', 0);
+    const zip = new JSZip();
+    await zip.loadAsync(buf);
+    const xml = await zip.file('word/document.xml').async('string');
+    res.set('Content-Type', 'text/xml; charset=utf-8');
+    res.send(xml);
+  } catch (e) {
+    console.error('Debug DOCX-XML error:', e);
+    res.status(500).send('Failed to generate debug DOCX XML');
   }
 });
 
