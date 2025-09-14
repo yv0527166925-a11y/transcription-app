@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -636,92 +636,39 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
 // 🔥 NEW: פונקציה לעיבוד טקסט לתבנית
 function processTranscriptionForTemplate(transcription) {
-  // Normalize text
-  let normalized = transcription
+  const paragraphs = transcription
     .replace(/\r\n/g, '\n')
-    .replace(/\u200f/g, '') // remove existing RLM if any to avoid duplicates
-    .trim();
-
-  let paragraphs;
-  const hasBlankLines = /\n\s*\n/.test(normalized);
-  if (hasBlankLines) {
-    paragraphs = normalized
-      .replace(/\n{3,}/g, '\n\n')
-      .split(/\n\s*\n/)
-      .map(p => p.replace(/\s+/g, ' ').trim())
-      .filter(p => p.length > 0);
-  } else {
-    // No blank lines: split by sentences and group into readable paragraphs
-    const sentences = normalized
-      .replace(/\n+/g, ' ')
-      .split(/(?<=[.!?])\s+/);
-
-    paragraphs = [];
-    let current = '';
-    let countInPara = 0;
-    const maxLen = 350; // target max characters per paragraph
-    const maxSentences = 3; // target sentences per paragraph
-    for (const s of sentences) {
-      const next = current ? current + ' ' + s : s;
-      if (next.length > maxLen || countInPara >= maxSentences) {
-        if (current.trim().length) paragraphs.push(current.trim());
-        current = s;
-        countInPara = 1;
-      } else {
-        current = next;
-        countInPara += 1;
-      }
-    }
-    if (current.trim().length) paragraphs.push(current.trim());
-  }
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .split(/\n\s*\n/)
+    .filter(p => p.length > 0);
   
-  const RLE = '&#x202B;'; // Right-To-Left Embedding
-  const PDF = '&#x202C;'; // Pop Directional Formatting
-  let xmlParas = '';
-  paragraphs.forEach(paragraph => {
-    // Each paragraph: right alignment + bidi
-    xmlParas += `
+  let xmlContent = '';
+paragraphs.forEach(paragraph => {
+    const boldTag = '';
+    
+    xmlContent += `
       <w:p>
         <w:pPr>
           <w:jc w:val="right"/>
           <w:bidi/>
-          <w:pStyle w:val="Normal"/>
         </w:pPr>
         <w:r>
           <w:rPr>
             <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
             <w:sz w:val="24"/>
-            <w:lang w:val="he-IL" w:bidi="he-IL"/>
+            <w:lang w:val="he-IL"/>
             <w:rtl/>
+            ${boldTag}
           </w:rPr>
-          <w:t xml:space="preserve">${RLE}${escapeXml(paragraph)}${PDF}</w:t>
+          <w:t>${escapeXml(paragraph)}</w:t>
         </w:r>
       </w:p>`;
   });
-
-  // Wrap in single-cell RTL table to force right alignment in Word/Word Online
-  const xmlTableWrapper = `
-    <w:tbl>
-      <w:tblPr>
-        <w:tblW w:w="0" w:type="auto"/>
-        <w:jc w:val="right"/>
-        <w:bidiVisual/>
-      </w:tblPr>
-      <w:tblGrid><w:gridCol w:w="9500"/></w:tblGrid>
-      <w:tr>
-        <w:tc>
-          <w:tcPr>
-            <w:tcW w:w="0" w:type="auto"/>
-            <w:rtl/>
-          </w:tcPr>
-          ${xmlParas}
-        </w:tc>
-      </w:tr>
-    </w:tbl>`;
-
-  console.log('DEBUG - Final XML content length:', xmlTableWrapper.length);
-  console.log('DEBUG - XML preview:', xmlTableWrapper.substring(0, 200));
-  return xmlTableWrapper;
+  
+ console.log('DEBUG - Final XML content length:', xmlContent.length);
+  console.log('DEBUG - XML preview:', xmlContent.substring(0, 200));
+  return xmlContent;
 }
 
 // 🔥 NEW: פונקציה לניטרול XML
@@ -744,116 +691,61 @@ function fixHebrewSpacing(text) {
 }
 
 // Word document creation (same as before)
-async function createWordDocument(transcription, filename, duration, options = {}) {
+async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
     console.log(`📄 Creating Word document from template for: ${cleanName}`);
     
-    // 🔥 NEW: Prefer template if present; fallback to programmatic creation
-    const templatePath = path.join(__dirname, 'simple-template.docx');
-    const useTemplate = process.env.USE_TEMPLATE === 'true';
-    try {
-      if (useTemplate && fs.existsSync(templatePath)) {
-        console.log('📋 Using template file (USE_TEMPLATE=true)');
-        const templateBuffer = fs.readFileSync(templatePath);
-        const zip = new JSZip();
-        await zip.loadAsync(templateBuffer);
-        const documentXml = await zip.file('word/document.xml').async('string');
-        // Also enforce RTL in styles.xml (Normal style)
-        if (zip.file('word/styles.xml')) {
-          try {
-            let stylesXml = await zip.file('word/styles.xml').async('string');
-            const normalStyleRegex = /(<w:style[^>]*w:styleId=\"Normal\"[^>]*>)[\s\S]*?(<\/w:style>)/;
-            if (normalStyleRegex.test(stylesXml)) {
-              stylesXml = stylesXml.replace(
-                normalStyleRegex,
-                (m, openTag, closeTag) =>
-                  `${openTag}<w:name w:val=\"Normal\"/><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr><w:rPr><w:lang w:val=\"he-IL\"/><w:rtl/></w:rPr>${closeTag}`
-              );
-              zip.file('word/styles.xml', stylesXml);
-            }
-            // Ensure global defaults are RTL/right-aligned
-            if (/<w:docDefaults>/.test(stylesXml)) {
-              stylesXml = stylesXml.replace(
-                /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/,
-                '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val=\"he-IL\" w:bidi=\"he-IL\"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults>'
-              );
-            } else {
-              stylesXml = stylesXml.replace(
-                /<\/w:styles>/,
-                '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val=\"he-IL\" w:bidi=\"he-IL\"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val=\"right\"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>'
-              );
-            }
-            zip.file('word/styles.xml', stylesXml);
-          } catch (e) {
-            console.warn('Could not update styles.xml for RTL:', e.message);
-          }
-        }
-        const title = cleanName;
-        const content = processTranscriptionForTemplate(transcription);
-        console.log('🔍 About to replace in XML...');
-        console.log('XML contains TITLE:', documentXml.includes('TITLE'));
-        console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
-        console.log('🔍 Content length to insert:', content.length);
-        let newDocumentXml = documentXml.replace(/TITLE/g, escapeXml(title));
-        const contentParaRegex = /<w:p[^>]*>[\s\S]*?CONTENT[\s\S]*?<\/w:p>/;
-        if (contentParaRegex.test(newDocumentXml)) {
-          newDocumentXml = newDocumentXml.replace(contentParaRegex, content);
-        } else {
-          console.warn('⚠️ CONTENT paragraph not found as a block; falling back to simple token replace');
-          newDocumentXml = newDocumentXml.replace(/CONTENT/g, content);
-        }
-        // Ensure sectPr includes RTL-friendly settings for Word 2016
-        const sectRegex = /<w:sectPr[^>]*>[\s\S]*?<\/w:sectPr>/;
-        if (sectRegex.test(newDocumentXml)) {
-          newDocumentXml = newDocumentXml.replace(sectRegex, (m) => {
-            let s = m;
-            if (!/<w:bidi\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:bidi/></w:sectPr>');
-            if (!/<w:rtlGutter\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:rtlGutter/></w:sectPr>');
-            if (!/<w:mirrorMargins\/>/.test(s)) s = s.replace('</w:sectPr>', '<w:mirrorMargins/></w:sectPr>');
-            if (!/<w:textDirection\b/.test(s)) s = s.replace('</w:sectPr>', '<w:textDirection w:val="rl"/></w:sectPr>');
-            return s;
-          });
-        }
-        zip.file('word/document.xml', newDocumentXml);
-
-        // Harden settings.xml for RTL defaults on older Word
-        if (zip.file('word/settings.xml')) {
-          try {
-            let settingsXml = await zip.file('word/settings.xml').async('string');
-            if (!/<w:themeFontLang\b/.test(settingsXml)) {
-              settingsXml = settingsXml.replace(/<\/w:settings>/, '<w:themeFontLang w:bidi="he-IL"/></w:settings>');
-            } else {
-              settingsXml = settingsXml.replace(/<w:themeFontLang\b[^>]*>/, (tag) => {
-                return tag.includes('w:bidi=') ? tag : tag.replace('>', ' w:bidi="he-IL">');
-              });
-            }
-            if (!/<w:compat>/.test(settingsXml)) {
-              settingsXml = settingsXml.replace(/<\/w:settings>/, '<w:compat><w:useFELayout/></w:compat></w:settings>');
-            } else if (!/<w:useFELayout\/>/.test(settingsXml)) {
-              settingsXml = settingsXml.replace(/<w:compat>/, '<w:compat><w:useFELayout/>');
-            }
-            zip.file('word/settings.xml', settingsXml);
-          } catch (e) {
-            console.warn('Could not update settings.xml for RTL compatibility:', e.message);
-          }
-        }
-        let buffer = await zip.generateAsync({ type: 'nodebuffer' });
-        // Final enforcement pass for RTL on the whole DOCX
-        buffer = await enforceRtlOnDocxBuffer(buffer, options);
-        console.log(`✅ Word document created from template for: ${cleanName}`);
-        return buffer;
-      }
-      console.log('⚠️ Template disabled or not found, using programmatic creation');
-    } catch (templateError) {
-      console.warn('⚠️ Template generation failed, falling back to programmatic creation:', templateError.message);
+    // 🔥 NEW: נסה תחילה עם תבנית
+  const templatePath = path.join(__dirname, 'simple-template.docx');
+    
+   if (false) {
+      console.log('📋 Using template file');
+      
+      const templateBuffer = fs.readFileSync(templatePath);
+      const zip = new JSZip();
+      await zip.loadAsync(templateBuffer);
+      
+      const documentXml = await zip.file('word/document.xml').async('string');
+      
+   // הכן תוכן
+      const title = cleanName;
+      const content = processTranscriptionForTemplate(transcription);
+      
+      console.log('🔍 About to replace in XML...');
+     console.log('XML contains TITLE:', documentXml.includes('TITLE'));
+console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
+      console.log('🔍 Content length to insert:', content.length);
+      
+      // החלף placeholders
+      let newDocumentXml = documentXml
+  .replace(/TITLE/g, escapeXml(title))
+  .replace(/CONTENT/g, content);
+        
+      console.log('🔍 After replacement:');
+      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
+      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
+      
+      zip.file('word/document.xml', newDocumentXml);
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+      
+      console.log(`✅ Word document created from template for: ${cleanName}`);
+      return buffer;
     }
+    
+    // 🔥 אם אין תבנית - השתמש בקוד הישן
+    console.log('⚠️ No template found, using programmatic creation');
     
 // החלף את הקטע בשורות 635-677 בקוד הזה:
 
 const doc = new Document({
   creator: "תמלול חכם",
   language: "he-IL",
+  defaultRunProperties: {
+    font: "Times New Roman",
+    size: 24,
+    rtl: true
+  },
   styles: {
     default: {
       document: {
@@ -869,36 +761,19 @@ const doc = new Document({
         }
       }
     },
-    // Enforce RTL and right alignment as the default (Normal)
     paragraphStyles: [
-      {
-        id: "Normal",
-        name: "Normal",
-        basedOn: "Normal",
-        run: {
-          font: "Arial",
-          size: 24,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        },
-        paragraph: {
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true
-        }
-      },
       {
         id: "HebrewParagraph",
         name: "Hebrew Paragraph",
         basedOn: "Normal",
-        run: {
-          font: "Arial",
-          size: 24,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        },
         paragraph: {
           alignment: AlignmentType.RIGHT,
           bidirectional: true
+        },
+        run: {
+          rightToLeft: true,
+          languageComplexScript: "he-IL",
+          font: "Arial"
         }
       }
     ]
@@ -912,10 +787,11 @@ const doc = new Document({
           bottom: 2160,
           left: 1800
         },
-        rtlGutter: true,
         textDirection: "rtl"
       },
-      bidi: true
+      rtlGutter: true,
+      bidi: true,
+      textDirection: "rtl"
     },
     children: [
       // Title with moderate spacing
@@ -939,134 +815,19 @@ const doc = new Document({
         }
       }),
       
-      // Content wrapped in an RTL table (forces right alignment in Word Online)
-      new Table({
-        width: { size: 100, type: WidthType.PERCENTAGE },
-        rows: [
-          new TableRow({
-            children: [
-              new TableCell({
-                children: processTranscriptionContent(transcription),
-                margins: { top: 0, bottom: 0, left: 0, right: 0 },
-              })
-            ]
-          })
-        ]
-      })
+      // Content with balanced spacing
+      ...processTranscriptionContent(transcription)
     ]
   }]
 });
     
-    let buffer = await Packer.toBuffer(doc);
-    // Final enforcement pass for RTL on the whole DOCX
-    buffer = await enforceRtlOnDocxBuffer(buffer, options);
+    const buffer = await Packer.toBuffer(doc);
     console.log(`✅ Word document created successfully for: ${cleanName}`);
     return buffer;
     
   } catch (error) {
     console.error('Error creating Word document:', error);
     throw error;
-  }
-}
-
-// Final pass: open the DOCX and ensure every paragraph and global settings enforce RTL/right alignment
-async function enforceRtlOnDocxBuffer(docxBuffer, options = {}) {
-  try {
-    const zip = new JSZip();
-    await zip.loadAsync(docxBuffer);
-    if (zip.file('word/document.xml')) {
-      let xml = await zip.file('word/document.xml').async('string');
-
-      // Ensure every paragraph has a pPr; if missing, inject with right/bidi
-      xml = xml.replace(/<w:p(\b[^>]*)>(?![\s\S]*?<w:pPr>)/g, (m) => {
-        return m + '<w:pPr><w:jc w:val="right"/><w:bidi/><w:pStyle w:val="Normal"/></w:pPr>';
-      });
-
-      // Ensure existing pPr blocks contain right/bidi
-      xml = xml.replace(/<w:pPr>([\s\S]*?)<\/w:pPr>/g, (m, inner) => {
-        let out = inner;
-        if (!/\b<w:jc\b[\s\S]*?\/>/.test(out)) out = `<w:jc w:val="right"/>` + out;
-        if (!/\b<w:bidi\/>/.test(out)) out = `<w:bidi/>` + out;
-        if (!/\b<w:pStyle\b/.test(out)) out = `<w:pStyle w:val="Normal"/>` + out;
-        return `<w:pPr>${out}</w:pPr>`;
-      });
-
-      // Ensure sectPr has RTL hints and landscape if requested
-      xml = xml.replace(/<w:sectPr([^>]*)>([\s\S]*?)<\/w:sectPr>/, (m, attrs, inner) => {
-        let s = inner;
-        if (!/\b<w:bidi\/>/.test(s)) s = s + '<w:bidi/>';
-        if (!/\b<w:rtlGutter\/>/.test(s)) s = s + '<w:rtlGutter/>';
-        if (!/\b<w:mirrorMargins\/>/.test(s)) s = s + '<w:mirrorMargins/>';
-        if (!/\b<w:textDirection\b/.test(s)) s = s + '<w:textDirection w:val="rl"/>';
-        // Force landscape if requested via options
-        if (options.landscape) {
-          // set pgSz orient="landscape" and swap w/h if present
-          if (/<w:pgSz\b/.test(s)) {
-            s = s.replace(/<w:pgSz([^>]*)\/>/, (tag, a) => {
-              let attrs = a;
-              attrs = attrs.replace(/w:orient="[^"]*"/, '');
-              attrs += ' w:orient="landscape"';
-              // optionally swap if needed is tricky; leave as is, Word will rotate
-              return `<w:pgSz${attrs}/>`;
-            });
-          } else {
-            s = '<w:pgSz w:orient="landscape"/>' + s;
-          }
-        }
-        return `<w:sectPr${attrs}>${s}</w:sectPr>`;
-      });
-
-      // Ensure each run has RTL and Hebrew language
-      xml = xml.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (m, inner) => {
-        let out = inner;
-        if (!/\b<w:rtl\/>/.test(out)) out = '<w:rtl/>' + out;
-        if (!/\b<w:lang\b/.test(out)) out = '<w:lang w:val="he-IL" w:bidi="he-IL"/>' + out;
-        return `<w:rPr>${out}</w:rPr>`;
-      });
-
-      zip.file('word/document.xml', xml);
-    }
-
-    // styles.xml defaults
-    if (zip.file('word/styles.xml')) {
-      let styles = await zip.file('word/styles.xml').async('string');
-      if (/<w:docDefaults>/.test(styles)) {
-        styles = styles.replace(
-          /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/,
-          '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="he-IL" w:bidi="he-IL"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults>'
-        );
-      } else {
-        styles = styles.replace(
-          /<\/w:styles>/,
-          '<w:docDefaults><w:rPrDefault><w:rPr><w:lang w:val="he-IL" w:bidi="he-IL"/><w:rtl/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:jc w:val="right"/><w:bidi/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>'
-        );
-      }
-      zip.file('word/styles.xml', styles);
-    }
-
-    // settings.xml compat/lang
-    if (zip.file('word/settings.xml')) {
-      let settings = await zip.file('word/settings.xml').async('string');
-      if (!/<w:themeFontLang\b/.test(settings)) {
-        settings = settings.replace(/<\/w:settings>/, '<w:themeFontLang w:bidi="he-IL"/></w:settings>');
-      } else {
-        settings = settings.replace(/<w:themeFontLang\b[^>]*>/, (tag) => {
-          return tag.includes('w:bidi=') ? tag : tag.replace('>', ' w:bidi="he-IL">');
-        });
-      }
-      if (!/<w:compat>/.test(settings)) {
-        settings = settings.replace(/<\/w:settings>/, '<w:compat><w:useFELayout/></w:compat></w:settings>');
-      } else if (!/<w:useFELayout\/>/.test(settings)) {
-        settings = settings.replace(/<w:compat>/, '<w:compat><w:useFELayout/>' );
-      }
-      zip.file('word/settings.xml', settings);
-    }
-
-    const out = await zip.generateAsync({ type: 'nodebuffer' });
-    return out;
-  } catch (e) {
-    console.warn('enforceRtlOnDocxBuffer failed, returning original buffer:', e.message);
-    return docxBuffer;
   }
 }
 
@@ -1370,8 +1131,7 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    ffmpegAvailable: checkFFmpegAvailability(),
-    useTemplate: process.env.USE_TEMPLATE === 'true'
+    ffmpegAvailable: checkFFmpegAvailability()
   });
 });
 
@@ -1383,44 +1143,6 @@ app.get('/api/test', (req, res) => {
     emailConfigured: !!process.env.EMAIL_USER,
     ffmpegAvailable: checkFFmpegAvailability()
   });
-});
-
-// Debug endpoint: Download a sample RTL DOCX generated by current server code
-app.get('/debug/docx', async (req, res) => {
-  try {
-    const sampleText = [
-      'זהו מסמך בדיקה ל-RTL. המשפט הזה אמור להיות מיושר לימין.',
-      'פסקה שנייה: בדיקה של כיוון מימין לשמאל ומספרים: 12345.',
-      'פסקה שלישית: אם זה עדיין בשמאל, נבדוק את הסגנונות וההגדרות של Word.'
-    ].join('\n\n');
-    const buf = await createWordDocument(sampleText, 'בדיקת_RTL.docx', 0, { landscape: req.query.landscape === '1' });
-    res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.set('Content-Disposition', 'attachment; filename="debug_rtl.docx"');
-    res.send(buf);
-  } catch (e) {
-    console.error('Debug DOCX error:', e);
-    res.status(500).send('Failed to generate debug DOCX');
-  }
-});
-
-// Debug endpoint: return the generated document.xml so we can inspect alignment flags
-app.get('/debug/docx-xml', async (req, res) => {
-  try {
-    const sampleText = [
-      'זהו מסמך בדיקה ל-RTL. המשפט הזה אמור להיות מיושר לימין.',
-      'פסקה שנייה: בדיקה של כיוון מימין לשמאל ומספרים: 12345.',
-      'פסקה שלישית: אם זה עדיין בשמאל, נבדוק את הסגנונות וההגדרות של Word.'
-    ].join('\n\n');
-    const buf = await createWordDocument(sampleText, 'בדיקת_RTL.docx', 0);
-    const zip = new JSZip();
-    await zip.loadAsync(buf);
-    const xml = await zip.file('word/document.xml').async('string');
-    res.set('Content-Type', 'text/xml; charset=utf-8');
-    res.send(xml);
-  } catch (e) {
-    console.error('Debug DOCX-XML error:', e);
-    res.status(500).send('Failed to generate debug DOCX XML');
-  }
 });
 
 // Authentication routes
