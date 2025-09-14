@@ -1152,55 +1152,24 @@ app.post('/api/login', (req, res) => {
     
     const { email, password } = req.body;
     
-    if (!email) {
-      return res.json({ 
-        success: false, 
-        error: 'נא להזין כתובת אימייל',
-        errorType: 'missing_email'
-      });
+    if (!email || !password) {
+      return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
     }
     
-    if (!password) {
-      return res.json({ 
-        success: false, 
-        error: 'נא להזין סיסמה',
-        errorType: 'missing_password'
-      });
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    console.log('🔍 User found:', user ? 'Yes' : 'No');
+    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
+    
+    if (user) {
+      console.log('✅ Login successful for:', user.email);
+      res.json({ success: true, user: { ...user, password: undefined } });
+    } else {
+      console.log('❌ Login failed for:', email);
+      res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
     }
-    
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (!user) {
-      return res.json({ 
-        success: false, 
-        error: 'משתמש עם כתובת אימייל זו לא נמצא במערכת',
-        errorType: 'user_not_found',
-        suggestion: 'האם אתה בטוח שנרשמת? נסה להירשם מחדש'
-      });
-    }
-    
-    if (user.password !== password) {
-      return res.json({ 
-        success: false, 
-        error: 'הסיסמה שהוזנה אינה נכונה',
-        errorType: 'wrong_password',
-        suggestion: 'בדוק את הסיסמה ונסה שוב'
-      });
-    }
-    
-    console.log('✅ Login successful for:', user.email);
-    res.json({ 
-      success: true, 
-      user: { ...user, password: undefined },
-      message: 'התחברת בהצלחה!'
-    });
-    
   } catch (error) {
-    console.error('Login system error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'שגיאה במערכת ההתחברות. נסה שוב מאוחר יותר'
-    });
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בשרת' });
   }
 });
 
@@ -1210,81 +1179,26 @@ app.post('/api/register', (req, res) => {
     
     const { name, email, password, phone } = req.body;
     
-    if (!name || !name.trim() || name.trim().length < 2) {
-      return res.json({ 
-        success: false, 
-        error: !name ? 'נא להזין שם מלא' : 'השם חייב להכיל לפחות 2 תווים',
-        errorType: 'invalid_name'
-      });
+    if (!name || !email || !password) {
+      return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
     }
     
-    if (!email) {
-      return res.json({ 
-        success: false, 
-        error: 'נא להזין כתובת אימייל',
-        errorType: 'missing_email'
-      });
-    }
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.json({ 
-        success: false, 
-        error: 'כתובת האימייל אינה תקינה (דוגמה: name@example.com)',
-        errorType: 'invalid_email'
-      });
-    }
-    
-    if (!password || password.length < 6) {
-      return res.json({ 
-        success: false, 
-        error: !password ? 'נא להזין סיסמה' : 'הסיסמה חייבת להכיל לפחות 6 תווים',
-        errorType: 'weak_password'
-      });
-    }
-    
-    const existingUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existingUser) {
-      return res.json({ 
-        success: false, 
-        error: 'משתמש עם כתובת האימייל הזו כבר רשום במערכת',
-        errorType: 'user_exists',
-        suggestion: 'האם אתה רוצה להתחבר במקום זאת?',
-        showLoginButton: true
-      });
+    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+      console.log('❌ User already exists:', email);
+      return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
     
     const newUser = {
       id: users.length + 1,
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password: password,
-      phone: phone ? phone.trim() : '',
+      name,
+      email: email.toLowerCase(),
+      password,
+      phone: phone || '',
       isAdmin: false,
-      remainingMinutes: 30,
+      remainingMinutes: 30, // 30 free minutes
       totalTranscribed: 0,
-      history: [],
-      registrationDate: new Date().toISOString()
+      history: []
     };
-    
-    users.push(newUser);
-    console.log('✅ User registered successfully:', newUser.email);
-    
-    res.json({ 
-      success: true, 
-      user: { ...newUser, password: undefined },
-      message: 'נרשמת בהצלחה! קיבלת 30 דקות תמלול חינם'
-    });
-    
-  } catch (error) {
-    console.error('Registration system error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'שגיאה במערכת ההרשמה. נסה שוב מאוחר יותר'
-    });
-  }
-});
-
     
     users.push(newUser);
     console.log('✅ User registered successfully:', newUser.email);
@@ -1442,8 +1356,6 @@ app.listen(PORT, () => {
   console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
-
-
 
 
 

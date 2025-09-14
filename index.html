@@ -795,58 +795,24 @@
         }
 
         // Authentication functions with better error handling
-       document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
 
-  if (!email) {
-    showStatus('❌ נא להזין כתובת אימייל', 'error');
-    return;
-  }
-  
-  if (!password) {
-    showStatus('❌ נא להזין סיסמה', 'error');
-    return;
-  }
+            updateDebugInfo('מנסה להתחבר...');
 
-  showStatus('<div class="spinner"></div>מתחבר...', 'processing');
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
 
-  try {
-    const response = await fetch(`${API_BASE}/login`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!response.ok) {
-      throw new Error(`שגיאת שרת: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      currentUser = data.user;
-      showStatus(`✅ ${data.message}`, 'success');
-      setTimeout(() => {
-        showApp();
-      }, 1500);
-    } else {
-      let errorMessage = `❌ ${data.error}`;
-      if (data.suggestion) {
-        errorMessage += `<br><small>💡 ${data.suggestion}</small>`;
-      }
-      showStatus(errorMessage, 'error');
-    }
-  } catch (error) {
-    console.error('Login error:', error);
-    showStatus(`❌ שגיאה בחיבור לשרת: ${error.message}`, 'error');
-  }
-});
                 console.log('Response status:', response.status);
 
                 if (!response.ok) {
@@ -879,90 +845,24 @@
         });
 
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  
-  const name = document.getElementById('registerName').value.trim();
-  const email = document.getElementById('registerEmail').value.trim();
-  const password = document.getElementById('registerPassword').value;
-  const phone = document.getElementById('registerPhone').value.trim();
+            e.preventDefault();
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const phone = document.getElementById('registerPhone').value;
 
-  if (!name) {
-    showStatus('❌ נא להזין שם מלא', 'error');
-    return;
-  }
-  
-  if (name.length < 2) {
-    showStatus('❌ השם חייב להכיל לפחות 2 תווים', 'error');
-    return;
-  }
-  
-  if (!email) {
-    showStatus('❌ נא להזין כתובת אימייל', 'error');
-    return;
-  }
-  
-  if (!email.includes('@') || !email.includes('.')) {
-    showStatus('❌ כתובת האימייל אינה תקינה', 'error');
-    return;
-  }
-  
-  if (!password) {
-    showStatus('❌ נא להזין סיסמה', 'error');
-    return;
-  }
-  
-  if (password.length < 6) {
-    showStatus('❌ הסיסמה חייבת להכיל לפחות 6 תווים', 'error');
-    return;
-  }
+            updateDebugInfo('מנסה להירשם...');
 
-  showStatus('<div class="spinner"></div>נרשם...', 'processing');
-
-  try {
-    const response = await fetch(`${API_BASE}/register`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ name, email, password, phone })
-    });
-
-    if (!response.ok) {
-      throw new Error(`שגיאת שרת: ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      currentUser = data.user;
-      showStatus(`✅ ${data.message}`, 'success');
-      setTimeout(() => {
-        showApp();
-      }, 2000);
-    } else {
-      let errorMessage = `❌ ${data.error}`;
-      if (data.suggestion) {
-        errorMessage += `<br><small>💡 ${data.suggestion}</small>`;
-      }
-      if (data.showLoginButton) {
-        errorMessage += `<br><button onclick="switchTab('login')" style="
-          background: #667eea; 
-          color: white; 
-          border: none; 
-          padding: 8px 16px; 
-          border-radius: 5px; 
-          cursor: pointer;
-          margin-top: 10px;
-        ">עבור להתחברות</button>`;
-      }
-      showStatus(errorMessage, 'error');
-    }
-  } catch (error) {
-    console.error('Register error:', error);
-    showStatus(`❌ שגיאה בחיבור לשרת: ${error.message}`, 'error');
-  }
-});
+            try {
+                const response = await fetch(`${API_BASE}/register`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password, phone })
+                });
 
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1507,7 +1407,6 @@
     </script>
 </body>
 </html>
-
 
 
 
