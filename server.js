@@ -968,6 +968,14 @@ async function enforceRtlOnDocxBuffer(docxBuffer) {
         return `<w:sectPr${attrs}>${s}</w:sectPr>`;
       });
 
+      // Ensure each run has RTL and Hebrew language
+      xml = xml.replace(/<w:rPr>([\s\S]*?)<\/w:rPr>/g, (m, inner) => {
+        let out = inner;
+        if (!/\b<w:rtl\/>/.test(out)) out = '<w:rtl/>' + out;
+        if (!/\b<w:lang\b/.test(out)) out = '<w:lang w:val="he-IL" w:bidi="he-IL"/>' + out;
+        return `<w:rPr>${out}</w:rPr>`;
+      });
+
       zip.file('word/document.xml', xml);
     }
 
