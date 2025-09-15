@@ -164,7 +164,10 @@ function saveUsersData() {
   } catch (error) {
     console.error('❌ Error saving users data:', error);
     console.error('❌ Error details:', error.message);
-    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ This may be due to read-only filesystem in deployment environment');
+    console.log('📂 Continuing with in-memory data only...');
+    // Don't throw - continue running with in-memory data
   }
 }
 
@@ -184,16 +187,22 @@ const TEMPLATE_FILE = path.join(__dirname, 'users_data_template.json');
 if (!fs.existsSync(DATA_FILE)) {
   console.log('📂 Data file not found, creating from template...');
 
-  if (fs.existsSync(TEMPLATE_FILE)) {
-    // Copy template to data file
-    fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
-    console.log('✅ Created users_data.json from template');
+  try {
+    if (fs.existsSync(TEMPLATE_FILE)) {
+      // Copy template to data file
+      fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
+      console.log('✅ Created users_data.json from template');
 
-    // Reload users from the new file
-    users = loadUsersData();
-  } else {
-    console.log('📂 No template found, creating with default users...');
-    saveUsersData();
+      // Reload users from the new file
+      users = loadUsersData();
+    } else {
+      console.log('📂 No template found, creating with default users...');
+      saveUsersData();
+    }
+  } catch (error) {
+    console.error('❌ Error creating data file:', error);
+    console.log('📂 Falling back to in-memory users only');
+    // Continue with in-memory users from loadUsersData()
   }
 } else {
   console.log('📂 Data file already exists, checking integrity...');

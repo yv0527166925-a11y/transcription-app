@@ -2,7 +2,7 @@ services:
   - type: web
     name: transcription-app
     env: node
-    plan: standard # או Pro אם צריך יותר משאבים לקבצים גדולים
+    plan: starter # Free tier - אפשר לשדרג ל-standard אם נדרש
     
     # 🔥 Build command מעודכן עם FFmpeg
     buildCommand: |
