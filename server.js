@@ -1177,17 +1177,58 @@ const attachments = transcriptions.map(trans => {
 }
 
 // Async transcription processing with enhanced complete transcription
-async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes) {
+// Global transcription tracking for cancellation
+let activeTranscriptions = new Map(); // Map of transcriptionId -> { userEmail, files, cancelled: boolean }
+
+async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes, transcriptionId) {
   console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
-  console.log(`📧 Processing for user: ${userEmail}`);
-  
+  console.log(`📧 Processing for user: ${userEmail} (ID: ${transcriptionId})`);
+
   const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
   if (!user) {
     console.error('❌ User not found during async processing:', userEmail);
     return;
   }
 
+  // Register transcription for cancellation tracking
+  activeTranscriptions.set(transcriptionId, {
+    userEmail,
+    files: files.map(f => f.path), // Store file paths for cleanup
+    cancelled: false,
+    startTime: new Date()
+  });
+
+  console.log(`📝 Registered transcription ${transcriptionId} for cancellation tracking`);
+
+  // Check for cancellation before deducting minutes
+  if (activeTranscriptions.get(transcriptionId)?.cancelled) {
+    console.log(`❌ Transcription ${transcriptionId} was cancelled before starting - cleaning up files`);
+    // Clean up uploaded files
+    files.forEach(file => {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`🗑️ Deleted cancelled file: ${file.path}`);
+      } catch (e) {
+        console.warn(`Could not delete file ${file.path}:`, e.message);
+      }
+    });
+    activeTranscriptions.delete(transcriptionId);
+    return;
+  }
+
   try {
+    // Deduct minutes immediately to prevent abuse (before actual processing)
+    user.remainingMinutes -= estimatedMinutes;
+    user.totalTranscribed += estimatedMinutes;
+    console.log(`💰 Minutes deducted upfront. User balance: ${user.remainingMinutes} minutes`);
+
+    // Save user data immediately after minute deduction
+    saveUsersData();
+
+    // ⚠️ CRITICAL: After this point, cancellation is no longer safe for refunds
+    // Minutes have been deducted, transcription is considered "started"
+    activeTranscriptions.get(transcriptionId).minutesDeducted = true;
+
     const transcriptions = [];
     const failedTranscriptions = [];
     
@@ -1249,10 +1290,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
 
-      // Update user stats only for successful transcriptions
-      const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
-      user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
-      user.totalTranscribed += actualMinutesUsed;
+      // Note: Minutes were already deducted at the start
+      // No need to deduct again - just record the usage
 
       // 🔧 NEW: Add each transcription to history
       transcriptions.forEach(transcription => {
@@ -1260,7 +1299,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           date: new Date().toLocaleDateString('he-IL'),
           timestamp: Date.now(), // Add timestamp for cleanup
           fileName: cleanFilename(transcription.filename),
-          duration: Math.ceil(actualMinutesUsed / transcriptions.length), // Distribute minutes across files
+          duration: Math.ceil(estimatedMinutes / transcriptions.length), // Distribute minutes across files
           language: language,
           status: 'completed',
           downloadUrl: `/api/download/${transcription.downloadFilename}` // Use actual saved filename
@@ -1303,6 +1342,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     
   } catch (error) {
     console.error('Async transcription batch error:', error);
+  } finally {
+    // Clean up transcription tracking
+    activeTranscriptions.delete(transcriptionId);
+    console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId}`);
   }
 }
 
@@ -1539,8 +1582,11 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         });
     }
 
+    // Generate unique transcription ID for cancellation tracking
+    const transcriptionId = `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     // Start enhanced async processing with the ACCURATE minutes
-    processTranscriptionAsync(req.files, email, language, accurateMinutes);
+    processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId);
 
     console.log('✅ Enhanced transcription started successfully with accurate minute count.');
     res.json({
@@ -1549,11 +1595,87 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
             'התמלול המתקדם התחיל - קבצים גדולים יתחלקו למקטעים אוטומטית' :
             'התמלול התחיל - ללא חלוקה למקטעים (FFmpeg לא זמין)',
         estimatedMinutes: accurateMinutes, // Return the accurate count to the client
-        chunkingEnabled: ffmpegAvailable
+        chunkingEnabled: ffmpegAvailable,
+        transcriptionId: transcriptionId // Return transcription ID for cancellation
     });
   } catch (error) {
     console.error('Enhanced transcription error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 🆕 Cancel transcription endpoint (safe cancellation window)
+app.post('/api/cancel-transcription', (req, res) => {
+  try {
+    const { transcriptionId, email } = req.body;
+
+    console.log(`🛑 Cancellation request for transcription ${transcriptionId} by ${email}`);
+
+    if (!transcriptionId || !email) {
+      return res.status(400).json({
+        success: false,
+        error: 'נדרש מזהה תמלול ואימייל'
+      });
+    }
+
+    const transcriptionData = activeTranscriptions.get(transcriptionId);
+
+    if (!transcriptionData) {
+      return res.status(404).json({
+        success: false,
+        error: 'התמלול לא נמצא או כבר הסתיים'
+      });
+    }
+
+    if (transcriptionData.userEmail.toLowerCase() !== email.toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        error: 'אין הרשאה לבטל תמלול זה'
+      });
+    }
+
+    if (transcriptionData.minutesDeducted) {
+      return res.status(400).json({
+        success: false,
+        error: 'התמלול כבר התחיל - לא ניתן לבטל'
+      });
+    }
+
+    // Mark as cancelled
+    transcriptionData.cancelled = true;
+    console.log(`✅ Transcription ${transcriptionId} marked as cancelled`);
+
+    // Clean up uploaded files immediately
+    let filesDeleted = 0;
+    transcriptionData.files.forEach(filePath => {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          filesDeleted++;
+          console.log(`🗑️ Deleted cancelled file: ${filePath}`);
+        }
+      } catch (e) {
+        console.warn(`Could not delete file ${filePath}:`, e.message);
+      }
+    });
+
+    // Remove from tracking
+    activeTranscriptions.delete(transcriptionId);
+
+    res.json({
+      success: true,
+      message: `התמלול בוטל בהצלחה. נמחקו ${filesDeleted} קבצים.`,
+      filesDeleted
+    });
+
+    console.log(`🛑 Transcription ${transcriptionId} cancelled successfully`);
+
+  } catch (error) {
+    console.error('Cancel transcription error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בביטול התמלול'
+    });
   }
 });
 
