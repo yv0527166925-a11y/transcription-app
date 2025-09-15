@@ -124,17 +124,21 @@ const defaultUsers = [
 // Load users data from file or use defaults
 function loadUsersData() {
   try {
+    console.log(`📂 Checking for data file at: ${DATA_FILE}`);
     if (fs.existsSync(DATA_FILE)) {
+      console.log('📂 Data file exists, loading...');
       const data = fs.readFileSync(DATA_FILE, 'utf8');
       const loadedUsers = JSON.parse(data);
-      console.log(`📂 Loaded ${loadedUsers.length} users from file`);
+      console.log(`✅ Successfully loaded ${loadedUsers.length} users from file`);
       return loadedUsers;
     } else {
-      console.log('📂 No data file found, using default users');
+      console.log('⚠️ No data file found, using default users');
+      console.log('📂 Default users will be created');
       return [...defaultUsers];
     }
   } catch (error) {
     console.error('❌ Error loading users data:', error);
+    console.error('❌ Error details:', error.message);
     console.log('📂 Using default users due to error');
     return [...defaultUsers];
   }
@@ -143,10 +147,21 @@ function loadUsersData() {
 // Save users data to file
 function saveUsersData() {
   try {
+    console.log(`💾 Attempting to save ${users.length} users to: ${DATA_FILE}`);
     fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2), 'utf8');
-    console.log(`💾 Saved ${users.length} users to file`);
+    console.log(`✅ Successfully saved ${users.length} users to file`);
+
+    // Verify file was created
+    if (fs.existsSync(DATA_FILE)) {
+      const stats = fs.statSync(DATA_FILE);
+      console.log(`📊 File size: ${stats.size} bytes, modified: ${stats.mtime}`);
+    } else {
+      console.error('❌ File was not created despite no error!');
+    }
   } catch (error) {
     console.error('❌ Error saving users data:', error);
+    console.error('❌ Error details:', error.message);
+    console.error('❌ Error stack:', error.stack);
   }
 }
 
@@ -164,7 +179,21 @@ if (!fs.existsSync(downloadsDir)) {
 if (!fs.existsSync(DATA_FILE)) {
   console.log('📂 Creating initial users data file...');
   saveUsersData();
+} else {
+  console.log('📂 Data file already exists, checking integrity...');
+  try {
+    const testData = fs.readFileSync(DATA_FILE, 'utf8');
+    const testUsers = JSON.parse(testData);
+    console.log(`✅ Data file is valid with ${testUsers.length} users`);
+  } catch (error) {
+    console.error('❌ Data file is corrupted, recreating...');
+    saveUsersData();
+  }
 }
+
+// Force save to test the mechanism
+console.log('🔧 Testing save mechanism...');
+saveUsersData();
 
 // Save data periodically (every 5 minutes)
 setInterval(() => {
