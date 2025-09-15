@@ -1423,6 +1423,7 @@
                 }
 
                 // Update UI after all files processed
+                updateSubmitButton();
                 updateCostEstimate();
 
                 // Show completion message (no total duration)
@@ -1518,13 +1519,17 @@
             const submitBtn = document.getElementById('submitBtn');
             const clearAllContainer = document.getElementById('clearAllContainer');
 
+            console.log(`🔘 עדכון כפתורים: ${selectedFiles.length} קבצים נבחרים`);
+
             submitBtn.disabled = selectedFiles.length === 0;
 
             // Show/hide clear all container
             if (selectedFiles.length > 0) {
                 clearAllContainer.style.display = 'block';
+                console.log('✅ מציג כפתור נקה הכל');
             } else {
                 clearAllContainer.style.display = 'none';
+                console.log('❌ מסתיר כפתור נקה הכל');
             }
         }
 
