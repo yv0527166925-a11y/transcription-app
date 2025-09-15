@@ -1192,91 +1192,22 @@
             }
         }
 
-        // Real audio/video duration detection with improved error handling
-        function getAudioDuration(file) {
-            return new Promise((resolve) => {
-                console.log(`🎵 מנסה לקרוא זמן לקובץ: ${file.name}`);
+        // Simple duration estimation based on file size - no more complex loading!
+        function estimateDuration(file) {
+            const fileSizeMB = file.size / (1024 * 1024);
+            const ext = file.name.toLowerCase().split('.').pop();
+            let estimatedMinutes;
 
-                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
-                    const url = URL.createObjectURL(file);
-                    const audio = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
+            if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+                // Video files: roughly 2-5MB per minute depending on quality
+                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
+            } else {
+                // Audio files: roughly 1-2MB per minute for good quality
+                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+            }
 
-                    let resolved = false; // Prevent multiple resolves
-
-                    audio.addEventListener('loadedmetadata', () => {
-                        if (!resolved) {
-                            resolved = true;
-                            const durationSeconds = audio.duration;
-                            const durationMinutes = Math.ceil(durationSeconds / 60);
-                            console.log(`📊 File: ${file.name} - Real duration: ${durationSeconds.toFixed(1)}s (${durationMinutes} minutes)`);
-                            URL.revokeObjectURL(url);
-                            resolve(durationMinutes);
-                        }
-                    });
-
-                    audio.addEventListener('error', (error) => {
-                        if (!resolved) {
-                            resolved = true;
-                            console.warn(`⚠️ Could not read duration for ${file.name}, using improved file size estimation`);
-                            URL.revokeObjectURL(url);
-                            // More accurate estimation based on file type and quality
-                            const fileSizeMB = file.size / (1024 * 1024);
-                            let estimatedMinutes;
-
-                            if (file.type.startsWith('video/')) {
-                                // Video files: roughly 2-5MB per minute depending on quality
-                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
-                            } else {
-                                // Audio files: roughly 1-2MB per minute for good quality
-                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                            }
-
-                            console.log(`📊 File: ${file.name} - Estimated: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
-                            resolve(estimatedMinutes);
-                        }
-                    });
-
-                    // Add timeout to prevent hanging
-                    setTimeout(() => {
-                        if (!resolved) {
-                            resolved = true;
-                            console.warn(`⏰ Timeout reading duration for ${file.name}, using improved file size estimation`);
-                            URL.revokeObjectURL(url);
-                            const fileSizeMB = file.size / (1024 * 1024);
-                            let estimatedMinutes;
-
-                            if (file.type.startsWith('video/')) {
-                                // Video files: roughly 2-5MB per minute depending on quality
-                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
-                            } else {
-                                // Audio files: roughly 1-2MB per minute for good quality
-                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                            }
-
-                            console.log(`📊 File: ${file.name} - Timeout estimate: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
-                            resolve(estimatedMinutes);
-                        }
-                    }, 2000); // 2 second timeout (reduced from 5)
-
-                    audio.src = url;
-                } else {
-                    // For unknown file types, estimate based on file size
-                    const fileSizeMB = file.size / (1024 * 1024);
-                    const ext = file.name.toLowerCase().split('.').pop();
-                    let estimatedMinutes;
-
-                    if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
-                        // Video files: roughly 2-5MB per minute depending on quality
-                        estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
-                    } else {
-                        // Audio files: roughly 1-2MB per minute for good quality
-                        estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                    }
-
-                    console.log(`📊 File: ${file.name} - Unknown type estimate: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
-                    resolve(estimatedMinutes);
-                }
-            });
+            console.log(`📊 ${file.name} - ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} דקות`);
+            return estimatedMinutes;
         }
 
         // File upload functions
@@ -1356,96 +1287,25 @@
             const filesToProcess = addToExisting ? newFiles : validFiles;
 
             if (filesToProcess.length > 0) {
-                showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
+                // Simple and fast processing - no spinners, no timeouts, no complications
+                console.log(`📁 מעבד ${filesToProcess.length} קבצים באופן מיידי`);
 
-                let processedCount = 0;
+                filesToProcess.forEach((file, index) => {
+                    // Calculate duration immediately using the simple function
+                    const estimatedDuration = estimateDuration(file);
 
-                // Process files with better error handling and timeout
-                const processFile = async (file, index) => {
-                    try {
-                        console.log(`🔄 מעבד קובץ ${index + 1}/${filesToProcess.length}: ${file.name}`);
+                    console.log(`📊 קובץ ${index + 1}/${filesToProcess.length}: ${file.name} → ${estimatedDuration} דקות`);
 
-                        // Add individual file timeout wrapper
-                        const duration = await Promise.race([
-                            getAudioDuration(file),
-                            new Promise((resolve) => {
-                                setTimeout(() => {
-                                    console.warn(`⏰ Timeout for file ${file.name}, using size estimation`);
-                                    const fileSizeMB = file.size / (1024 * 1024);
-                                    const ext = file.name.toLowerCase().split('.').pop();
-                                    let estimatedDuration;
+                    selectedFiles.push({
+                        file: file,
+                        duration: estimatedDuration
+                    });
 
-                                    if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
-                                        estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 3));
-                                    } else {
-                                        estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                                    }
+                    displayFile(file, estimatedDuration);
+                });
 
-                                    resolve(estimatedDuration);
-                                }, 3000); // 3 second timeout per file
-                            })
-                        ]);
-
-                        console.log(`✅ משך זמן מחושב לקובץ ${file.name}: ${duration} דקות`);
-
-                        selectedFiles.push({
-                            file: file,
-                            duration: duration
-                        });
-                        displayFile(file, duration);
-
-                        processedCount++;
-
-                        // Update status with progress
-                        if (processedCount < filesToProcess.length) {
-                            showStatus(`<div class="spinner"></div>מעבד קובץ ${processedCount + 1}/${filesToProcess.length}...`, 'processing');
-                        }
-
-                        // Update cost estimate after each file for real-time updates
-                        updateCostEstimate();
-
-                        return true;
-
-                    } catch (error) {
-                        console.error('Error processing file:', file.name, error);
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        const ext = file.name.toLowerCase().split('.').pop();
-                        let estimatedDuration;
-
-                        if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
-                            // Video files: roughly 2-5MB per minute depending on quality
-                            estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 3));
-                        } else {
-                            // Audio files: roughly 1-2MB per minute for good quality
-                            estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                        }
-
-                        console.log(`⚠️ הערכת זמן לקובץ ${file.name}: ${estimatedDuration} דקות (לפי גודל קובץ)`);
-
-                        selectedFiles.push({
-                            file: file,
-                            duration: estimatedDuration
-                        });
-                        displayFile(file, estimatedDuration);
-
-                        processedCount++;
-
-                        // Update status with progress
-                        if (processedCount < filesToProcess.length) {
-                            showStatus(`<div class="spinner"></div>מעבד קובץ ${processedCount + 1}/${filesToProcess.length}...`, 'processing');
-                        }
-
-                        // Update cost estimate after each file for real-time updates
-                        updateCostEstimate();
-
-                        return true;
-                    }
-                };
-
-                // Process all files sequentially
-                for (let i = 0; i < filesToProcess.length; i++) {
-                    await processFile(filesToProcess[i], i);
-                }
+                // Update cost estimate once at the end
+                updateCostEstimate();
 
                 // Show success message based on context
                 console.log(`✅ סיום עיבוד ${filesToProcess.length} קבצים`);
