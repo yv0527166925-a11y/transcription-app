@@ -526,6 +526,11 @@
             color: white;
         }
 
+        .admin-table .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
         .admin-title {
             color: #333;
             font-size: 1.2em;
@@ -1870,6 +1875,7 @@
                             <td>${user.totalTranscribed}</td>
                             <td>${user.joinDate || 'לא זמין'}</td>
                             <td>
+                                <button class="action-btn btn-success" onclick="addMinutesToUser('${user.email}', '${user.name}')">➕ הוסף דקות</button>
                                 <button class="action-btn btn-edit" onclick="editUser('${user.email}')">✏️ ערוך</button>
                                 ${!user.isAdmin ? `<button class="action-btn btn-delete" onclick="deleteUser('${user.email}')">🗑️ מחק</button>` : ''}
                             </td>
@@ -1880,6 +1886,51 @@
             } catch (error) {
                 console.error('Error loading admin users:', error);
             }
+        }
+
+        async function addMinutesToUser(userEmail, userName) {
+            const minutes = prompt(`כמה דקות להוסיף למשתמש ${userName}?`, '60');
+
+            if (minutes === null || minutes === '') {
+                return; // User cancelled
+            }
+
+            const minutesToAdd = parseInt(minutes);
+            if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
+                alert('אנא הזן מספר דקות תקין');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/add-minutes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        adminEmail: currentUser.email,
+                        userEmail: userEmail,
+                        minutes: minutesToAdd
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(`✅ נוספו ${minutesToAdd} דקות למשתמש ${userName}`);
+                    loadAdminUsers(); // Refresh the table
+                } else {
+                    alert(`❌ שגיאה: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error adding minutes:', error);
+                alert('❌ שגיאה בהוספת דקות');
+            }
+        }
+
+        // Placeholder for editUser function
+        function editUser(userEmail) {
+            alert('🚧 פונקציית עריכה בפיתוח');
         }
 
         async function loadAdminTranscriptions() {
