@@ -105,6 +105,9 @@ const upload = multer({
 
 // Data persistence
 const DATA_FILE = path.join(__dirname, 'users_data.json');
+console.log(`🔧 Data file path: ${DATA_FILE}`);
+console.log(`🔧 Current working directory: ${process.cwd()}`);
+console.log(`🔧 __dirname: ${__dirname}`);
 
 // Default users data
 const defaultUsers = [
@@ -189,6 +192,20 @@ if (!fs.existsSync(DATA_FILE)) {
     console.error('❌ Data file is corrupted, recreating...');
     saveUsersData();
   }
+}
+
+// Check current file status
+if (fs.existsSync(DATA_FILE)) {
+  console.log('✅ Data file exists at startup');
+  try {
+    const currentData = fs.readFileSync(DATA_FILE, 'utf8');
+    const currentUsers = JSON.parse(currentData);
+    console.log(`✅ Current file contains ${currentUsers.length} users`);
+  } catch (error) {
+    console.error('❌ Error reading existing file:', error);
+  }
+} else {
+  console.log('❌ Data file does not exist at startup');
 }
 
 // Force save to test the mechanism
