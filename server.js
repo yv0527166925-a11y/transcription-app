@@ -178,10 +178,23 @@ if (!fs.existsSync(downloadsDir)) {
   console.log('📁 Created downloads directory');
 }
 
-// Save initial data if file doesn't exist to ensure persistence works
+// Initialize data file from template if it doesn't exist
+const TEMPLATE_FILE = path.join(__dirname, 'users_data_template.json');
+
 if (!fs.existsSync(DATA_FILE)) {
-  console.log('📂 Creating initial users data file...');
-  saveUsersData();
+  console.log('📂 Data file not found, creating from template...');
+
+  if (fs.existsSync(TEMPLATE_FILE)) {
+    // Copy template to data file
+    fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
+    console.log('✅ Created users_data.json from template');
+
+    // Reload users from the new file
+    users = loadUsersData();
+  } else {
+    console.log('📂 No template found, creating with default users...');
+    saveUsersData();
+  }
 } else {
   console.log('📂 Data file already exists, checking integrity...');
   try {
@@ -189,8 +202,14 @@ if (!fs.existsSync(DATA_FILE)) {
     const testUsers = JSON.parse(testData);
     console.log(`✅ Data file is valid with ${testUsers.length} users`);
   } catch (error) {
-    console.error('❌ Data file is corrupted, recreating...');
-    saveUsersData();
+    console.error('❌ Data file is corrupted, recreating from template...');
+    if (fs.existsSync(TEMPLATE_FILE)) {
+      fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
+      users = loadUsersData();
+      console.log('✅ Restored from template');
+    } else {
+      saveUsersData();
+    }
   }
 }
 
