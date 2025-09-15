@@ -613,7 +613,7 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="totalTranscribed">0</div>
-                        <div class="stat-label">דקות מומלות</div>
+                        <div class="stat-label">דקות מתומללות</div>
                     </div>
                 </div>
 
@@ -651,9 +651,21 @@
                             ✨ תמלול עם Gemini 2.5 Pro → קובץ Word מסודר ומעוצב
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
+                        <!-- Hidden input for adding more files -->
+                        <input type="file" id="additionalFileInput" class="file-input" accept="audio/*,video/*" multiple style="display: none;">
                     </div>
 
                     <div id="selectedFiles"></div>
+
+                    <!-- Add more files button (shown when files are selected) -->
+                    <div id="addMoreContainer" style="display: none; margin: 15px 0;">
+                        <button type="button" id="addMoreBtn" class="btn-secondary" onclick="addMoreFiles()">
+                            ➕ הוסף קבצים נוספים
+                        </button>
+                        <button type="button" class="btn-secondary" onclick="clearAllFiles()" style="margin-right: 10px;">
+                            🗑️ נקה הכל
+                        </button>
+                    </div>
 
                     <div id="estimatedCost" style="display: none;" class="insufficient-minutes">
                         <strong>אמידת זמן תמלול:</strong> <span id="estimatedMinutes">0</span> דקות<br>
@@ -1041,6 +1053,7 @@
         // File upload functions
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
+        const additionalFileInput = document.getElementById('additionalFileInput');
         const selectedFilesDiv = document.getElementById('selectedFiles');
 
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -1054,28 +1067,48 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+            handleFiles(e.dataTransfer.files, false); // false = replace existing files
         });
 
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+            handleFiles(e.target.files, false); // false = replace existing files
         });
 
-        async function handleFiles(files) {
-            const validFiles = Array.from(files).filter(file => 
-                file.type.startsWith('audio/') || 
+        additionalFileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files, true); // true = add to existing files
+        });
+
+        async function handleFiles(files, addToExisting = false) {
+            const validFiles = Array.from(files).filter(file =>
+                file.type.startsWith('audio/') ||
                 file.type.startsWith('video/') ||
                 file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
             );
-            
+
             if (validFiles.length === 0) {
                 showStatus('אנא בחר קבצי אודיו או וידאו תקינים', 'error');
                 return;
             }
-            
+
+            // Filter out files that are already selected (prevent duplicates)
+            const newFiles = validFiles.filter(file =>
+                !selectedFiles.some(selected => selected.file.name === file.name)
+            );
+
+            if (newFiles.length === 0 && addToExisting) {
+                showStatus('כל הקבצים שנבחרו כבר קיימים ברשימה', 'error');
+                return;
+            }
+
+            // Clear existing files only if not adding to existing
+            if (!addToExisting) {
+                selectedFiles = [];
+                selectedFilesDiv.innerHTML = '';
+            }
+
             showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
-            
-            for (const file of validFiles) {
+
+            for (const file of (addToExisting ? newFiles : validFiles)) {
                 try {
                     const duration = await getAudioDuration(file);
                     selectedFiles.push({
@@ -1165,7 +1198,39 @@
 
         function updateSubmitButton() {
             const submitBtn = document.getElementById('submitBtn');
+            const addMoreContainer = document.getElementById('addMoreContainer');
+
             submitBtn.disabled = selectedFiles.length === 0;
+
+            // Show/hide add more files container
+            if (selectedFiles.length > 0) {
+                addMoreContainer.style.display = 'block';
+            } else {
+                addMoreContainer.style.display = 'none';
+            }
+        }
+
+        // 🔧 NEW: Functions for additional file management
+        function addMoreFiles() {
+            additionalFileInput.click();
+        }
+
+        function clearAllFiles() {
+            selectedFiles = [];
+            selectedFilesDiv.innerHTML = '';
+
+            // Reset both file inputs
+            fileInput.value = '';
+            additionalFileInput.value = '';
+
+            updateSubmitButton();
+            updateCostEstimate();
+
+            showStatus('✅ כל הקבצים נוקו מהרשימה', 'success');
+            setTimeout(() => {
+                const status = document.getElementById('status');
+                if (status) status.style.display = 'none';
+            }, 2000);
         }
 
         function updateCostEstimate() {
@@ -1322,7 +1387,9 @@
                     selectedFiles = [];
                     selectedFilesDiv.innerHTML = '';
                     updateCostEstimate();
+                    updateSubmitButton(); // Hide add more buttons
                     fileInput.value = '';
+                    additionalFileInput.value = '';
                 } else {
                     throw new Error(data.error || 'שגיאה בעיבוד');
                 }
@@ -1423,7 +1490,29 @@
         }
 
         function downloadFile(url) {
-            showStatus('⬇️ ההורדה תתחיל תוך רגע...', 'success');
+            try {
+                showStatus('⬇️ מתחיל הורדה...', 'processing');
+
+                // Create a temporary anchor element for download
+                const link = document.createElement('a');
+                link.href = url;
+                link.style.display = 'none';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                setTimeout(() => {
+                    showStatus('✅ ההורדה החלה בהצלחה!', 'success');
+                    setTimeout(() => {
+                        const status = document.getElementById('status');
+                        if (status) status.style.display = 'none';
+                    }, 3000);
+                }, 500);
+
+            } catch (error) {
+                console.error('Download error:', error);
+                showStatus('❌ שגיאה בהורדת הקובץ', 'error');
+            }
         }
 
         // Initialize app

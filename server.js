@@ -1077,11 +1077,24 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         }
         
         const wordDoc = await createWordDocument(transcription, file.filename, estimatedMinutes);
-        
+
+        // 🔧 NEW: Save document to downloads folder
+        const downloadsDir = path.join(__dirname, 'downloads');
+        if (!fs.existsSync(downloadsDir)) {
+          fs.mkdirSync(downloadsDir, { recursive: true });
+        }
+
+        const docFilename = `${cleanFilename(file.filename)}_${Date.now()}.docx`;
+        const docPath = path.join(downloadsDir, docFilename);
+        fs.writeFileSync(docPath, wordDoc);
+        console.log(`💾 Saved document: ${docPath}`);
+
         transcriptions.push({
           filename: file.filename,
           transcription,
-          wordDoc
+          wordDoc,
+          savedPath: docPath,
+          downloadFilename: docFilename
         });
         
         console.log(`✅ Successfully processed: ${cleanFilename(file.filename)}`);
@@ -1108,15 +1121,52 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     if (transcriptions.length > 0) {
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
-      
+
       // Update user stats only for successful transcriptions
       const actualMinutesUsed = Math.min(estimatedMinutes, user.remainingMinutes);
       user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
       user.totalTranscribed += actualMinutesUsed;
-      
+
+      // 🔧 NEW: Add each transcription to history
+      transcriptions.forEach(transcription => {
+        const historyEntry = {
+          date: new Date().toLocaleDateString('he-IL'),
+          fileName: cleanFilename(transcription.filename),
+          duration: Math.ceil(actualMinutesUsed / transcriptions.length), // Distribute minutes across files
+          language: language,
+          status: 'completed',
+          downloadUrl: `/api/download/${transcription.downloadFilename}` // Use actual saved filename
+        };
+
+        if (!user.history) {
+          user.history = [];
+        }
+        user.history.push(historyEntry);
+        console.log(`📝 Added to history: ${historyEntry.fileName}`);
+      });
+
+      // 🔧 NEW: Add failed transcriptions to history
+      failedTranscriptions.forEach(failed => {
+        const historyEntry = {
+          date: new Date().toLocaleDateString('he-IL'),
+          fileName: cleanFilename(failed.filename),
+          duration: 0,
+          language: language,
+          status: 'failed',
+          downloadUrl: null
+        };
+
+        if (!user.history) {
+          user.history = [];
+        }
+        user.history.push(historyEntry);
+        console.log(`📝 Added failed to history: ${historyEntry.fileName}`);
+      });
+
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
+      console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
     }
@@ -1128,11 +1178,40 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
 // Routes
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     ffmpegAvailable: checkFFmpegAvailability()
   });
+});
+
+// 🔧 NEW: Download endpoint for transcribed files
+app.get('/api/download/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    const filePath = path.join(__dirname, 'downloads', filename);
+
+    console.log(`📥 Download request for: ${filename}`);
+
+    if (!fs.existsSync(filePath)) {
+      console.log(`❌ File not found: ${filePath}`);
+      return res.status(404).json({ success: false, error: 'קובץ לא נמצא' });
+    }
+
+    const originalName = filename.replace(/_\d+\.docx$/, '.docx'); // Remove timestamp
+    const hebrewName = `תמלול_${originalName}`;
+
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(hebrewName)}`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    console.log(`✅ Download started for: ${filename}`);
+  } catch (error) {
+    console.error('Download error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בהורדת הקובץ' });
+  }
 });
 
 app.get('/api/test', (req, res) => {

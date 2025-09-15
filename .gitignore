@@ -16,6 +16,9 @@ uploads/
 temp/
 tmp/
 
+# Downloaded transcription files
+downloads/
+
 # Logs
 *.log
 logs/
