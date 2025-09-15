@@ -1192,22 +1192,65 @@
             }
         }
 
-        // Simple duration estimation based on file size - no more complex loading!
-        function estimateDuration(file) {
-            const fileSizeMB = file.size / (1024 * 1024);
-            const ext = file.name.toLowerCase().split('.').pop();
-            let estimatedMinutes;
+        // Real audio/video duration detection with better error handling
+        function getRealAudioDuration(file) {
+            return new Promise((resolve) => {
+                console.log(`🎵 קורא משך זמן אמיתי לקובץ: ${file.name}`);
 
-            if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
-                // Video files: roughly 2-5MB per minute depending on quality
-                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
-            } else {
-                // Audio files: roughly 1-2MB per minute for good quality
-                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-            }
+                const url = URL.createObjectURL(file);
+                const mediaElement = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
 
-            console.log(`📊 ${file.name} - ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} דקות`);
-            return estimatedMinutes;
+                let resolved = false;
+
+                const cleanup = () => {
+                    URL.revokeObjectURL(url);
+                    mediaElement.src = '';
+                };
+
+                const resolveWithFallback = () => {
+                    if (!resolved) {
+                        resolved = true;
+                        cleanup();
+
+                        // Fallback to file size estimation only if real duration fails
+                        const fileSizeMB = file.size / (1024 * 1024);
+                        const ext = file.name.toLowerCase().split('.').pop();
+                        let estimatedMinutes;
+
+                        if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+                            estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
+                        } else {
+                            estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                        }
+
+                        console.log(`⚠️ ${file.name} - נכשל בקריאת זמן אמיתי, הערכה: ${estimatedMinutes} דקות`);
+                        resolve(estimatedMinutes);
+                    }
+                };
+
+                // Success: got real duration
+                mediaElement.addEventListener('loadedmetadata', () => {
+                    if (!resolved && !isNaN(mediaElement.duration) && mediaElement.duration > 0) {
+                        resolved = true;
+                        const durationSeconds = mediaElement.duration;
+                        const durationMinutes = Math.ceil(durationSeconds / 60);
+                        cleanup();
+
+                        console.log(`✅ ${file.name} - זמן אמיתי: ${durationSeconds.toFixed(1)}s (${durationMinutes} דקות)`);
+                        resolve(durationMinutes);
+                    }
+                }, { once: true });
+
+                // Error handling
+                mediaElement.addEventListener('error', resolveWithFallback, { once: true });
+
+                // Timeout after 1.5 seconds
+                setTimeout(resolveWithFallback, 1500);
+
+                // Start loading
+                mediaElement.src = url;
+                mediaElement.load();
+            });
         }
 
         // File upload functions
@@ -1287,39 +1330,67 @@
             const filesToProcess = addToExisting ? newFiles : validFiles;
 
             if (filesToProcess.length > 0) {
-                // Simple and fast processing - no spinners, no timeouts, no complications
-                console.log(`📁 מעבד ${filesToProcess.length} קבצים באופן מיידי`);
+                console.log(`📁 מעבד ${filesToProcess.length} קבצים עם זמן אמיתי`);
+                showStatus('<div class="spinner"></div>קורא זמן אמיתי לקבצים...', 'processing');
 
-                filesToProcess.forEach((file, index) => {
-                    // Calculate duration immediately using the simple function
-                    const estimatedDuration = estimateDuration(file);
+                // Process files concurrently but with limit to avoid overload
+                const processFiles = async () => {
+                    const promises = filesToProcess.map(async (file, index) => {
+                        try {
+                            const duration = await getRealAudioDuration(file);
 
-                    console.log(`📊 קובץ ${index + 1}/${filesToProcess.length}: ${file.name} → ${estimatedDuration} דקות`);
+                            selectedFiles.push({
+                                file: file,
+                                duration: duration
+                            });
 
-                    selectedFiles.push({
-                        file: file,
-                        duration: estimatedDuration
+                            displayFile(file, duration);
+                            updateCostEstimate();
+
+                            console.log(`📊 קובץ ${index + 1}/${filesToProcess.length}: ${file.name} → ${duration} דקות`);
+
+                            return { file, duration, success: true };
+                        } catch (error) {
+                            console.error('Error processing file:', file.name, error);
+
+                            // Fallback to size estimation
+                            const fileSizeMB = file.size / (1024 * 1024);
+                            const ext = file.name.toLowerCase().split('.').pop();
+                            const estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
+                                ? Math.max(1, Math.ceil(fileSizeMB / 3))
+                                : Math.max(1, Math.ceil(fileSizeMB / 1.2));
+
+                            selectedFiles.push({
+                                file: file,
+                                duration: estimatedDuration
+                            });
+
+                            displayFile(file, estimatedDuration);
+                            updateCostEstimate();
+
+                            return { file, duration: estimatedDuration, success: false };
+                        }
                     });
 
-                    displayFile(file, estimatedDuration);
-                });
+                    const results = await Promise.all(promises);
 
-                // Update cost estimate once at the end
-                updateCostEstimate();
+                    const successCount = results.filter(r => r.success).length;
+                    const totalDuration = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
 
-                // Show success message based on context
-                console.log(`✅ סיום עיבוד ${filesToProcess.length} קבצים`);
-                if (addToExisting) {
-                    showStatus(`✅ נוספו ${filesToProcess.length} קבצים חדשים לרשימה - סה"כ ${selectedFiles.length} קבצים`, 'success');
-                } else {
-                    showStatus(`✅ נבחרו ${filesToProcess.length} קבצים לתמלול - סה"כ זמן: ${Math.round(selectedFiles.reduce((sum, item) => sum + item.duration, 0))} דקות`, 'success');
-                }
+                    // Show completion status
+                    if (addToExisting) {
+                        showStatus(`✅ נוספו ${filesToProcess.length} קבצים (${successCount} עם זמן אמיתי) - סה"כ ${selectedFiles.length} קבצים`, 'success');
+                    } else {
+                        showStatus(`✅ נבחרו ${filesToProcess.length} קבצים (${successCount} עם זמן אמיתי) - סה"כ ${Math.round(totalDuration)} דקות`, 'success');
+                    }
 
-                // Hide status after delay
-                setTimeout(() => {
-                    const status = document.getElementById('status');
-                    if (status) status.style.display = 'none';
-                }, 2000);
+                    setTimeout(() => {
+                        const status = document.getElementById('status');
+                        if (status) status.style.display = 'none';
+                    }, 3000);
+                };
+
+                processFiles();
             }
 
             updateSubmitButton();
