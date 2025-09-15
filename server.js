@@ -153,6 +153,25 @@ function saveUsersData() {
 // Load users on startup
 let users = loadUsersData();
 
+// Ensure downloads directory exists
+const downloadsDir = path.join(__dirname, 'downloads');
+if (!fs.existsSync(downloadsDir)) {
+  fs.mkdirSync(downloadsDir, { recursive: true });
+  console.log('📁 Created downloads directory');
+}
+
+// Save initial data if file doesn't exist to ensure persistence works
+if (!fs.existsSync(DATA_FILE)) {
+  console.log('📂 Creating initial users data file...');
+  saveUsersData();
+}
+
+// Save data periodically (every 5 minutes)
+setInterval(() => {
+  console.log('💾 Auto-saving user data...');
+  saveUsersData();
+}, 5 * 60 * 1000);
+
 // 🔥 NEW: FFmpeg and chunking functions
 let ffmpegAvailabilityCache = null; // Cache the result
 
@@ -1632,12 +1651,29 @@ function scheduleHistoryCleanup() {
 }
 
 // Start server
+// Graceful shutdown handling
+process.on('SIGINT', () => {
+  console.log('\n🛑 Received SIGINT, saving data before shutdown...');
+  saveUsersData();
+  console.log('💾 Data saved successfully');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Received SIGTERM, saving data before shutdown...');
+  saveUsersData();
+  console.log('💾 Data saved successfully');
+  process.exit(0);
+});
+
 app.listen(PORT, () => {
   const ffmpegAvailable = checkFFmpegAvailability();
 
   console.log(`🚀 Enhanced server running on port ${PORT}`);
   console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
+  console.log(`📂 Data file: ${DATA_FILE}`);
+  console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
 
   if (ffmpegAvailable) {
     console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
