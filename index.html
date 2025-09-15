@@ -1097,6 +1097,11 @@
 
             if (newFiles.length === 0 && addToExisting) {
                 showStatus('כל הקבצים שנבחרו כבר קיימים ברשימה', 'error');
+                additionalFileInput.value = ''; // Reset the input
+                setTimeout(() => {
+                    const status = document.getElementById('status');
+                    if (status) status.style.display = 'none';
+                }, 3000);
                 return;
             }
 
@@ -1106,30 +1111,53 @@
                 selectedFilesDiv.innerHTML = '';
             }
 
-            showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
+            const filesToProcess = addToExisting ? newFiles : validFiles;
 
-            for (const file of (addToExisting ? newFiles : validFiles)) {
-                try {
-                    const duration = await getAudioDuration(file);
-                    selectedFiles.push({
-                        file: file,
-                        duration: duration
-                    });
-                    await displayFile(file, duration);
-                } catch (error) {
-                    console.error('Error processing file:', file.name, error);
-                    const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
-                    selectedFiles.push({
-                        file: file,
-                        duration: estimatedDuration
-                    });
-                    await displayFile(file, estimatedDuration);
+            if (filesToProcess.length > 0) {
+                showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
+
+                for (const file of filesToProcess) {
+                    try {
+                        const duration = await getAudioDuration(file);
+                        selectedFiles.push({
+                            file: file,
+                            duration: duration
+                        });
+                        await displayFile(file, duration);
+                    } catch (error) {
+                        console.error('Error processing file:', file.name, error);
+                        const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
+                        selectedFiles.push({
+                            file: file,
+                            duration: estimatedDuration
+                        });
+                        await displayFile(file, estimatedDuration);
+                    }
                 }
+
+                // Show success message based on context
+                if (addToExisting) {
+                    showStatus(`✅ נוספו ${filesToProcess.length} קבצים חדשים לרשימה`, 'success');
+                } else {
+                    showStatus(`✅ נבחרו ${filesToProcess.length} קבצים לתמלול`, 'success');
+                }
+
+                // Hide status after delay
+                setTimeout(() => {
+                    const status = document.getElementById('status');
+                    if (status) status.style.display = 'none';
+                }, 2000);
             }
-            
+
             updateSubmitButton();
             updateCostEstimate();
-            hideStatus();
+
+            // Reset file inputs after processing
+            if (addToExisting) {
+                additionalFileInput.value = '';
+            } else {
+                fileInput.value = '';
+            }
         }
 
         function displayFile(file, duration) {
@@ -1306,10 +1334,10 @@
         function hideStatus() {
             setTimeout(() => {
                 const status = document.getElementById('status');
-                if (status.classList.contains('processing')) {
+                if (status && status.classList.contains('processing')) {
                     status.style.display = 'none';
                 }
-            }, 2000);
+            }, 1000); // Reduced delay for better UX
         }
 
         function updateProgress(percent) {
