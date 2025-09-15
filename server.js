@@ -840,14 +840,11 @@ async function createWordDocument(transcription, filename, duration) {
       const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       let combinedSection = lines.join(' ').trim();
 
-      // תיקון רווחים סביב סימני פיסוק
+      // תיקון רווחים - סימני פיסוק צמודים למילים בעברית
       combinedSection = combinedSection
-        .replace(/\s*\.\s*/g, '. ')
-        .replace(/\s*,\s*/g, ', ')
-        .replace(/\s*!\s*/g, '! ')
-        .replace(/\s*\?\s*/g, '? ')
-        .replace(/\s*:\s*/g, ': ')
-        .replace(/\s+/g, ' ')
+        .replace(/\s+([.,!?:])/g, '$1')           // הסר רווחים לפני סימני פיסוק
+        .replace(/([.,!?:])\s+/g, '$1&nbsp;')     // החלף רווח אחרי פיסוק ב-&nbsp;
+        .replace(/\s{2,}/g, ' ')                  // רווחים כפולים לרווח יחיד
         .trim();
 
       if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
@@ -861,7 +858,7 @@ async function createWordDocument(transcription, filename, duration) {
 
         sentences.forEach(sentence => {
           if (currentParagraph.length + sentence.length > 400 && currentParagraph.length > 0) {
-            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 16px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
+            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
             currentParagraph = sentence + ' ';
           } else {
             currentParagraph += sentence + ' ';
@@ -869,10 +866,10 @@ async function createWordDocument(transcription, filename, duration) {
         });
 
         if (currentParagraph.trim()) {
-          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 16px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
+          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
         }
       } else {
-        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 16px;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
+        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
       }
     });
 
@@ -885,9 +882,9 @@ async function createWordDocument(transcription, filename, duration) {
           <meta http-equiv="Content-Language" content="he-IL">
           <title>תמלול</title>
         </head>
-        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial; font-size: 16px;" lang="he-IL">
-          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 20px; font-weight: bold; margin-bottom: 24px; margin-top: 0;">${cleanName}</h1>
-          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 16px; line-height: 1.8;">
+        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial; font-size: 15px;" lang="he-IL">
+          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0;">${cleanName}</h1>
+          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8;">
             ${contentHtml}
           </div>
         </body>
