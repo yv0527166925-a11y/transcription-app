@@ -1304,16 +1304,26 @@
             }
 
             // Filter out files that are already selected (prevent duplicates)
-            const newFiles = validFiles.filter(file =>
-                !selectedFiles.some(selected =>
+            const newFiles = validFiles.filter(file => {
+                const isDuplicate = selectedFiles.some(selected =>
                     selected.file.name === file.name &&
                     selected.file.size === file.size &&
                     selected.file.lastModified === file.lastModified
-                )
-            );
+                );
+
+                if (isDuplicate) {
+                    console.log(`🔄 קובץ כפול נמנע: ${file.name}`);
+                }
+
+                return !isDuplicate;
+            });
 
             console.log(`🔍 קבצים חדשים לעיבוד: ${newFiles.length}/${validFiles.length}`);
             console.log('🆕 קבצים חדשים:', newFiles.map(f => f.name));
+
+            if (newFiles.length < validFiles.length) {
+                console.log(`⚠️ ${validFiles.length - newFiles.length} קבצים נמנעו בגלל כפילות`);
+            }
 
             if (newFiles.length === 0 && addToExisting) {
                 showStatus('כל הקבצים שנבחרו כבר קיימים ברשימה', 'error');
@@ -1334,68 +1344,40 @@
             const filesToProcess = addToExisting ? newFiles : validFiles;
 
             if (filesToProcess.length > 0) {
-                console.log(`📁 מעבד ${filesToProcess.length} קבצים עם זמן אמיתי - רציף`);
-                showStatus('<div class="spinner"></div>מתחיל עיבוד קבצים...', 'processing');
+                console.log(`📁 מוסיף ${filesToProcess.length} קבצים מיידיהו`);
 
-                // Process files sequentially to avoid conflicts
-                let processedCount = 0;
-                let successCount = 0;
+                // Add files immediately with basic estimation
+                filesToProcess.forEach((file, index) => {
+                    // Quick estimation for display only
+                    const fileSizeMB = file.size / (1024 * 1024);
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    const estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
+                        ? Math.max(1, Math.ceil(fileSizeMB / 3))
+                        : Math.max(1, Math.ceil(fileSizeMB / 1.2));
 
-                for (const file of filesToProcess) {
-                    try {
-                        processedCount++;
-                        showStatus(`<div class="spinner"></div>מעבד קובץ ${processedCount}/${filesToProcess.length}: ${file.name}`, 'processing');
+                    selectedFiles.push({
+                        file: file,
+                        duration: estimatedDuration // This is just for display, real duration will be calculated during transcription
+                    });
 
-                        console.log(`🔄 מעבד קובץ ${processedCount}/${filesToProcess.length}: ${file.name}`);
+                    displayFile(file, estimatedDuration);
+                    console.log(`📊 נוסף: ${file.name} → ~${estimatedDuration} דקות (הערכה בלבד)`);
+                });
 
-                        const duration = await getRealAudioDuration(file);
+                // Update UI immediately
+                updateCostEstimate();
 
-                        selectedFiles.push({
-                            file: file,
-                            duration: duration
-                        });
-
-                        displayFile(file, duration);
-                        updateCostEstimate();
-
-                        successCount++;
-                        console.log(`✅ ${file.name} → ${duration} דקות (זמן אמיתי)`);
-
-                    } catch (error) {
-                        console.error('Error processing file:', file.name, error);
-
-                        // Fallback to size estimation
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        const ext = file.name.toLowerCase().split('.').pop();
-                        const estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
-                            ? Math.max(1, Math.ceil(fileSizeMB / 3))
-                            : Math.max(1, Math.ceil(fileSizeMB / 1.2));
-
-                        selectedFiles.push({
-                            file: file,
-                            duration: estimatedDuration
-                        });
-
-                        displayFile(file, estimatedDuration);
-                        updateCostEstimate();
-
-                        console.log(`⚠️ ${file.name} → ${estimatedDuration} דקות (הערכה)`);
-                    }
-                }
-
-                // Show completion status
-                const totalDuration = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
-
+                // Show simple completion message
                 if (addToExisting) {
-                    showStatus(`✅ נוספו ${filesToProcess.length} קבצים (${successCount} עם זמן אמיתי) - סה"כ ${selectedFiles.length} קבצים`, 'success');
+                    showStatus(`✅ נוספו ${filesToProcess.length} קבצים לרשימה - סה"כ ${selectedFiles.length} קבצים`, 'success');
                 } else {
-                    showStatus(`✅ נבחרו ${filesToProcess.length} קבצים (${successCount} עם זמן אמיתי) - סה"כ ${Math.round(totalDuration)} דקות`, 'success');
+                    showStatus(`✅ נבחרו ${filesToProcess.length} קבצים לתמלול`, 'success');
                 }
 
                 setTimeout(() => {
                     const status = document.getElementById('status');
                     if (status) status.style.display = 'none';
-                }, 3000);
+                }, 2000);
             }
 
             // Final update (only if no files were processed above)
@@ -1423,7 +1405,7 @@
                     <div>
                         <div class="file-name">${fileTypeIcon} ${file.name}</div>
                         <div class="file-size">📏 גודל: ${fileSizeFormatted}</div>
-                        <div class="file-duration">⏱️ משך זמן: ${duration} דקות</div>
+                        <div class="file-duration">⏱️ משך זמן: ~${duration} דקות (הערכה)</div>
                         <div class="file-type" style="font-size: 0.8em; color: #888;">סוג: ${getFileTypeDescription(file.type, file.name)}</div>
                     </div>
                     <button type="button" class="remove-file" onclick="removeFile('${file.name}')">×</button>
@@ -1540,13 +1522,13 @@
             } else {
                 costDiv.className = 'status success';
                 costDiv.innerHTML = `
-                    <strong>✅ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
+                    <strong>✅ זמן תמלול מוערך:</strong> ~${totalMinutes} דקות (הערכה)<br>
                     <strong>יתרה נוכחית:</strong> ${currentUser ? currentUser.remainingMinutes : 0} דקות<br>
-                    <strong style="color: #2e7d32;">יתרה לאחר תמלול:</strong> ${currentUser ? Math.round(currentUser.remainingMinutes - totalMinutes) : 0} דקות<br>
-                    <small>🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית</small>
+                    <strong style="color: #2e7d32;">יתרה מוערכת לאחר תמלול:</strong> ~${currentUser ? Math.round(currentUser.remainingMinutes - totalMinutes) : 0} דקות<br>
+                    <small>💡 זמן אמיתי יחושב במהלך התמלול ויעדכן את היתרה בהתאם</small>
                 `;
                 document.getElementById('submitBtn').disabled = false;
-                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול מלא';
+                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול';
             }
         }
 
