@@ -829,10 +829,35 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // פצל לפסקאות
-    const sections = cleanedText.split(/\n\s*\n/)
+    // פצל לפסקאות - גם על בסיס שורות ריקות וגם על בסיס אורך
+    let sections = cleanedText.split(/\n\s*\n/)
       .map(section => section.trim())
       .filter(section => section.length > 0);
+
+    // אם יש רק פסקה אחת ארוכה, חלק אותה למשפטים
+    if (sections.length === 1 && sections[0].length > 300) {
+      const longText = sections[0];
+      const sentences = longText.split(/(?<=[.!?])\s+/);
+
+      // אם יש מספיק משפטים לחלוקה
+      if (sentences.length > 3) {
+        sections = [];
+        let currentSection = '';
+
+        sentences.forEach(sentence => {
+          if (currentSection.length + sentence.length > 200 && currentSection.length > 0) {
+            sections.push(currentSection.trim());
+            currentSection = sentence + ' ';
+          } else {
+            currentSection += sentence + ' ';
+          }
+        });
+
+        if (currentSection.trim()) {
+          sections.push(currentSection.trim());
+        }
+      }
+    }
 
     // בנה HTML עם הגדרות RTL נכונות וחלוקה לפסקאות
     let contentHtml = '';
@@ -840,8 +865,10 @@ async function createWordDocument(transcription, filename, duration) {
       const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       let combinedSection = lines.join(' ').trim();
 
-      // תיקון רווחים - סימני פיסוק צמודים למילים בעברית
+      // תיקון בעיות פיסוק ורווחים
       combinedSection = combinedSection
+        .replace(/([א-ת])\.([א-ת])/g, '$1 $2')    // תקן נקודות בין מילים עבריות צמודות
+        .replace(/([א-ת]),([א-ת])/g, '$1, $2')   // תקן פסיקים בין מילים עבריות צמודות
         .replace(/\s+([.,!?:])/g, '$1')           // הסר רווחים לפני סימני פיסוק
         .replace(/([.,!?:])\s+/g, '$1&nbsp;')     // החלף רווח אחרי פיסוק ב-&nbsp;
         .replace(/\s{2,}/g, ' ')                  // רווחים כפולים לרווח יחיד
