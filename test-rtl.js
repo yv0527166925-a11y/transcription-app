@@ -6,12 +6,12 @@ const transcribedText = "זהו משפט ניסיון בעברית כדי לבד
 // יצירת מחרוזת HTML פשוטה. החלק הקריטי הוא הגדרות ה-style בתוך תג ה-body
 const htmlString = `
   <!DOCTYPE html>
-  <html>
+  <html lang="he" dir="rtl">
     <head>
       <meta charset="UTF-8">
       <title>תמלול</title>
     </head>
-    <body style="direction: rtl; text-align: right; font-family: Arial;">
+    <body style="direction: rtl; text-align: right; font-family: Arial;" lang="he">
       <h1>תמלול אוטומטי</h1>
       <p>${transcribedText}</p>
     </body>
@@ -26,7 +26,7 @@ const htmlString = `
     pageNumber: true,
   });
 
-  fs.writeFile('My-RTL-from-HTML.docx', fileBuffer, (error) => {
+  fs.writeFile('My-RTL-Hebrew-Language.docx', fileBuffer, (error) => {
     if (error) {
       console.log('Docx creation failed');
       return;
