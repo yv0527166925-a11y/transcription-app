@@ -1138,6 +1138,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       transcriptions.forEach(transcription => {
         const historyEntry = {
           date: new Date().toLocaleDateString('he-IL'),
+          timestamp: Date.now(), // Add timestamp for cleanup
           fileName: cleanFilename(transcription.filename),
           duration: Math.ceil(actualMinutesUsed / transcriptions.length), // Distribute minutes across files
           language: language,
@@ -1156,6 +1157,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       failedTranscriptions.forEach(failed => {
         const historyEntry = {
           date: new Date().toLocaleDateString('he-IL'),
+          timestamp: Date.now(), // Add timestamp for cleanup
           fileName: cleanFilename(failed.filename),
           duration: 0,
           language: language,
@@ -1283,7 +1285,8 @@ app.post('/api/register', (req, res) => {
       isAdmin: false,
       remainingMinutes: 30, // 30 free minutes
       totalTranscribed: 0,
-      history: []
+      history: [],
+      joinDate: new Date().toISOString() // Add join date
     };
     
     users.push(newUser);
@@ -1431,6 +1434,163 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
   }
 });
 
+// 🔧 NEW: Admin API endpoints
+app.get('/api/admin/overview', (req, res) => {
+  try {
+    const today = new Date().toDateString();
+    const newUsersToday = users.filter(user => {
+      const userDate = user.joinDate ? new Date(user.joinDate).toDateString() : null;
+      return userDate === today;
+    }).length;
+
+    const totalTranscriptions = users.reduce((total, user) => {
+      return total + (user.history ? user.history.length : 0);
+    }, 0);
+
+    const totalMinutesUsed = users.reduce((total, user) => {
+      return total + (user.totalTranscribed || 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      totalUsers: users.length,
+      newUsersToday,
+      totalTranscriptions,
+      totalMinutesUsed
+    });
+  } catch (error) {
+    console.error('Admin overview error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בטעינת נתונים' });
+  }
+});
+
+app.get('/api/admin/users', (req, res) => {
+  try {
+    const usersData = users.map(user => ({
+      name: user.name,
+      email: user.email,
+      remainingMinutes: user.remainingMinutes,
+      totalTranscribed: user.totalTranscribed || 0,
+      joinDate: user.joinDate || 'לא זמין',
+      isAdmin: user.isAdmin || false
+    }));
+
+    res.json({
+      success: true,
+      users: usersData
+    });
+  } catch (error) {
+    console.error('Admin users error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בטעינת משתמשים' });
+  }
+});
+
+app.get('/api/admin/transcriptions', (req, res) => {
+  try {
+    const allTranscriptions = [];
+
+    users.forEach(user => {
+      if (user.history && user.history.length > 0) {
+        user.history.forEach(entry => {
+          allTranscriptions.push({
+            ...entry,
+            userEmail: user.email,
+            userName: user.name
+          });
+        });
+      }
+    });
+
+    // Sort by date (newest first)
+    allTranscriptions.sort((a, b) => {
+      if (a.timestamp && b.timestamp) {
+        return b.timestamp - a.timestamp;
+      }
+      return 0;
+    });
+
+    // Take only the last 50 transcriptions for performance
+    const recentTranscriptions = allTranscriptions.slice(0, 50);
+
+    res.json({
+      success: true,
+      transcriptions: recentTranscriptions
+    });
+  } catch (error) {
+    console.error('Admin transcriptions error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה בטעינת תמלולים' });
+  }
+});
+
+// 🔧 NEW: History and files cleanup function
+function cleanupOldHistory() {
+  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days in milliseconds
+  let totalCleaned = 0;
+  let totalFilesDeleted = 0;
+
+  users.forEach(user => {
+    if (user.history && user.history.length > 0) {
+      const originalCount = user.history.length;
+
+      // Keep only entries from the last 30 days
+      user.history = user.history.filter(entry => {
+        // For backward compatibility, keep entries without timestamp
+        if (!entry.timestamp) return true;
+
+        // If entry is older than 30 days, also delete its file
+        if (entry.timestamp <= thirtyDaysAgo && entry.downloadUrl) {
+          try {
+            const filename = entry.downloadUrl.split('/').pop();
+            const filePath = path.join(__dirname, 'downloads', filename);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              totalFilesDeleted++;
+              console.log(`🗑️ Deleted old file: ${filename}`);
+            }
+          } catch (error) {
+            console.warn(`⚠️ Could not delete file for entry: ${entry.fileName}`, error.message);
+          }
+        }
+
+        return entry.timestamp > thirtyDaysAgo;
+      });
+
+      const cleanedCount = originalCount - user.history.length;
+      if (cleanedCount > 0) {
+        totalCleaned += cleanedCount;
+        console.log(`🧹 Cleaned ${cleanedCount} old history entries for user: ${user.email}`);
+      }
+    }
+  });
+
+  if (totalCleaned > 0 || totalFilesDeleted > 0) {
+    console.log(`🧹 Total cleanup: Removed ${totalCleaned} history entries and ${totalFilesDeleted} old files`);
+  }
+}
+
+// 🔧 NEW: Schedule daily cleanup at midnight
+function scheduleHistoryCleanup() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0); // Set to midnight
+
+  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+  // Schedule first cleanup at next midnight
+  setTimeout(() => {
+    cleanupOldHistory();
+
+    // Then schedule daily cleanups
+    setInterval(() => {
+      cleanupOldHistory();
+    }, 24 * 60 * 60 * 1000); // Every 24 hours
+
+  }, msUntilMidnight);
+
+  console.log(`🕒 History cleanup scheduled for every day at midnight`);
+}
+
 // Start server
 app.listen(PORT, () => {
   const ffmpegAvailable = checkFFmpegAvailability();
@@ -1446,6 +1606,9 @@ app.listen(PORT, () => {
   }
 
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
+
+  // Start history cleanup scheduler
+  scheduleHistoryCleanup();
 });
 
 
