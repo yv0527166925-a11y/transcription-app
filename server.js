@@ -118,14 +118,21 @@ let users = [
 ];
 
 // 🔥 NEW: FFmpeg and chunking functions
+let ffmpegAvailabilityCache = null; // Cache the result
+
 function checkFFmpegAvailability() {
+  // Return cached result if already checked
+  if (ffmpegAvailabilityCache !== null) {
+    return ffmpegAvailabilityCache;
+  }
+
   try {
     const { execSync } = require('child_process');
     execSync('ffmpeg -version', { stdio: 'ignore' });
-    console.log('✅ FFmpeg is available - enhanced chunking enabled');
+    ffmpegAvailabilityCache = true;
     return true;
   } catch (error) {
-    console.warn('⚠️ FFmpeg not available - using direct transcription only');
+    ffmpegAvailabilityCache = false;
     return false;
   }
 }
@@ -1360,9 +1367,6 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     
     // Check FFmpeg availability for chunking
     const ffmpegAvailable = checkFFmpegAvailability();
-    if (!ffmpegAvailable) {
-      console.warn('⚠️ FFmpeg not available - using fallback transcription only');
-    }
     
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     console.log('🔍 User lookup for transcription:', user ? 'Found' : 'Not found');
@@ -1429,10 +1433,18 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  const ffmpegAvailable = checkFFmpegAvailability();
+
   console.log(`🚀 Enhanced server running on port ${PORT}`);
   console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
-  console.log(`🔧 FFmpeg available: ${checkFFmpegAvailability()}`);
+
+  if (ffmpegAvailable) {
+    console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
+  } else {
+    console.log(`⚠️ FFmpeg not available - using direct transcription only`);
+  }
+
   console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
 });
 

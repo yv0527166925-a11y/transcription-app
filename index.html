@@ -1124,6 +1124,9 @@
                             duration: duration
                         });
                         await displayFile(file, duration);
+
+                        // Update cost estimate after each file for real-time updates
+                        updateCostEstimate();
                     } catch (error) {
                         console.error('Error processing file:', file.name, error);
                         const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
@@ -1132,6 +1135,9 @@
                             duration: estimatedDuration
                         });
                         await displayFile(file, estimatedDuration);
+
+                        // Update cost estimate after each file for real-time updates
+                        updateCostEstimate();
                     }
                 }
 
@@ -1267,7 +1273,7 @@
                 return;
             }
 
-            const totalMinutes = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
+            const totalMinutes = Math.round(selectedFiles.reduce((sum, item) => sum + item.duration, 0));
             document.getElementById('estimatedMinutes').textContent = totalMinutes;
             document.getElementById('currentBalance').textContent = currentUser ? currentUser.remainingMinutes : 0;
             
@@ -1279,7 +1285,7 @@
                 costDiv.innerHTML = `
                     <strong>⚠️ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
                     <strong>יתרה נוכחית:</strong> ${currentUser.remainingMinutes} דקות<br>
-                    <strong style="color: #d32f2f;">חסרות ${totalMinutes - currentUser.remainingMinutes} דקות!</strong><br>
+                    <strong style="color: #d32f2f;">חסרות ${Math.round(totalMinutes - currentUser.remainingMinutes)} דקות!</strong><br>
                     <small>💡 אנא רכוש דקות נוספות או הסר קבצים</small>
                 `;
                 document.getElementById('submitBtn').disabled = true;
@@ -1289,7 +1295,7 @@
                 costDiv.innerHTML = `
                     <strong>✅ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
                     <strong>יתרה נוכחית:</strong> ${currentUser ? currentUser.remainingMinutes : 0} דקות<br>
-                    <strong style="color: #2e7d32;">יתרה לאחר תמלול:</strong> ${currentUser ? currentUser.remainingMinutes - totalMinutes : 0} דקות<br>
+                    <strong style="color: #2e7d32;">יתרה לאחר תמלול:</strong> ${currentUser ? Math.round(currentUser.remainingMinutes - totalMinutes) : 0} דקות<br>
                     <small>🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית</small>
                 `;
                 document.getElementById('submitBtn').disabled = false;
