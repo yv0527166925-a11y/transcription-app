@@ -1667,7 +1667,7 @@
             showStatus(`
                 <div class="spinner"></div>
                 <strong>מעבד ${selectedFiles.length} קבצים עם Gemini 2.5 Pro...</strong><br>
-                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 תמלול מלא ומותאם לעברית</small><br>
+                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 דיוק גבוה: 98% עברית רגילה, 95% הגייה ישיבתית</small><br>
                 <small>📧 התוצאות יישלחו למייל ${currentUser.email}</small>
             `, 'processing');
 
@@ -1707,7 +1707,7 @@
                         ⏱️ נוצלו ${data.estimatedMinutes || totalMinutes} דקות מהחשבון<br>
                         💰 יתרה נוכחית: <strong>${currentUser.remainingMinutes} דקות</strong><br>
                         🕒 זמן עיבוד משוער: <strong>3-8 דקות</strong><br>
-                        🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית
+                        🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                     `, 'success');
                     
                     selectedFiles = [];

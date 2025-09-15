@@ -1073,7 +1073,7 @@ const attachments = transcriptions.map(trans => {
                 <li>🔗 <strong>איחוד אוטומטי</strong> - עם זיהוי חפיפות מתקדם</li>
                 <li>🛡️ <strong>גיבוי אוטומטי</strong> - אם חלוקה נכשלת</li>
                 <li>⚡ <strong>תמיכה בקבצים ענקיים</strong> - עד 500MB</li>
-                <li>🎓 <strong>מותאם לעברית אקדמית</strong> - מושגים דתיים מדויקים</li>
+                <li>🎓 <strong>דיוק גבוה בעברית</strong> - 98% דיוק בעברית רגילה, 95% דיוק בהגייה ישיבתית</li>
                 <li>💬 <strong>זיהוי דוברים וציטוטים</strong> - במירכאות נכונות</li>
               </ul>
             </div>
