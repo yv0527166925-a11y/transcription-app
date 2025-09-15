@@ -141,6 +141,31 @@
             background: #dc3545;
         }
 
+        .btn-clear-all {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+            min-width: 120px;
+        }
+
+        .btn-clear-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+            background: linear-gradient(45deg, #ff5252, #e74c3c);
+        }
+
+        .btn-clear-all:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+        }
+
         .text-center {
             text-align: center;
         }
@@ -795,8 +820,8 @@
                     <div id="selectedFiles"></div>
 
                     <!-- Clear all button (shown when files are selected) -->
-                    <div id="clearAllContainer" style="display: none; margin: 15px 0;">
-                        <button type="button" class="btn-secondary" onclick="clearAllFiles()">
+                    <div id="clearAllContainer" style="display: none; margin: 15px 0; text-align: center;">
+                        <button type="button" class="btn-clear-all" onclick="clearAllFiles()">
                             🗑️ נקה הכל
                         </button>
                     </div>
