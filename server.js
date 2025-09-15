@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
+const HTMLtoDOCX = require('html-to-docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -164,10 +164,7 @@ function saveUsersData() {
   } catch (error) {
     console.error('❌ Error saving users data:', error);
     console.error('❌ Error details:', error.message);
-    console.error('❌ Error code:', error.code);
-    console.error('❌ This may be due to read-only filesystem in deployment environment');
-    console.log('📂 Continuing with in-memory data only...');
-    // Don't throw - continue running with in-memory data
+    console.error('❌ Error stack:', error.stack);
   }
 }
 
@@ -187,22 +184,16 @@ const TEMPLATE_FILE = path.join(__dirname, 'users_data_template.json');
 if (!fs.existsSync(DATA_FILE)) {
   console.log('📂 Data file not found, creating from template...');
 
-  try {
-    if (fs.existsSync(TEMPLATE_FILE)) {
-      // Copy template to data file
-      fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
-      console.log('✅ Created users_data.json from template');
+  if (fs.existsSync(TEMPLATE_FILE)) {
+    // Copy template to data file
+    fs.copyFileSync(TEMPLATE_FILE, DATA_FILE);
+    console.log('✅ Created users_data.json from template');
 
-      // Reload users from the new file
-      users = loadUsersData();
-    } else {
-      console.log('📂 No template found, creating with default users...');
-      saveUsersData();
-    }
-  } catch (error) {
-    console.error('❌ Error creating data file:', error);
-    console.log('📂 Falling back to in-memory users only');
-    // Continue with in-memory users from loadUsersData()
+    // Reload users from the new file
+    users = loadUsersData();
+  } else {
+    console.log('📂 No template found, creating with default users...');
+    saveUsersData();
   }
 } else {
   console.log('📂 Data file already exists, checking integrity...');
@@ -830,244 +821,77 @@ function fixHebrewSpacing(text) {
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`📄 Creating Word document from template for: ${cleanName}`);
-    
-    // 🔥 NEW: נסה תחילה עם תבנית
-  const templatePath = path.join(__dirname, 'simple-template.docx');
-    
-   if (false) {
-      console.log('📋 Using template file');
-      
-      const templateBuffer = fs.readFileSync(templatePath);
-      const zip = new JSZip();
-      await zip.loadAsync(templateBuffer);
-      
-      const documentXml = await zip.file('word/document.xml').async('string');
-      
-   // הכן תוכן
-      const title = cleanName;
-      const content = processTranscriptionForTemplate(transcription);
-      
-      console.log('🔍 About to replace in XML...');
-     console.log('XML contains TITLE:', documentXml.includes('TITLE'));
-console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
-      console.log('🔍 Content length to insert:', content.length);
-      
-      // החלף placeholders
-      let newDocumentXml = documentXml
-  .replace(/TITLE/g, escapeXml(title))
-  .replace(/CONTENT/g, content);
-        
-      console.log('🔍 After replacement:');
-      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
-      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
-      
-      zip.file('word/document.xml', newDocumentXml);
-      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
-      
-      console.log(`✅ Word document created from template for: ${cleanName}`);
-      return buffer;
-    }
-    
-    // 🔥 אם אין תבנית - השתמש בקוד הישן
-    console.log('⚠️ No template found, using programmatic creation');
-    
-// החלף את הקטע בשורות 635-677 בקוד הזה:
+    console.log(`📄 Creating Word document with HTML-to-DOCX for: ${cleanName}`);
 
-const doc = new Document({
-  creator: "תמלול חכם",
-  language: "he-IL",
-  defaultRunProperties: {
-    font: "Times New Roman",
-    size: 24,
-    rtl: true
-  },
-  styles: {
-    default: {
-      document: {
-        run: {
-          font: "Arial",
-          size: 24,
-          rightToLeft: true,
-          languageComplexScript: "he-IL"
-        },
-        paragraph: {
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true
-        }
+    // נקה את הטקסט
+    let cleanedText = transcription
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    // פצל לפסקאות
+    const sections = cleanedText.split(/\n\s*\n/)
+      .map(section => section.trim())
+      .filter(section => section.length > 0);
+
+    // בנה HTML עם הגדרות RTL נכונות
+    let contentHtml = '';
+    sections.forEach(section => {
+      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      let combinedSection = lines.join(' ').trim();
+
+      // תיקון רווחים סביב סימני פיסוק
+      combinedSection = combinedSection
+        .replace(/\s*\.\s*/g, '. ')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/\s*!\s*/g, '! ')
+        .replace(/\s*\?\s*/g, '? ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
+        combinedSection += '.';
       }
-    },
-    paragraphStyles: [
-      {
-        id: "HebrewParagraph",
-        name: "Hebrew Paragraph",
-        basedOn: "Normal",
-        paragraph: {
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true
-        },
-        run: {
-          rightToLeft: true,
-          languageComplexScript: "he-IL",
-          font: "Arial"
-        }
-      }
-    ]
-  },
-  sections: [{
-    properties: {
-      page: {
-        margin: {
-          top: 2160,
-          right: 1800,
-          bottom: 2160,
-          left: 1800
-        },
-        textDirection: "rtl"
-      },
-      rtlGutter: true,
-      bidi: true,
-      textDirection: "rtl"
-    },
-    children: [
-      // Title with moderate spacing
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: cleanName,
-            bold: true,
-            size: 36,
-            font: { name: "Arial" },
-            rightToLeft: true,
-            languageComplexScript: "he-IL"
-          })
-        ],
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-        style: "HebrewParagraph",
-        spacing: { 
-          after: 480,
-          line: 480
-        }
-      }),
-      
-      // Content with balanced spacing
-      ...processTranscriptionContent(transcription)
-    ]
-  }]
-});
-    
-    const buffer = await Packer.toBuffer(doc);
+
+      contentHtml += `<p><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
+    });
+
+    const htmlString = `
+      <!DOCTYPE html>
+      <html lang="he" dir="rtl">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="language" content="Hebrew">
+          <meta http-equiv="Content-Language" content="he-IL">
+          <title>תמלול</title>
+        </head>
+        <body style="direction: rtl; text-align: right; font-family: Arial, 'Times New Roman', serif; font-size: 14pt; line-height: 1.5; writing-mode: horizontal-tb;" lang="he-IL" xml:lang="he-IL">
+          <h1 style="font-size: 20pt; font-weight: bold; margin-bottom: 24pt;">${cleanName}</h1>
+          <div style="font-size: 14pt; line-height: 1.8;">
+            ${contentHtml}
+          </div>
+        </body>
+      </html>
+    `;
+
+    const buffer = await HTMLtoDOCX(htmlString, null, {
+      table: { row: { cantSplit: true } },
+      footer: true,
+      pageNumber: true,
+      lang: 'he-IL',
+      locale: 'he-IL'
+    });
+
     console.log(`✅ Word document created successfully for: ${cleanName}`);
     return buffer;
-    
+
   } catch (error) {
     console.error('Error creating Word document:', error);
     throw error;
   }
 }
 
-// Process transcription content for Word document
-function processTranscriptionContent(transcription) {
-  const paragraphs = [];
-  
-  let cleanedText = transcription
-    .replace(/\r\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-  
-  const sections = cleanedText.split(/\n\s*\n/)
-    .map(section => section.trim())
-    .filter(section => section.length > 0);
-  
-  sections.forEach((section, index) => {
-    const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    let combinedSection = lines.join(' ').trim();
-
-// תיקון רווחים סביב סימני פיסוק
-combinedSection = combinedSection
-  .replace(/\s*\.\s*/g, '. ')  // נקודה + רווח יחיד
-  .replace(/\s*,\s*/g, ', ')   // פסיק + רווח יחיד
-  .replace(/\s*!\s*/g, '! ')   // קריאה + רווח יחיד
-  .replace(/\s*\?\s*/g, '? ')  // שאלה + רווח יחיד
-  .replace(/\s*:\s*/g, ': ')   // נקודתיים + רווח יחיד
-  .replace(/\s+/g, ' ')        // רווחים כפולים לרווח יחיד
-  .trim();
-    if (combinedSection.length > 300) {
-      const sentences = combinedSection.split(/(?<=[.!?])\s+/);
-      let currentPara = '';
-      
-      for (const sentence of sentences) {
-        if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
-          paragraphs.push(new Paragraph({
-            children: [
-              new TextRun({
-                text: currentPara.trim(),
-                size: 24,
-                font: { name: "Arial" },
-                rightToLeft: true,
-                languageComplexScript: "he-IL"
-              })
-            ],
-            alignment: AlignmentType.RIGHT,
-            bidirectional: true,
-            spacing: { after: 120, line: 360 }
-          }));
-          currentPara = sentence + ' ';
-        } else {
-          currentPara += sentence + ' ';
-        }
-      }
-      
-      if (currentPara.trim()) {
-        paragraphs.push(new Paragraph({
-          children: [
-            new TextRun({
-              text: currentPara.trim(),
-              size: 24,
-              font: { name: "Arial" },
-              rightToLeft: true,
-              languageComplexScript: "he-IL"
-            })
-          ],
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-          spacing: { after: 120, line: 360 }
-        }));
-      }
-      return;
-    }
-    
-    if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
-      combinedSection += '.';
-    }
-    
-    // ללא בדיקת דוברים - פשוט יצירת פסקה רגילה
-paragraphs.push(new Paragraph({
-  children: [
-    new TextRun({
-      text: combinedSection,
-      size: 24,
-      font: { 
-        name: "Arial"
-      },
-      rightToLeft: true,
-      languageComplexScript: "he-IL"
-      // ללא bold, ללא color
-    })
-  ],
-  alignment: AlignmentType.RIGHT,
-  bidirectional: true,
-  style: "HebrewParagraph",
-  spacing: { 
-    after: 120,
-    line: 360
-  }
-}));
-  });
-  
-  return paragraphs;
-}
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
