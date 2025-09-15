@@ -784,24 +784,19 @@
                 <form id="transcriptionForm">
                     <div class="upload-area" id="uploadArea">
                         <div class="upload-icon">📁</div>
-                        <div class="upload-text">לחץ כאן או גרור קבצים</div>
-                        <div class="upload-subtext">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV</div>
+                        <div class="upload-text">לחץ כאן או גרור קבצים (ללא הגבלה)</div>
+                        <div class="upload-subtext">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV</div>
                         <div style="margin-top: 10px; font-size: 0.8em; color: #667eea;">
                             ✨ תמלול עם Gemini 2.5 Pro → קובץ Word מסודר ומעוצב
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
-                        <!-- Hidden input for adding more files -->
-                        <input type="file" id="additionalFileInput" class="file-input" accept="audio/*,video/*" multiple style="display: none;">
                     </div>
 
                     <div id="selectedFiles"></div>
 
-                    <!-- Add more files button (shown when files are selected) -->
-                    <div id="addMoreContainer" style="display: none; margin: 15px 0;">
-                        <button type="button" id="addMoreBtn" class="btn-secondary" onclick="addMoreFiles()">
-                            ➕ הוסף קבצים נוספים
-                        </button>
-                        <button type="button" class="btn-secondary" onclick="clearAllFiles()" style="margin-right: 10px;">
+                    <!-- Clear all button (shown when files are selected) -->
+                    <div id="clearAllContainer" style="display: none; margin: 15px 0;">
+                        <button type="button" class="btn-secondary" onclick="clearAllFiles()">
                             🗑️ נקה הכל
                         </button>
                     </div>
@@ -1220,11 +1215,20 @@
                     audio.addEventListener('error', (error) => {
                         if (!resolved) {
                             resolved = true;
-                            console.warn(`⚠️ Could not read duration for ${file.name}, using file size estimation`);
+                            console.warn(`⚠️ Could not read duration for ${file.name}, using improved file size estimation`);
                             URL.revokeObjectURL(url);
-                            // Better estimation: audio files are roughly 1MB per minute at decent quality
+                            // More accurate estimation based on file type and quality
                             const fileSizeMB = file.size / (1024 * 1024);
-                            const estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.5)); // More conservative estimate
+                            let estimatedMinutes;
+
+                            if (file.type.startsWith('video/')) {
+                                // Video files: roughly 2-5MB per minute depending on quality
+                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
+                            } else {
+                                // Audio files: roughly 1-2MB per minute for good quality
+                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                            }
+
                             console.log(`📊 File: ${file.name} - Estimated: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
                             resolve(estimatedMinutes);
                         }
@@ -1234,10 +1238,19 @@
                     setTimeout(() => {
                         if (!resolved) {
                             resolved = true;
-                            console.warn(`⏰ Timeout reading duration for ${file.name}, using file size estimation`);
+                            console.warn(`⏰ Timeout reading duration for ${file.name}, using improved file size estimation`);
                             URL.revokeObjectURL(url);
                             const fileSizeMB = file.size / (1024 * 1024);
-                            const estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.5));
+                            let estimatedMinutes;
+
+                            if (file.type.startsWith('video/')) {
+                                // Video files: roughly 2-5MB per minute depending on quality
+                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
+                            } else {
+                                // Audio files: roughly 1-2MB per minute for good quality
+                                estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                            }
+
                             console.log(`📊 File: ${file.name} - Timeout estimate: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
                             resolve(estimatedMinutes);
                         }
@@ -1247,7 +1260,17 @@
                 } else {
                     // For unknown file types, estimate based on file size
                     const fileSizeMB = file.size / (1024 * 1024);
-                    const estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.5));
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    let estimatedMinutes;
+
+                    if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+                        // Video files: roughly 2-5MB per minute depending on quality
+                        estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
+                    } else {
+                        // Audio files: roughly 1-2MB per minute for good quality
+                        estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                    }
+
                     console.log(`📊 File: ${file.name} - Unknown type estimate: ${fileSizeMB.toFixed(1)}MB → ${estimatedMinutes} minutes`);
                     resolve(estimatedMinutes);
                 }
@@ -1257,7 +1280,6 @@
         // File upload functions
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
-        const additionalFileInput = document.getElementById('additionalFileInput');
         const selectedFilesDiv = document.getElementById('selectedFiles');
 
         uploadArea.addEventListener('click', () => fileInput.click());
@@ -1271,16 +1293,13 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files, false); // false = replace existing files
+            handleFiles(e.dataTransfer.files, true); // true = add to existing files
         });
 
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files, false); // false = replace existing files
-        });
-
-        additionalFileInput.addEventListener('change', (e) => {
             handleFiles(e.target.files, true); // true = add to existing files
         });
+
 
         async function handleFiles(files, addToExisting = false) {
             const validFiles = Array.from(files).filter(file =>
@@ -1301,7 +1320,7 @@
 
             if (newFiles.length === 0 && addToExisting) {
                 showStatus('כל הקבצים שנבחרו כבר קיימים ברשימה', 'error');
-                additionalFileInput.value = ''; // Reset the input
+                fileInput.value = ''; // Reset the input
                 setTimeout(() => {
                     const status = document.getElementById('status');
                     if (status) status.style.display = 'none';
@@ -1333,7 +1352,18 @@
                         updateCostEstimate();
                     } catch (error) {
                         console.error('Error processing file:', file.name, error);
-                        const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
+                        const fileSizeMB = file.size / (1024 * 1024);
+                        const ext = file.name.toLowerCase().split('.').pop();
+                        let estimatedDuration;
+
+                        if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
+                            // Video files: roughly 2-5MB per minute depending on quality
+                            estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 3));
+                        } else {
+                            // Audio files: roughly 1-2MB per minute for good quality
+                            estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                        }
+
                         selectedFiles.push({
                             file: file,
                             duration: estimatedDuration
@@ -1362,12 +1392,8 @@
             updateSubmitButton();
             updateCostEstimate();
 
-            // Reset file inputs after processing
-            if (addToExisting) {
-                additionalFileInput.value = '';
-            } else {
-                fileInput.value = '';
-            }
+            // Reset file input after processing
+            fileInput.value = '';
         }
 
         function displayFile(file, duration) {
@@ -1436,30 +1462,24 @@
 
         function updateSubmitButton() {
             const submitBtn = document.getElementById('submitBtn');
-            const addMoreContainer = document.getElementById('addMoreContainer');
+            const clearAllContainer = document.getElementById('clearAllContainer');
 
             submitBtn.disabled = selectedFiles.length === 0;
 
-            // Show/hide add more files container
+            // Show/hide clear all container
             if (selectedFiles.length > 0) {
-                addMoreContainer.style.display = 'block';
+                clearAllContainer.style.display = 'block';
             } else {
-                addMoreContainer.style.display = 'none';
+                clearAllContainer.style.display = 'none';
             }
-        }
-
-        // 🔧 NEW: Functions for additional file management
-        function addMoreFiles() {
-            additionalFileInput.click();
         }
 
         function clearAllFiles() {
             selectedFiles = [];
             selectedFilesDiv.innerHTML = '';
 
-            // Reset both file inputs
+            // Reset file input
             fileInput.value = '';
-            additionalFileInput.value = '';
 
             updateSubmitButton();
             updateCostEstimate();
@@ -1638,9 +1658,8 @@
                     selectedFiles = [];
                     selectedFilesDiv.innerHTML = '';
                     updateCostEstimate();
-                    updateSubmitButton(); // Hide add more buttons
+                    updateSubmitButton(); // Hide clear all button
                     fileInput.value = '';
-                    additionalFileInput.value = '';
                 } else {
                     throw new Error(data.error || 'שגיאה בעיבוד');
                 }
