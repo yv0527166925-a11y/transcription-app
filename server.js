@@ -103,8 +103,11 @@ const upload = multer({
   }
 });
 
-// Mock database
-let users = [
+// Data persistence
+const DATA_FILE = path.join(__dirname, 'users_data.json');
+
+// Default users data
+const defaultUsers = [
   {
     id: 1,
     name: 'מנהל המערכת',
@@ -113,9 +116,42 @@ let users = [
     isAdmin: true,
     remainingMinutes: 1000,
     totalTranscribed: 0,
-    history: []
+    history: [],
+    joinDate: new Date().toISOString()
   }
 ];
+
+// Load users data from file or use defaults
+function loadUsersData() {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const data = fs.readFileSync(DATA_FILE, 'utf8');
+      const loadedUsers = JSON.parse(data);
+      console.log(`📂 Loaded ${loadedUsers.length} users from file`);
+      return loadedUsers;
+    } else {
+      console.log('📂 No data file found, using default users');
+      return [...defaultUsers];
+    }
+  } catch (error) {
+    console.error('❌ Error loading users data:', error);
+    console.log('📂 Using default users due to error');
+    return [...defaultUsers];
+  }
+}
+
+// Save users data to file
+function saveUsersData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2), 'utf8');
+    console.log(`💾 Saved ${users.length} users to file`);
+  } catch (error) {
+    console.error('❌ Error saving users data:', error);
+  }
+}
+
+// Load users on startup
+let users = loadUsersData();
 
 // 🔥 NEW: FFmpeg and chunking functions
 let ffmpegAvailabilityCache = null; // Cache the result
@@ -1172,6 +1208,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         console.log(`📝 Added failed to history: ${historyEntry.fileName}`);
       });
 
+      saveUsersData(); // Save after updating user data
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
@@ -1290,6 +1327,7 @@ app.post('/api/register', (req, res) => {
     };
     
     users.push(newUser);
+    saveUsersData(); // Save after adding new user
     console.log('✅ User registered successfully:', newUser.email);
     console.log('📋 Total users now:', users.length);
     
@@ -1331,7 +1369,8 @@ app.post('/api/admin/add-minutes', (req, res) => {
     const oldBalance = user.remainingMinutes;
     user.remainingMinutes += minutes;
     const newBalance = user.remainingMinutes;
-    
+    saveUsersData(); // Save after updating balance
+
     console.log(`✅ Added ${minutes} minutes to ${userEmail}: ${oldBalance} → ${newBalance}`);
     
     res.json({ 
@@ -1564,6 +1603,7 @@ function cleanupOldHistory() {
   });
 
   if (totalCleaned > 0 || totalFilesDeleted > 0) {
+    saveUsersData(); // Save after cleanup
     console.log(`🧹 Total cleanup: Removed ${totalCleaned} history entries and ${totalFilesDeleted} old files`);
   }
 }

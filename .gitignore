@@ -70,3 +70,6 @@ generated_docs/
 # FFmpeg temporary files
 *_converted.*
 
+# User data persistence
+users_data.json
+

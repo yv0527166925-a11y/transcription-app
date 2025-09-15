@@ -644,6 +644,8 @@
                         <button class="link-btn" onclick="switchTab('login')">יש לך חשבון? התחבר כאן</button>
                     </div>
                 </div>
+                <!-- Status for auth messages -->
+                <div class="status" id="registerAuthStatus" style="display: none;"></div>
             </div>
         </div>
 
@@ -858,10 +860,10 @@
             <div id="paymentTab" class="tab-content">
                 <h3>רכישת דקות תמלול</h3>
                <div class="payment-options">
-    <div class="payment-option" onclick="selectPaymentOption(this, 60, 6)">
+    <div class="payment-option" onclick="selectPaymentOption(this, 60, 10)">
         <div class="payment-amount">60</div>
         <div class="payment-minutes">דקות תמלול</div>
-        <div class="payment-price">₪6</div>
+        <div class="payment-price">₪10</div>
     </div>
 </div>
                 <button class="btn" id="purchaseBtn" disabled onclick="processPurchase()">
@@ -934,8 +936,12 @@
 
             // Clear auth status when switching tabs
             const authStatus = document.getElementById('authStatus');
+            const registerAuthStatus = document.getElementById('registerAuthStatus');
             if (authStatus) {
                 authStatus.style.display = 'none';
+            }
+            if (registerAuthStatus) {
+                registerAuthStatus.style.display = 'none';
             }
         }
 
@@ -1520,7 +1526,20 @@
         }
 
         function showAuthStatus(message, type) {
-            const status = document.getElementById('authStatus');
+            // Determine which tab is active and show status in the correct place
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+
+            let status;
+            if (loginTab && loginTab.classList.contains('active')) {
+                status = document.getElementById('authStatus');
+            } else if (registerTab && registerTab.classList.contains('active')) {
+                status = document.getElementById('registerAuthStatus');
+            } else {
+                // Default to login tab status
+                status = document.getElementById('authStatus');
+            }
+
             if (status) {
                 status.className = `status ${type}`;
                 status.innerHTML = message;
