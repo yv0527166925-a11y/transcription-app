@@ -1293,20 +1293,33 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files, true); // true = add to existing files
+            console.log(`🎯 גרירת קבצים: ${e.dataTransfer.files.length} קבצים`);
+            // Create a copy of files array to avoid reference issues
+            const filesArray = Array.from(e.dataTransfer.files);
+            handleFiles(filesArray, true); // true = add to existing files
         });
 
         fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files, true); // true = add to existing files
+            console.log(`📁 בחירת קבצים דרך File Input: ${e.target.files.length} קבצים`);
+            if (e.target.files.length > 0) {
+                // Create a copy of files array to avoid reference issues
+                const filesArray = Array.from(e.target.files);
+                handleFiles(filesArray, true); // true = add to existing files
+            }
         });
 
 
         async function handleFiles(files, addToExisting = false) {
+            console.log(`🔄 טיפול בקבצים: ${files.length} קבצים, הוספה לקיימים: ${addToExisting}`);
+            console.log('📁 קבצים שהתקבלו:', Array.from(files).map(f => `${f.name} (${f.size} bytes)`));
+
             const validFiles = Array.from(files).filter(file =>
                 file.type.startsWith('audio/') ||
                 file.type.startsWith('video/') ||
                 file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
             );
+
+            console.log(`✅ קבצים תקינים: ${validFiles.length}/${files.length}`);
 
             if (validFiles.length === 0) {
                 showStatus('אנא בחר קבצי אודיו או וידאו תקינים', 'error');
@@ -1315,7 +1328,11 @@
 
             // Filter out files that are already selected (prevent duplicates)
             const newFiles = validFiles.filter(file =>
-                !selectedFiles.some(selected => selected.file.name === file.name)
+                !selectedFiles.some(selected =>
+                    selected.file.name === file.name &&
+                    selected.file.size === file.size &&
+                    selected.file.lastModified === file.lastModified
+                )
             );
 
             if (newFiles.length === 0 && addToExisting) {
@@ -1339,14 +1356,23 @@
             if (filesToProcess.length > 0) {
                 showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
 
+                let processedCount = 0;
                 for (const file of filesToProcess) {
                     try {
+                        console.log(`🔄 מעבד קובץ ${processedCount + 1}/${filesToProcess.length}: ${file.name}`);
                         const duration = await getAudioDuration(file);
+                        console.log(`✅ משך זמן מחושב לקובץ ${file.name}: ${duration} דקות`);
+
                         selectedFiles.push({
                             file: file,
                             duration: duration
                         });
-                        await displayFile(file, duration);
+                        displayFile(file, duration);
+
+                        processedCount++;
+
+                        // Update status with progress
+                        showStatus(`<div class="spinner"></div>מעבד קובץ ${processedCount}/${filesToProcess.length}: ${file.name}`, 'processing');
 
                         // Update cost estimate after each file for real-time updates
                         updateCostEstimate();
@@ -1364,11 +1390,18 @@
                             estimatedDuration = Math.max(1, Math.ceil(fileSizeMB / 1.2));
                         }
 
+                        console.log(`⚠️ הערכת זמן לקובץ ${file.name}: ${estimatedDuration} דקות (לפי גודל קובץ)`);
+
                         selectedFiles.push({
                             file: file,
                             duration: estimatedDuration
                         });
-                        await displayFile(file, estimatedDuration);
+                        displayFile(file, estimatedDuration);
+
+                        processedCount++;
+
+                        // Update status with progress
+                        showStatus(`<div class="spinner"></div>מעבד קובץ ${processedCount}/${filesToProcess.length}: ${file.name} (הערכה)`, 'processing');
 
                         // Update cost estimate after each file for real-time updates
                         updateCostEstimate();
@@ -1392,8 +1425,10 @@
             updateSubmitButton();
             updateCostEstimate();
 
-            // Reset file input after processing
-            fileInput.value = '';
+            // Reset file input after a small delay to ensure processing is complete
+            setTimeout(() => {
+                fileInput.value = '';
+            }, 100);
         }
 
         function displayFile(file, duration) {
@@ -1492,12 +1527,21 @@
         }
 
         function updateCostEstimate() {
+            console.log(`📊 עדכון הערכת עלות - קבצים נבחרים: ${selectedFiles.length}`);
+
             if (selectedFiles.length === 0) {
                 document.getElementById('estimatedCost').style.display = 'none';
                 return;
             }
 
+            // Log each file's duration for debugging
+            selectedFiles.forEach((item, index) => {
+                console.log(`📄 קובץ ${index + 1}: ${item.file.name} - ${item.duration} דקות`);
+            });
+
             const totalMinutes = Math.round(selectedFiles.reduce((sum, item) => sum + item.duration, 0));
+            console.log(`🔢 סה"כ דקות מחושבות: ${totalMinutes}`);
+
             document.getElementById('estimatedMinutes').textContent = totalMinutes;
             document.getElementById('currentBalance').textContent = currentUser ? currentUser.remainingMinutes : 0;
             
