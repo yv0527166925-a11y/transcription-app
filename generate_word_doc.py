@@ -19,14 +19,21 @@ def create_hebrew_word_document(transcription, title, output_path):
         from zipfile import ZipFile
 
         # בדיקה אם קיימת תבנית עובדת
-        template_path = 'חזר מהשרת תקין 2.docx'
-        if not os.path.exists(template_path):
-            print(f"Template not found: {template_path}")
-            # נסה תבנית אחרת
-            template_path = 'template.docx'
-            if not os.path.exists(template_path):
-                print("No working template found, falling back to basic creation")
-                return create_basic_hebrew_document(transcription, title, output_path)
+        possible_templates = [
+            'חזר מהשרת תקין 2.docx',
+            'template.docx',
+            'simple-template.docx'
+        ]
+
+        template_path = None
+        for template in possible_templates:
+            if os.path.exists(template):
+                template_path = template
+                break
+
+        if not template_path:
+            print("No working template found, falling back to basic creation")
+            return create_basic_hebrew_document(transcription, title, output_path)
 
         # העתקת התבנית
         shutil.copy2(template_path, output_path)
