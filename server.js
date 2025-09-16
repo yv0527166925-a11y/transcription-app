@@ -909,24 +909,56 @@ async function createWordDocument(transcription, filename, duration) {
         </w:p>`;
     });
 
-    // עכשיו פשוט החלף את הטקסט בתבנית
-    let combinedSection = sections.join('\n\n');
+    // עכשיו פסקה אחת עם line breaks
+    let allText = sections.map(section => {
+      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      let combinedSection = lines.join(' ').trim();
 
-    // הוסף RLM markers לפיסוק לתיקון RTL
-    combinedSection = combinedSection
-      .replace(/\s{2,}/g, ' ')          // ניקוי רווחים כפולים
-      .replace(/\./g, '.\u200F')        // נקודה + RLM
-      .replace(/!/g, '!\u200F')         // קריאה + RLM
-      .replace(/\?/g, '?\u200F')        // שאלה + RLM
-      .replace(/:/g, ':\u200F')         // נקודתיים + RLM
-      .replace(/;/g, ';\u200F')         // נקודה-פסיק + RLM
-      .replace(/,/g, ',\u200F')         // פסיק + RLM
-      .trim();
+      // תיקון פיסוק פשוט
+      combinedSection = combinedSection
+        .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
+        .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
+        .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
+        .replace(/([א-ת])\?([א-ת])/g, '$1? $2')   // שאלה עם רווח
+        .replace(/([א-ת]):([א-ת])/g, '$1: $2')    // נקודתיים עם רווח
+        .replace(/([א-ת]);([א-ת])/g, '$1; $2')    // נקודה-פסיק עם רווח
+        .replace(/([א-ת])"([א-ת])/g, '$1" $2')    // גרשיים עם רווח
+        .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
+        .trim();
 
-    // החלפת התוכן בתבנית - השאר את המבנה המקורי
+      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
+        combinedSection += '.';
+      }
+
+      return combinedSection;
+    }).join('\n\n'); // הפרד בשורות ריקות
+
+    // פסקה יחידה עם כל התוכן
+    const contentParagraph = `
+      <w:p w14:paraId="346CE71B" w14:textId="424A57EE" w:rsidR="009550AA" w:rsidRPr="009F17F4" w:rsidRDefault="0056303E" w:rsidP="0056303E">
+        <w:pPr>
+          <w:spacing w:after="240"/>
+          <w:rPr>
+            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          </w:rPr>
+        </w:pPr>
+        <w:r w:rsidRPr="0056303E">
+          <w:rPr>
+            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+          </w:rPr>
+          <w:t xml:space="preserve">${escapeXml(allText)}</w:t>
+        </w:r>
+      </w:p>`;
+
+    const newParagraphs = [titleParagraph, contentParagraph];
+
+    // החלפת התוכן בתבנית
     let newDocXml = docXml
-      .replace(/REPLACETITLE/g, escapeXml(cleanName))
-      .replace(/REPLACECONTENT/g, escapeXml(combinedSection));
+      .replace(/REPLACETITLE/g, '')
+      .replace(/REPLACECONTENT/g, '');
+
+    // הוספת הפסקאות החדשות לפני סוגר ה-body
+    newDocXml = newDocXml.replace('</w:body>', newParagraphs.join('') + '</w:body>');
 
     // יצירת ZIP חדש
     const newZip = new JSZip();
@@ -954,6 +986,104 @@ async function createWordDocument(transcription, filename, duration) {
     console.error('Error creating template-based Word document:', error);
     console.log('⚠️ Falling back to HTML method');
     return await createWordDocumentFallback(transcription, filename, duration);
+  }
+}
+
+// NEW: Python-based Word document creation
+async function createWordDocumentPython(transcription, filename, duration) {
+  try {
+    const cleanName = cleanFilename(filename);
+    console.log(`🐍 Creating Word document using Python for: ${cleanName}`);
+
+    const { spawn } = require('child_process');
+    const path = require('path');
+    const fs = require('fs');
+
+    // יצירת נתיב לקובץ הפלט
+    const outputPath = path.join(__dirname, 'output', `${cleanName}.docx`);
+
+    // וידוא שתיקיית output קיימת
+    const outputDir = path.dirname(outputPath);
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    // הכנת הנתונים לסקריפט Python
+    const pythonData = JSON.stringify({
+      transcription: transcription,
+      title: cleanName,
+      output_path: outputPath
+    });
+
+    // קריאה לסקריפט Python
+    return new Promise((resolve, reject) => {
+      const pythonProcess = spawn('python', ['generate_word_doc.py', pythonData], {
+        cwd: __dirname,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+      let output = '';
+      let errorOutput = '';
+
+      pythonProcess.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+
+      pythonProcess.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+      });
+
+      pythonProcess.on('close', (code) => {
+        if (code === 0) {
+          try {
+            // ניסיון לפרסר את התגובה מ-Python
+            const lines = output.trim().split('\n');
+            const lastLine = lines[lines.length - 1];
+
+            if (lastLine.startsWith('{')) {
+              const result = JSON.parse(lastLine);
+              if (result.success && fs.existsSync(outputPath)) {
+                console.log(`✅ Python script completed successfully: ${outputPath}`);
+                const buffer = fs.readFileSync(outputPath);
+                // ניקוי קובץ זמני
+                fs.unlinkSync(outputPath);
+                resolve(buffer);
+              } else {
+                console.error('❌ Python script failed:', result.error || 'Unknown error');
+                reject(new Error(result.error || 'Python script failed'));
+              }
+            } else {
+              console.log('🐍 Python output:', output);
+              if (fs.existsSync(outputPath)) {
+                const buffer = fs.readFileSync(outputPath);
+                fs.unlinkSync(outputPath);
+                resolve(buffer);
+              } else {
+                reject(new Error('Output file not created'));
+              }
+            }
+          } catch (parseError) {
+            console.error('❌ Error parsing Python output:', parseError);
+            console.log('Raw output:', output);
+            reject(parseError);
+          }
+        } else {
+          console.error(`❌ Python script exited with code ${code}`);
+          console.error('Error output:', errorOutput);
+          console.log('Standard output:', output);
+          reject(new Error(`Python script failed with code ${code}: ${errorOutput}`));
+        }
+      });
+
+      pythonProcess.on('error', (error) => {
+        console.error('❌ Error spawning Python process:', error);
+        reject(error);
+      });
+    });
+
+  } catch (error) {
+    console.error('❌ Error in Python Word document creation:', error);
+    throw error;
   }
 }
 
@@ -1209,7 +1339,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           throw new Error('תמלול ריק או קצר מדי');
         }
         
-        const wordDoc = await createWordDocument(transcription, file.filename, estimatedMinutes);
+        const wordDoc = await createWordDocumentPython(transcription, file.filename, estimatedMinutes);
 
         // 🔧 NEW: Save document to downloads folder
         const downloadsDir = path.join(__dirname, 'downloads');
