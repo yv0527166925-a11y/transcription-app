@@ -1334,9 +1334,23 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       try {
         // Use the enhanced transcription method that handles large files with chunking
         const transcription = await realGeminiTranscription(file.path, file.filename, language);
-        
-        if (!transcription || transcription.trim().length < 50) {
-          throw new Error('תמלול ריק או קצר מדי');
+
+        console.log(`🔍 Transcription validation:`);
+        console.log(`   Type: ${typeof transcription}`);
+        console.log(`   Length: ${transcription ? transcription.length : 'null'}`);
+        console.log(`   Preview: ${transcription ? transcription.substring(0, 100) + '...' : 'null'}`);
+
+        if (!transcription || typeof transcription !== 'string') {
+          throw new Error(`תמלול לא תקין: סוג=${typeof transcription}, ערך=${transcription}`);
+        }
+
+        if (transcription.trim().length < 50) {
+          throw new Error(`תמלול קצר מדי: "${transcription}"`);
+        }
+
+        // Check if transcription looks like binary data or PDF
+        if (transcription.includes('%PDF') || transcription.includes('<<') || transcription.length > 10000) {
+          throw new Error('התמלול נראה כמו קובץ PDF או נתונים בינאריים במקום טקסט');
         }
         
         const wordDoc = await createWordDocumentPython(transcription, file.filename, estimatedMinutes);

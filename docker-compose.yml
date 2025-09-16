@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  transcription-app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+    volumes:
+      # Mount source code for development
+      - .:/app
+      - /app/node_modules
+      # Mount uploads directory to persist files
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Add a volume for persistent uploads
+volumes:
+  uploads:
+    driver: local

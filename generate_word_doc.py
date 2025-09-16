@@ -341,6 +341,22 @@ def main():
         output_path = data.get('output_path', 'output.docx')
 
         print(f"Creating document: {title} -> {output_path}", file=sys.stderr)
+        print(f"Transcription type: {type(transcription)}", file=sys.stderr)
+        print(f"Transcription length: {len(str(transcription))}", file=sys.stderr)
+        print(f"Transcription preview: {str(transcription)[:100]}...", file=sys.stderr)
+
+        # Validation של הטקסט
+        if not transcription or not isinstance(transcription, str):
+            error_msg = f"Invalid transcription data: type={type(transcription)}, value={str(transcription)[:200]}"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            print(json.dumps({"success": False, "error": error_msg}))
+            sys.exit(1)
+
+        if len(transcription.strip()) < 10:
+            error_msg = f"Transcription too short: '{transcription}'"
+            print(f"ERROR: {error_msg}", file=sys.stderr)
+            print(json.dumps({"success": False, "error": error_msg}))
+            sys.exit(1)
 
         # יצירת המסמך
         success = create_hebrew_word_document(transcription, title, output_path)

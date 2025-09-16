@@ -9,7 +9,11 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "check-ffmpeg": "ffmpeg -version",
     "setup": "npm install && npm run check-ffmpeg",
-    "postinstall": "pip install -r requirements.txt || echo 'Python dependencies not installed, using HTML fallback'"
+    "postinstall": "pip install -r requirements.txt || echo 'Python dependencies not installed, using HTML fallback'",
+    "docker:build": "docker build -t transcription-app .",
+    "docker:run": "docker run -p 3000:3000 transcription-app",
+    "docker:dev": "docker-compose up --build",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up --build"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.113",
