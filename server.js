@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const HTMLtoDOCX = require('html-to-docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -817,11 +817,131 @@ function fixHebrewSpacing(text) {
     .trim();
 }
 
-// Word document creation (same as before)
+// Template-based Word document creation - guaranteed RTL
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`📄 Creating Word document with HTML-to-DOCX for: ${cleanName}`);
+    console.log(`📄 Creating template-based Word document with guaranteed RTL for: ${cleanName}`);
+
+    const JSZip = require('jszip');
+    const templatePath = path.join(__dirname, 'template.docx');
+
+    // בדיקה אם התבנית קיימת
+    if (!fs.existsSync(templatePath)) {
+      console.log('⚠️ Template not found, falling back to HTML method');
+      return await createWordDocumentFallback(transcription, filename, duration);
+    }
+
+    // טעינת התבנית
+    const templateData = fs.readFileSync(templatePath);
+    const zip = await JSZip.loadAsync(templateData);
+    const docXml = await zip.file('word/document.xml').async('text');
+
+    // עיבוד התמלול
+    let cleanedText = transcription
+      .replace(/\r\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const sections = cleanedText.split(/\n\s*\n/)
+      .map(section => section.trim())
+      .filter(section => section.length > 0);
+
+    // יצירת פסקאות חדשות עם הגדרות RTL מתבנית
+    const newParagraphs = sections.map(section => {
+      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      let combinedSection = lines.join(' ').trim();
+
+      // תיקון מקיף של סימני פיסוק ורווחים
+      combinedSection = combinedSection
+        // תיקון פיסוק בסיסי
+        .replace(/\s*\.\s*/g, '. ')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/\s*!\s*/g, '! ')
+        .replace(/\s*\?\s*/g, '? ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s*;\s*/g, '; ')
+        // תיקון פיסוק צמוד למילים עבריות - ללא כיסוח תווים
+        .replace(/(?<=[א-ת])\./g, '. ')
+        .replace(/(?<=[א-ת]),/g, ', ')
+        .replace(/(?<=[א-ת])!/g, '! ')
+        .replace(/(?<=[א-ת])\?/g, '? ')
+        .replace(/(?<=[א-ת]):/g, ': ')
+        .replace(/(?<=[א-ת]);/g, '; ')
+        // ניקוי רווחים כפולים
+        .replace(/\s{2,}/g, ' ')
+        // ניקוי רווחים לפני פיסוק
+        .replace(/\s+([.!?,:;])/g, '$1')
+        .trim();
+
+      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
+        combinedSection += '.';
+      }
+
+      return `
+        <w:p>
+          <w:pPr>
+            <w:jc w:val="right"/>
+            <w:bidi/>
+            <w:spacing w:after="120"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+              <w:sz w:val="24"/>
+              <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
+              <w:rtl/>
+              <w:bidi/>
+            </w:rPr>
+            <w:t xml:space="preserve">${escapeXml(combinedSection)}</w:t>
+          </w:r>
+        </w:p>`;
+    });
+
+    // החלפת התוכן בתבנית
+    let newDocXml = docXml
+      .replace(/REPLACETITLE/g, escapeXml(cleanName))
+      .replace(/REPLACECONTENT/g, '');
+
+    // הוספת הפסקאות החדשות לפני סוגר ה-body
+    newDocXml = newDocXml.replace('</w:body>', newParagraphs.join('') + '</w:body>');
+
+    // יצירת ZIP חדש
+    const newZip = new JSZip();
+
+    // העתקת כל הקבצים מהתבנית
+    for (const [relativePath, file] of Object.entries(zip.files)) {
+      if (relativePath === 'word/document.xml') {
+        newZip.file(relativePath, newDocXml);
+      } else if (!file.dir) {
+        const content = await file.async('nodebuffer');
+        newZip.file(relativePath, content);
+      }
+    }
+
+    const buffer = await newZip.generateAsync({
+      type: 'nodebuffer',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    console.log(`✅ Template-based Word document created successfully for: ${cleanName}`);
+    return buffer;
+
+  } catch (error) {
+    console.error('Error creating template-based Word document:', error);
+    console.log('⚠️ Falling back to HTML method');
+    return await createWordDocumentFallback(transcription, filename, duration);
+  }
+}
+
+// Fallback method using HTML-to-DOCX
+async function createWordDocumentFallback(transcription, filename, duration) {
+  try {
+    const cleanName = cleanFilename(filename);
+    console.log(`📄 Using fallback HTML-to-DOCX method for: ${cleanName}`);
+
+    const HTMLtoDOCX = require('html-to-docx');
 
     // נקה את הטקסט
     let cleanedText = transcription
@@ -829,114 +949,61 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    // פצל לפסקאות - גם על בסיס שורות ריקות וגם על בסיס אורך
+    // פצל לפסקאות
     let sections = cleanedText.split(/\n\s*\n/)
       .map(section => section.trim())
       .filter(section => section.length > 0);
 
-    // אם יש רק פסקה אחת ארוכה, חלק אותה למשפטים
-    if (sections.length === 1 && sections[0].length > 300) {
-      const longText = sections[0];
-      const sentences = longText.split(/(?<=[.!?])\s+/);
-
-      // אם יש מספיק משפטים לחלוקה
-      if (sentences.length > 3) {
-        sections = [];
-        let currentSection = '';
-
-        sentences.forEach(sentence => {
-          if (currentSection.length + sentence.length > 200 && currentSection.length > 0) {
-            sections.push(currentSection.trim());
-            currentSection = sentence + ' ';
-          } else {
-            currentSection += sentence + ' ';
-          }
-        });
-
-        if (currentSection.trim()) {
-          sections.push(currentSection.trim());
-        }
-      }
-    }
-
-    // בנה HTML עם הגדרות RTL נכונות וחלוקה לפסקאות
+    // בנה HTML עם הגדרות RTL
     let contentHtml = '';
     sections.forEach(section => {
       const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       let combinedSection = lines.join(' ').trim();
 
-      // תיקון בעיות פיסוק ורווחים - כל סימני הפיסוק
+      // תיקון מקיף של סימני פיסוק ורווחים
       combinedSection = combinedSection
-        // קודם תקן אכרונים עבריים - כל הסוגים
-        .replace(/([א-ת]+)\s*"\s*([א-ת]{1,2})(\s|$|[^א-תא-ת])/g, '$1__QUOTE__$2$3')     // הגן על אכרונים כמו רמב"ם, ז"ל
-        .replace(/([א-ת]+)\s*'\s*([א-ת]{1,2})(\s|$|[^א-תא-ת])/g, '$1__APOST__$2$3')     // הגן על אכרונים עם גרש
-        // אחר כך תקן פיסוק בין מילים נפרדות - כולל צמודות וכולל עם רווחים
-        .replace(/([\u0590-\u05FF])\.(\s*)([\u0590-\u05FF\[])/g, '$1.&nbsp;$3')      // תקן נקודות בין מילים עבריות
-        .replace(/([\u0590-\u05FF]),(\s*)([\u0590-\u05FF\"])/g, '$1,&nbsp;$3')  // תקן פסיקים צמודים למילים
-        .replace(/([\u0590-\u05FF])"(\s*)([\u0590-\u05FF])/g, '$1"&nbsp;$3')     // תקן גרשיים בין מילים עבריות
-        // החזר את האכרונים המוגנים
-        .replace(/__QUOTE__/g, '"')                              // החזר גרשיים באכרונים
-        .replace(/__APOST__/g, '\'')                             // החזר גרש באכרונים
-        .replace(/\](\s*)([\u0590-\u05FF\"])/g, ']&nbsp;$2')           // תקן סוגריים מרובעים צמודים למילים
-        .replace(/\",\"(\s*)([\u0590-\u05FF])/g, '",&nbsp;\"$2')       // תקן גרשיים+פסיק+גרשיים צמודים
-        .replace(/([\u0590-\u05FF])\"\./g, '$1\".&nbsp;')                // תקן גרשיים+נקודה בסוף
-        .replace(/([\u0590-\u05FF])\"\.(\s*)([\u0590-\u05FF])/g, '$1\".&nbsp;$3')  // תקן גרשיים+נקודה צמודים למילה
-        .replace(/^\"\.(\s*)([\u0590-\u05FF])/g, '\"&nbsp;$2')        // תקן גרשיים+נקודה בתחילת משפט
-        .replace(/([\u0590-\u05FF])'\s+([\u0590-\u05FF])/g, '$1\'&nbsp;$2')    // תקן גרש בין מילים נפרדות (רק עם רווח)
-        .replace(/([\u0590-\u05FF])\?(\s*)([\u0590-\u05FF])/g, '$1?&nbsp;$3')    // תקן סימני שאלה בין מילים עבריות
-        .replace(/([\u0590-\u05FF])!(\s*)([\u0590-\u05FF])/g, '$1!&nbsp;$3')     // תקן סימני קריאה בין מילים עבריות
-        .replace(/([\u0590-\u05FF]):(\s*)([\u0590-\u05FF])/g, '$1:&nbsp;$3')     // תקן נקודתיים בין מילים עבריות
-        .replace(/([\u0590-\u05FF]);(\s*)([\u0590-\u05FF])/g, '$1;&nbsp;$3')     // תקן נקודה פסיק בין מילים עבריות
-        // ניקוי כללי
-        .replace(/\s+([.,!?:"';])/g, '$1')          // הסר רווחים לפני סימני פיסוק
-        .replace(/([.,!?:"';])\s+/g, '$1&nbsp;')    // החלף רווח אחרי פיסוק ב-&nbsp;
-        .replace(/\s{2,}/g, ' ')                    // רווחים כפולים לרווח יחיד
-        .replace(/^([.,!?:"';])\s*/g, '')           // הסר סימני פיסוק מתחילת משפט (בסוף!)
+        // תיקון פיסוק בסיסי
+        .replace(/\s*\.\s*/g, '. ')
+        .replace(/\s*,\s*/g, ', ')
+        .replace(/\s*!\s*/g, '! ')
+        .replace(/\s*\?\s*/g, '? ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s*;\s*/g, '; ')
+        // תיקון פיסוק צמוד למילים עבריות - ללא כיסוח תווים
+        .replace(/(?<=[א-ת])\./g, '. ')
+        .replace(/(?<=[א-ת]),/g, ', ')
+        .replace(/(?<=[א-ת])!/g, '! ')
+        .replace(/(?<=[א-ת])\?/g, '? ')
+        .replace(/(?<=[א-ת]):/g, ': ')
+        .replace(/(?<=[א-ת]);/g, '; ')
+        // ניקוי רווחים כפולים
+        .replace(/\s{2,}/g, ' ')
+        // ניקוי רווחים לפני פיסוק
+        .replace(/\s+([.!?,:;])/g, '$1')
         .trim();
 
       if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
         combinedSection += '.';
       }
 
-      // חלק לפסקאות קצרות יותר אם הטקסט ארוך
-      if (combinedSection.length > 400) {
-        const sentences = combinedSection.split(/(?<=[.!?])\s+/);
-        let currentParagraph = '';
-
-        sentences.forEach(sentence => {
-          if (currentParagraph.length + sentence.length > 400 && currentParagraph.length > 0) {
-            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
-            currentParagraph = sentence + ' ';
-          } else {
-            currentParagraph += sentence + ' ';
-          }
-        });
-
-        if (currentParagraph.trim()) {
-          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
-        }
-      } else {
-        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
-      }
+      contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
     });
 
-    const htmlString = `
-      <!DOCTYPE html>
-      <html lang="he-IL" dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="language" content="Hebrew">
-          <meta http-equiv="Content-Language" content="he-IL">
-          <title>תמלול</title>
-        </head>
-        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial, sans-serif; font-size: 15px;" lang="he-IL">
-          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0; font-family: Arial, sans-serif;">${cleanName}</h1>
-          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8; font-family: Arial, sans-serif;">
-            ${contentHtml}
-          </div>
-        </body>
-      </html>
-    `;
+    const htmlString = `<!DOCTYPE html>
+<html lang="he-IL" dir="rtl">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="language" content="Hebrew">
+    <meta http-equiv="Content-Language" content="he-IL">
+    <title>תמלול</title>
+  </head>
+  <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial, sans-serif; font-size: 15px;" lang="he-IL">
+    <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0; font-family: Arial, sans-serif;">${cleanName}</h1>
+    <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8; font-family: Arial, sans-serif;">
+      ${contentHtml}
+    </div>
+  </body>
+</html>`;
 
     const buffer = await HTMLtoDOCX(htmlString, null, {
       table: { row: { cantSplit: true } },
@@ -946,14 +1013,15 @@ async function createWordDocument(transcription, filename, duration) {
       locale: 'he-IL'
     });
 
-    console.log(`✅ Word document created successfully for: ${cleanName}`);
+    console.log(`✅ Fallback Word document created successfully for: ${cleanName}`);
     return buffer;
 
   } catch (error) {
-    console.error('Error creating Word document:', error);
+    console.error('Error creating fallback Word document:', error);
     throw error;
   }
 }
+
 
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
@@ -1042,13 +1110,6 @@ const attachments = transcriptions.map(trans => {
            <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
                 🎉 תמלול מלא ושלם - אפילו לקבצים של שעות!
-              </p>
-            </div>
-            
-            <div style="background: #fff9c4; padding: 15px 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #fdd835;">
-              <h3 style="color: #5f4300; margin-top: 0; margin-bottom: 10px; font-size: 16px;">לתשומת לב:</h3>
-              <p style="margin: 0; font-size: 14px; color: #5f4300;">
-                אם הטקסט בקובץ אינו מיושר לימין, יש לבחור את כל התוכן (Ctrl+A) וללחוץ על כפתור 'ישר לימין' בתוכנת ה-Word.
               </p>
             </div>
             
