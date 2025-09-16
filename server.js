@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const HTMLtoDOCX = require('html-to-docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
@@ -821,140 +821,244 @@ function fixHebrewSpacing(text) {
 async function createWordDocument(transcription, filename, duration) {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`📄 Creating Word document with HTML-to-DOCX for: ${cleanName}`);
-
-    // נקה את הטקסט
-    let cleanedText = transcription
-      .replace(/\r\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-
-    // פצל לפסקאות - גם על בסיס שורות ריקות וגם על בסיס אורך
-    let sections = cleanedText.split(/\n\s*\n/)
-      .map(section => section.trim())
-      .filter(section => section.length > 0);
-
-    // אם יש רק פסקה אחת ארוכה, חלק אותה למשפטים
-    if (sections.length === 1 && sections[0].length > 300) {
-      const longText = sections[0];
-      const sentences = longText.split(/(?<=[.!?])\s+/);
-
-      // אם יש מספיק משפטים לחלוקה
-      if (sentences.length > 3) {
-        sections = [];
-        let currentSection = '';
-
-        sentences.forEach(sentence => {
-          if (currentSection.length + sentence.length > 200 && currentSection.length > 0) {
-            sections.push(currentSection.trim());
-            currentSection = sentence + ' ';
-          } else {
-            currentSection += sentence + ' ';
-          }
-        });
-
-        if (currentSection.trim()) {
-          sections.push(currentSection.trim());
-        }
-      }
+    console.log(`📄 Creating Word document from template for: ${cleanName}`);
+    
+    // 🔥 NEW: נסה תחילה עם תבנית
+  const templatePath = path.join(__dirname, 'simple-template.docx');
+    
+   if (false) {
+      console.log('📋 Using template file');
+      
+      const templateBuffer = fs.readFileSync(templatePath);
+      const zip = new JSZip();
+      await zip.loadAsync(templateBuffer);
+      
+      const documentXml = await zip.file('word/document.xml').async('string');
+      
+   // הכן תוכן
+      const title = cleanName;
+      const content = processTranscriptionForTemplate(transcription);
+      
+      console.log('🔍 About to replace in XML...');
+     console.log('XML contains TITLE:', documentXml.includes('TITLE'));
+console.log('XML contains CONTENT:', documentXml.includes('CONTENT'));
+      console.log('🔍 Content length to insert:', content.length);
+      
+      // החלף placeholders
+      let newDocumentXml = documentXml
+  .replace(/TITLE/g, escapeXml(title))
+  .replace(/CONTENT/g, content);
+        
+      console.log('🔍 After replacement:');
+      console.log('🔍 Still contains REPLACETITLE:', newDocumentXml.includes('REPLACETITLE'));
+      console.log('🔍 Still contains REPLACECONTENT:', newDocumentXml.includes('REPLACECONTENT'));
+      
+      zip.file('word/document.xml', newDocumentXml);
+      const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+      
+      console.log(`✅ Word document created from template for: ${cleanName}`);
+      return buffer;
     }
+    
+    // 🔥 אם אין תבנית - השתמש בקוד הישן
+    console.log('⚠️ No template found, using programmatic creation');
+    
+// החלף את הקטע בשורות 635-677 בקוד הזה:
 
-    // בנה HTML עם הגדרות RTL נכונות וחלוקה לפסקאות
-    let contentHtml = '';
-    sections.forEach(section => {
-      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      let combinedSection = lines.join(' ').trim();
-
-      // תיקון בעיות פיסוק ורווחים - כל סימני הפיסוק
-      combinedSection = combinedSection
-        // קודם תקן אכרונים עבריים - כל הסוגים
-        .replace(/([א-ת]+)\s*"\s*([א-ת]{1,2})(\s|$|[^א-תא-ת])/g, '$1__QUOTE__$2$3')     // הגן על אכרונים כמו רמב"ם, ז"ל
-        .replace(/([א-ת]+)\s*'\s*([א-ת]{1,2})(\s|$|[^א-תא-ת])/g, '$1__APOST__$2$3')     // הגן על אכרונים עם גרש
-        // אחר כך תקן פיסוק בין מילים נפרדות - כולל צמודות וכולל עם רווחים
-        .replace(/([\u0590-\u05FF])\.(\s*)([\u0590-\u05FF\[])/g, '$1.&nbsp;$3')      // תקן נקודות בין מילים עבריות
-        .replace(/([\u0590-\u05FF]),(\s*)([\u0590-\u05FF\"])/g, '$1,&nbsp;$3')  // תקן פסיקים צמודים למילים
-        .replace(/([\u0590-\u05FF])"(\s*)([\u0590-\u05FF])/g, '$1"&nbsp;$3')     // תקן גרשיים בין מילים עבריות
-        // החזר את האכרונים המוגנים
-        .replace(/__QUOTE__/g, '"')                              // החזר גרשיים באכרונים
-        .replace(/__APOST__/g, '\'')                             // החזר גרש באכרונים
-        .replace(/\](\s*)([\u0590-\u05FF\"])/g, ']&nbsp;$2')           // תקן סוגריים מרובעים צמודים למילים
-        .replace(/\",\"(\s*)([\u0590-\u05FF])/g, '",&nbsp;\"$2')       // תקן גרשיים+פסיק+גרשיים צמודים
-        .replace(/([\u0590-\u05FF])\"\./g, '$1\".&nbsp;')                // תקן גרשיים+נקודה בסוף
-        .replace(/([\u0590-\u05FF])\"\.(\s*)([\u0590-\u05FF])/g, '$1\".&nbsp;$3')  // תקן גרשיים+נקודה צמודים למילה
-        .replace(/^\"\.(\s*)([\u0590-\u05FF])/g, '\"&nbsp;$2')        // תקן גרשיים+נקודה בתחילת משפט
-        .replace(/([\u0590-\u05FF])'\s+([\u0590-\u05FF])/g, '$1\'&nbsp;$2')    // תקן גרש בין מילים נפרדות (רק עם רווח)
-        .replace(/([\u0590-\u05FF])\?(\s*)([\u0590-\u05FF])/g, '$1?&nbsp;$3')    // תקן סימני שאלה בין מילים עבריות
-        .replace(/([\u0590-\u05FF])!(\s*)([\u0590-\u05FF])/g, '$1!&nbsp;$3')     // תקן סימני קריאה בין מילים עבריות
-        .replace(/([\u0590-\u05FF]):(\s*)([\u0590-\u05FF])/g, '$1:&nbsp;$3')     // תקן נקודתיים בין מילים עבריות
-        .replace(/([\u0590-\u05FF]);(\s*)([\u0590-\u05FF])/g, '$1;&nbsp;$3')     // תקן נקודה פסיק בין מילים עבריות
-        // ניקוי כללי
-        .replace(/\s+([.,!?:"';])/g, '$1')          // הסר רווחים לפני סימני פיסוק
-        .replace(/([.,!?:"';])\s+/g, '$1&nbsp;')    // החלף רווח אחרי פיסוק ב-&nbsp;
-        .replace(/\s{2,}/g, ' ')                    // רווחים כפולים לרווח יחיד
-        .replace(/^([.,!?:"';])\s*/g, '')           // הסר סימני פיסוק מתחילת משפט (בסוף!)
-        .trim();
-
-      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
-        combinedSection += '.';
-      }
-
-      // חלק לפסקאות קצרות יותר אם הטקסט ארוך
-      if (combinedSection.length > 400) {
-        const sentences = combinedSection.split(/(?<=[.!?])\s+/);
-        let currentParagraph = '';
-
-        sentences.forEach(sentence => {
-          if (currentParagraph.length + sentence.length > 400 && currentParagraph.length > 0) {
-            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
-            currentParagraph = sentence + ' ';
-          } else {
-            currentParagraph += sentence + ' ';
-          }
-        });
-
-        if (currentParagraph.trim()) {
-          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
+const doc = new Document({
+  creator: "תמלול חכם",
+  language: "he-IL",
+  defaultRunProperties: {
+    font: "Times New Roman",
+    size: 24,
+    rtl: true
+  },
+  styles: {
+    default: {
+      document: {
+        run: {
+          font: "Arial",
+          size: 24,
+          rightToLeft: true,
+          languageComplexScript: "he-IL"
+        },
+        paragraph: {
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true
         }
-      } else {
-        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
       }
-    });
-
-    const htmlString = `
-      <!DOCTYPE html>
-      <html lang="he-IL" dir="rtl">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="language" content="Hebrew">
-          <meta http-equiv="Content-Language" content="he-IL">
-          <title>תמלול</title>
-        </head>
-        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial, sans-serif; font-size: 15px;" lang="he-IL">
-          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0; font-family: Arial, sans-serif;">${cleanName}</h1>
-          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8; font-family: Arial, sans-serif;">
-            ${contentHtml}
-          </div>
-        </body>
-      </html>
-    `;
-
-    const buffer = await HTMLtoDOCX(htmlString, null, {
-      table: { row: { cantSplit: true } },
-      footer: true,
-      pageNumber: true,
-      lang: 'he-IL',
-      locale: 'he-IL'
-    });
-
+    },
+    paragraphStyles: [
+      {
+        id: "HebrewParagraph",
+        name: "Hebrew Paragraph",
+        basedOn: "Normal",
+        paragraph: {
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true
+        },
+        run: {
+          rightToLeft: true,
+          languageComplexScript: "he-IL",
+          font: "Arial"
+        }
+      }
+    ]
+  },
+  sections: [{
+    properties: {
+      page: {
+        margin: {
+          top: 2160,
+          right: 1800,
+          bottom: 2160,
+          left: 1800
+        },
+        textDirection: "rtl"
+      },
+      rtlGutter: true,
+      bidi: true,
+      textDirection: "rtl"
+    },
+    children: [
+      // Title with moderate spacing
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: cleanName,
+            bold: true,
+            size: 36,
+            font: { name: "Arial" },
+            rightToLeft: true,
+            languageComplexScript: "he-IL"
+          })
+        ],
+        alignment: AlignmentType.RIGHT,
+        bidirectional: true,
+        style: "HebrewParagraph",
+        spacing: { 
+          after: 480,
+          line: 480
+        }
+      }),
+      
+      // Content with balanced spacing
+      ...processTranscriptionContent(transcription)
+    ]
+  }]
+});
+    
+    const buffer = await Packer.toBuffer(doc);
     console.log(`✅ Word document created successfully for: ${cleanName}`);
     return buffer;
-
+    
   } catch (error) {
     console.error('Error creating Word document:', error);
     throw error;
   }
 }
 
+// Process transcription content for Word document
+function processTranscriptionContent(transcription) {
+  const paragraphs = [];
+  
+  let cleanedText = transcription
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  
+  const sections = cleanedText.split(/\n\s*\n/)
+    .map(section => section.trim())
+    .filter(section => section.length > 0);
+  
+  sections.forEach((section, index) => {
+    const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    let combinedSection = lines.join(' ').trim();
+
+// תיקון רווחים סביב סימני פיסוק
+combinedSection = combinedSection
+  .replace(/\s*\.\s*/g, '. ')  // נקודה + רווח יחיד
+  .replace(/\s*,\s*/g, ', ')   // פסיק + רווח יחיד
+  .replace(/\s*!\s*/g, '! ')   // קריאה + רווח יחיד
+  .replace(/\s*\?\s*/g, '? ')  // שאלה + רווח יחיד
+  .replace(/\s*:\s*/g, ': ')   // נקודתיים + רווח יחיד
+  .replace(/\s+/g, ' ')        // רווחים כפולים לרווח יחיד
+  .trim();
+    if (combinedSection.length > 300) {
+      const sentences = combinedSection.split(/(?<=[.!?])\s+/);
+      let currentPara = '';
+      
+      for (const sentence of sentences) {
+        if (currentPara.length + sentence.length > 300 && currentPara.length > 0) {
+          paragraphs.push(new Paragraph({
+            children: [
+              new TextRun({
+                text: currentPara.trim(),
+                size: 24,
+                font: { name: "Arial" },
+                rightToLeft: true,
+                languageComplexScript: "he-IL"
+              })
+            ],
+            alignment: AlignmentType.RIGHT,
+            bidirectional: true,
+            spacing: { after: 120, line: 360 }
+          }));
+          currentPara = sentence + ' ';
+        } else {
+          currentPara += sentence + ' ';
+        }
+      }
+      
+      if (currentPara.trim()) {
+        paragraphs.push(new Paragraph({
+          children: [
+            new TextRun({
+              text: currentPara.trim(),
+              size: 24,
+              font: { name: "Arial" },
+              rightToLeft: true,
+              languageComplexScript: "he-IL"
+            })
+          ],
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true,
+          spacing: { after: 120, line: 360 }
+        }));
+      }
+      return;
+    }
+    
+    if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
+      combinedSection += '.';
+    }
+    
+    // ללא בדיקת דוברים - פשוט יצירת פסקה רגילה
+paragraphs.push(new Paragraph({
+  children: [
+    new TextRun({
+      text: combinedSection,
+      size: 24,
+      font: { 
+        name: "Arial"
+      },
+      rightToLeft: true,
+      languageComplexScript: "he-IL"
+      // ללא bold, ללא color
+    })
+  ],
+  alignment: AlignmentType.RIGHT,
+  bidirectional: true,
+  style: "HebrewParagraph",
+  spacing: { 
+    after: 120,
+    line: 360
+  }
+}));
+  });
+  
+  return paragraphs;
+}
 // Enhanced email with failure reporting
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
