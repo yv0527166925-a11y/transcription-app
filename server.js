@@ -1458,13 +1458,72 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   }
 }
 
+// Python availability checker
+function checkPythonAvailability() {
+  try {
+    const { execSync } = require('child_process');
+    execSync('python3 --version', { timeout: 5000 });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Routes
 app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    ffmpegAvailable: checkFFmpegAvailability()
+    ffmpegAvailable: checkFFmpegAvailability(),
+    pythonAvailable: checkPythonAvailability()
   });
+});
+
+// Test Python integration
+app.get('/test-python', async (req, res) => {
+  try {
+    const { spawn } = require('child_process');
+
+    const pythonProcess = spawn('python3', ['-c', `
+import sys
+from python_docx import Document
+print("Python and python-docx are working!")
+print(f"Python version: {sys.version}")
+    `]);
+
+    let output = '';
+    let error = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+      error += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code === 0) {
+        res.json({
+          success: true,
+          output: output.trim(),
+          message: 'Python and python-docx integration working!'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: error.trim(),
+          exitCode: code
+        });
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // 🔧 NEW: Download endpoint for transcribed files
