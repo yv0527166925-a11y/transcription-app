@@ -899,7 +899,7 @@ async function createWordDocument(transcription, filename, duration) {
 
         sentences.forEach(sentence => {
           if (currentParagraph.length + sentence.length > 400 && currentParagraph.length > 0) {
-            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
+            contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
             currentParagraph = sentence + ' ';
           } else {
             currentParagraph += sentence + ' ';
@@ -907,10 +907,10 @@ async function createWordDocument(transcription, filename, duration) {
         });
 
         if (currentParagraph.trim()) {
-          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
+          contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${currentParagraph.trim()}</span></p>`;
         }
       } else {
-        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
+        contentHtml += `<p dir="rtl" style="direction: rtl !important; text-align: right !important; margin-bottom: 16px; line-height: 1.7; font-size: 15px; font-family: Arial, sans-serif;"><span lang="he-IL" xml:lang="he-IL">${combinedSection}</span></p>`;
       }
     });
 
@@ -923,9 +923,9 @@ async function createWordDocument(transcription, filename, duration) {
           <meta http-equiv="Content-Language" content="he-IL">
           <title>תמלול</title>
         </head>
-        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial; font-size: 15px;" lang="he-IL">
-          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0;">${cleanName}</h1>
-          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8;">
+        <body dir="rtl" style="direction: rtl !important; text-align: right !important; font-family: Arial, sans-serif; font-size: 15px;" lang="he-IL">
+          <h1 dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 18px; font-weight: bold; margin-bottom: 24px; margin-top: 0; font-family: Arial, sans-serif;">${cleanName}</h1>
+          <div dir="rtl" style="direction: rtl !important; text-align: right !important; font-size: 15px; line-height: 1.8; font-family: Arial, sans-serif;">
             ${contentHtml}
           </div>
         </body>
