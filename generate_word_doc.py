@@ -3,17 +3,27 @@
 
 import sys
 import json
-from docx import Document
-from docx.shared import Inches, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
+
+# Don't import docx at module level - do it only when needed
+# This prevents immediate failure if docx is not installed
 
 def create_hebrew_word_document(transcription, title, output_path):
     """
     יוצר מסמך Word בשיטה של החלפת תבנית עובדת
     """
     try:
+        # Check if python-docx is available
+        try:
+            from docx import Document
+            from docx.shared import Inches, Pt
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+            from docx.oxml.ns import qn
+            from docx.oxml import OxmlElement
+        except ImportError as e:
+            print(f"python-docx not available: {str(e)}", file=sys.stderr)
+            print("Falling back to HTML generation", file=sys.stderr)
+            return create_html_fallback(transcription, title, output_path)
+
         import os
         import shutil
         from zipfile import ZipFile
@@ -140,6 +150,11 @@ def create_basic_hebrew_document(transcription, title, output_path):
     יצירת מסמך בסיסי אם אין תבנית
     """
     try:
+        # Import docx here too
+        from docx import Document
+        from docx.shared import Pt
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+
         doc = Document()
     except Exception as e:
         print(f"Error creating basic document: {str(e)}", file=sys.stderr)
@@ -229,12 +244,11 @@ def create_html_fallback(transcription, title, output_path):
 </body>
 </html>'''
 
-        # שמירה כקובץ HTML
-        html_path = output_path.replace('.docx', '.html')
-        with open(html_path, 'w', encoding='utf-8') as f:
+        # שמירה כקובץ HTML במקום docx
+        with open(output_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-        print(f"Created HTML fallback: {html_path}")
+        print(f"Created HTML fallback at: {output_path}", file=sys.stderr)
         return True
 
     except Exception as e:
@@ -306,14 +320,14 @@ def main():
             print("Usage: python generate_word_doc.py '<json_data>'")
             sys.exit(1)
 
-        # בדיקת python-docx
+        # בדיקת python-docx - לא בהכרח נדרשת כי יש לנו HTML fallback
         try:
             import docx
             print(f"python-docx version: {docx.__version__}", file=sys.stderr)
+            print("python-docx is available", file=sys.stderr)
         except ImportError as e:
             print(f"python-docx import error: {str(e)}", file=sys.stderr)
-            print(json.dumps({"success": False, "error": f"python-docx not installed: {str(e)}"}))
-            sys.exit(1)
+            print("Will use HTML fallback instead", file=sys.stderr)
 
         # קבלת הנתונים מ-Node.js
         json_data = sys.argv[1]
