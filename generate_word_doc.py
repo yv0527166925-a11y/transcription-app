@@ -139,7 +139,12 @@ def create_basic_hebrew_document(transcription, title, output_path):
     """
     יצירת מסמך בסיסי אם אין תבנית
     """
-    doc = Document()
+    try:
+        doc = Document()
+    except Exception as e:
+        print(f"Error creating basic document: {str(e)}", file=sys.stderr)
+        # אם גם זה נכשל, ניצור מסמך HTML פשוט
+        return create_html_fallback(transcription, title, output_path)
 
     # כותרת פשוטה
     title_paragraph = doc.add_paragraph()
@@ -171,6 +176,70 @@ def create_basic_hebrew_document(transcription, title, output_path):
 
     doc.save(output_path)
     return True
+
+def create_html_fallback(transcription, title, output_path):
+    """
+    יצירת קובץ HTML כ-fallback אם Python-docx לא זמין
+    """
+    try:
+        html_content = f'''<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+    <style>
+        body {{
+            font-family: David, Arial, sans-serif;
+            direction: rtl;
+            text-align: right;
+            margin: 40px;
+            line-height: 1.6;
+        }}
+        h1 {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }}
+        p {{
+            margin-bottom: 16px;
+            font-size: 12px;
+        }}
+    </style>
+</head>
+<body>
+    <h1>{title}</h1>
+'''
+
+        # עיבוד הטקסט לפסקאות
+        clean_text = transcription.replace('\r\n', '\n').replace('\n\n\n', '\n\n').strip()
+        sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
+
+        for section in sections:
+            lines = [line.strip() for line in section.split('\n') if line.strip()]
+            combined_text = ' '.join(lines).strip()
+
+            if combined_text and not combined_text[-1] in '.!?:':
+                combined_text += '.'
+
+            # הימנעות מ-HTML injection
+            safe_text = combined_text.replace('<', '&lt;').replace('>', '&gt;').replace('&', '&amp;')
+            html_content += f'    <p>{safe_text}</p>\n'
+
+        html_content += '''
+</body>
+</html>'''
+
+        # שמירה כקובץ HTML
+        html_path = output_path.replace('.docx', '.html')
+        with open(html_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        print(f"Created HTML fallback: {html_path}")
+        return True
+
+    except Exception as e:
+        print(f"HTML fallback failed: {str(e)}")
+        return False
 
 def escape_xml(text):
     """
@@ -229,17 +298,35 @@ def main():
     פונקציה ראשית המקבלת פרמטרים מ-Node.js
     """
     try:
+        print("Python script started", file=sys.stderr)
+        print(f"Python version: {sys.version}", file=sys.stderr)
+        print(f"Arguments: {sys.argv}", file=sys.stderr)
+
         if len(sys.argv) != 2:
             print("Usage: python generate_word_doc.py '<json_data>'")
             sys.exit(1)
 
+        # בדיקת python-docx
+        try:
+            import docx
+            print(f"python-docx version: {docx.__version__}", file=sys.stderr)
+        except ImportError as e:
+            print(f"python-docx import error: {str(e)}", file=sys.stderr)
+            print(json.dumps({"success": False, "error": f"python-docx not installed: {str(e)}"}))
+            sys.exit(1)
+
         # קבלת הנתונים מ-Node.js
         json_data = sys.argv[1]
+        print(f"Received JSON data length: {len(json_data)}", file=sys.stderr)
+
         data = json.loads(json_data)
+        print(f"Parsed data keys: {list(data.keys())}", file=sys.stderr)
 
         transcription = data.get('transcription', '')
         title = data.get('title', 'תמלול')
         output_path = data.get('output_path', 'output.docx')
+
+        print(f"Creating document: {title} -> {output_path}", file=sys.stderr)
 
         # יצירת המסמך
         success = create_hebrew_word_document(transcription, title, output_path)
@@ -250,6 +337,9 @@ def main():
             print(json.dumps({"success": False, "error": "Failed to create document"}))
 
     except Exception as e:
+        print(f"Exception in main: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         print(json.dumps({"success": False, "error": str(e)}))
         sys.exit(1)
 
