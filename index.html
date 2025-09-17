@@ -166,39 +166,6 @@
             box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
         }
 
-        /* 🆕 Cancel transcription button styles */
-        .cancel-btn {
-            background: linear-gradient(45deg, #ff9800, #f57c00);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            padding: 12px 20px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
-            min-width: 140px;
-            margin-right: 10px;
-            animation: pulse-orange 2s infinite;
-        }
-
-        .cancel-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(255, 152, 0, 0.4);
-            background: linear-gradient(45deg, #f57c00, #ef6c00);
-        }
-
-        .cancel-btn:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
-        }
-
-        @keyframes pulse-orange {
-            0% { box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3); }
-            50% { box-shadow: 0 6px 20px rgba(255, 152, 0, 0.5); }
-            100% { box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3); }
-        }
 
         .text-center {
             text-align: center;
@@ -1702,8 +1669,6 @@
             submitBtn.textContent = '⏳ מעבד...';
             document.getElementById('progressBar').style.display = 'block';
 
-            // Show cancel button for safe cancellation window
-            showCancelButton();
             
             showStatus(`
                 <div class="spinner"></div>
@@ -1743,8 +1708,6 @@
                 updateProgress(100);
 
                 if (data.success) {
-                    // Hide cancel button once transcription officially started
-                    hideCancelButton();
 
                     currentUser.remainingMinutes -= data.estimatedMinutes || totalMinutes;
                     currentUser.totalTranscribed += data.estimatedMinutes || totalMinutes;
@@ -1773,7 +1736,6 @@
                 clearInterval(progressInterval);
                 showStatus(`❌ <strong>שגיאה:</strong> ${error.message}<br><small>אנא נסה שוב או צור קשר לתמיכה</small>`, 'error');
             } finally {
-                hideCancelButton();
                 submitBtn.disabled = false;
                 submitBtn.textContent = '🚀 התחל תמלול מלא';
                 setTimeout(() => {
@@ -1784,70 +1746,6 @@
             }
         });
 
-        // 🆕 Transcription cancellation functions
-        function showCancelButton() {
-            const submitBtn = document.getElementById('submitBtn');
-            if (!document.getElementById('cancelBtn')) {
-                const cancelBtn = document.createElement('button');
-                cancelBtn.id = 'cancelBtn';
-                cancelBtn.type = 'button';
-                cancelBtn.className = 'cancel-btn';
-                cancelBtn.innerHTML = '❌ בטל תמלול';
-                cancelBtn.onclick = cancelTranscription;
-
-                // Insert after submit button
-                submitBtn.parentNode.insertBefore(cancelBtn, submitBtn.nextSibling);
-            }
-        }
-
-        function hideCancelButton() {
-            const cancelBtn = document.getElementById('cancelBtn');
-            if (cancelBtn) {
-                cancelBtn.remove();
-            }
-        }
-
-        async function cancelTranscription() {
-            if (!currentTranscriptionId) {
-                showStatus('❌ לא ניתן לבטל - התמלול כבר התחיל', 'error');
-                return;
-            }
-
-            const confirmCancel = confirm('האם אתה בטוח שברצונך לבטל את התמלול?\nלא יחויבו דקות עבור ביטול זה.');
-            if (!confirmCancel) return;
-
-            try {
-                const response = await fetch(`${API_BASE}/cancel-transcription`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        transcriptionId: currentTranscriptionId,
-                        email: currentUser.email
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    showStatus('✅ התמלול בוטל בהצלחה - לא נחויבו דקות', 'success');
-
-                    // Reset UI to initial state
-                    const submitBtn = document.getElementById('submitBtn');
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = '🚀 התחל תמלול';
-                    document.getElementById('progressBar').style.display = 'none';
-                    updateProgress(0);
-
-                    hideCancelButton();
-                    currentTranscriptionId = null;
-                } else {
-                    showStatus(`❌ שגיאה בביטול: ${data.error}`, 'error');
-                }
-            } catch (error) {
-                console.error('Cancel transcription error:', error);
-                showStatus(`❌ שגיאה בביטול התמלול: ${error.message}`, 'error');
-            }
-        }
 
         // Payment functions
         function selectPaymentOption(element, minutes, price) {
