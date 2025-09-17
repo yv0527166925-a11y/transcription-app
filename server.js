@@ -15,13 +15,16 @@ const PORT = process.env.PORT || 3000;
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Email transporter
+// Email transporter with timeout settings
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  connectionTimeout: 60000, // 60 seconds
+  greetingTimeout: 30000, // 30 seconds
+  socketTimeout: 60000 // 60 seconds
 });
 
 // Middleware
@@ -1264,10 +1267,17 @@ const attachments = transcriptions.map(trans => {
 
     await transporter.sendMail(mailOptions);
     console.log(`✅ Enhanced email sent successfully to: ${userEmail}`);
-    
+
   } catch (error) {
-    console.error('Email sending error:', error);
-    throw error;
+    console.error('❌ Email sending error:', error.message);
+    console.error('❌ Error code:', error.code);
+
+    // Don't throw error - transcription succeeded, only email failed
+    console.log('⚠️ Transcription completed successfully but email failed');
+    console.log('💡 User can download files from their history or contact support');
+
+    // Could implement alternative notification methods here
+    // For now, just log the issue without failing the entire process
   }
 }
 
