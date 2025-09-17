@@ -1017,7 +1017,7 @@ async function createWordDocumentPython(transcription, filename, duration) {
 
     // קריאה לסקריפט Python
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', ['generate_word_doc.py', pythonData], {
+      const pythonProcess = spawn('python3', ['generate_word_doc.py', pythonData], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -1462,9 +1462,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 function checkPythonAvailability() {
   try {
     const { execSync } = require('child_process');
-    execSync('python3 --version', { timeout: 5000 });
+    execSync('python3 --version', { timeout: 5000, stdio: 'ignore' });
     return true;
   } catch (error) {
+    console.log('⚠️ Python3 not available:', error.message);
     return false;
   }
 }
@@ -1477,6 +1478,45 @@ app.get('/health', (req, res) => {
     ffmpegAvailable: checkFFmpegAvailability(),
     pythonAvailable: checkPythonAvailability()
   });
+});
+
+// Test Gemini API key directly
+app.get('/test-gemini', async (req, res) => {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    console.log('🔑 Testing Gemini API key...');
+    console.log('🔑 Key exists:', !!apiKey);
+    console.log('🔑 Key length:', apiKey ? apiKey.length : 0);
+    console.log('🔑 Key prefix:', apiKey ? apiKey.substring(0, 10) + '...' : 'none');
+
+    if (!apiKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'GEMINI_API_KEY not found in environment variables'
+      });
+    }
+
+    // Test with a simple text generation
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const result = await model.generateContent("Say hello in Hebrew");
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({
+      success: true,
+      message: 'Gemini API key is working!',
+      keyLength: apiKey.length,
+      testResponse: text.substring(0, 100)
+    });
+
+  } catch (error) {
+    console.error('🔥 Gemini API test error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      details: error.toString()
+    });
+  }
 });
 
 // Test Python integration
