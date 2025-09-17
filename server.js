@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const { Resend } = require('resend');
+const mailjet = require('node-mailjet');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
@@ -16,13 +16,16 @@ const PORT = process.env.PORT || 3000;
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Initialize Resend
-let resend;
-if (process.env.RESEND_API_KEY) {
-  resend = new Resend(process.env.RESEND_API_KEY);
-  console.log('📧 Resend configured');
+// Initialize Mailjet
+let mailjetClient;
+if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) {
+  mailjetClient = mailjet.apiConnect(
+    process.env.MAILJET_API_KEY,
+    process.env.MAILJET_SECRET_KEY
+  );
+  console.log('📧 Mailjet configured');
 } else {
-  console.log('⚠️ Resend API key not found');
+  console.log('⚠️ Mailjet API keys not found');
 }
 
 // Email transporter with timeout settings
@@ -1215,14 +1218,20 @@ const attachments = transcriptions.map(trans => {
       `;
     }
 
-    // Try Resend first, fallback to nodemailer
-    if (process.env.RESEND_API_KEY && resend) {
-      // Resend email
+    // Try Mailjet first, fallback to nodemailer
+    if (mailjetClient) {
+      // Mailjet email
       const emailData = {
-        to: [userEmail],
-        from: process.env.EMAIL_USER || 'noreply@transcription.app',
-        subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
-        html: `
+        Messages: [{
+          From: {
+            Email: process.env.EMAIL_USER || 'noreply@transcription.app',
+            Name: 'מערכת התמלול החכמה'
+          },
+          To: [{
+            Email: userEmail
+          }],
+          Subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+          HTMLPart: `
         <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
@@ -1274,23 +1283,21 @@ const attachments = transcriptions.map(trans => {
             </p>
           </div>
         </div>
-      `
+          `
+        }]
       };
 
-      // Add attachments to Resend
+      // Add attachments to Mailjet
       if (attachments && attachments.length > 0) {
-        emailData.attachments = attachments.map(att => ({
-          content: att.content,
-          filename: att.filename,
-          contentType: att.contentType
+        emailData.Messages[0].Attachments = attachments.map(att => ({
+          ContentType: att.contentType,
+          Filename: att.filename,
+          Base64Content: att.content.toString('base64')
         }));
       }
 
-      const { data, error } = await resend.emails.send(emailData);
-      if (error) {
-        throw new Error(error.message);
-      }
-      console.log(`✅ Resend email sent successfully to: ${userEmail}`);
+      const result = await mailjetClient.post('send', { version: 'v3.1' }).request(emailData);
+      console.log(`✅ Mailjet email sent successfully to: ${userEmail}`);
 
     } else {
       // Fallback to nodemailer
