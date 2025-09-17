@@ -532,9 +532,63 @@ function mergeTranscriptionChunks(chunks) {
     .replace(/\n{4,}/g, '\n\n\n')
     .replace(/^\s+|\s+$/gm, '')
     .trim();
-  
+
   console.log(`✅ Merge completed: ${merged.length} total characters`);
+
+  // Apply paragraph breaking logic to merged content to ensure short paragraphs
+  console.log(`📝 Applying paragraph breaking to merged transcription...`);
+  merged = applyParagraphBreaking(merged);
+
   return merged;
+}
+
+// Helper function to break long paragraphs into shorter ones
+function applyParagraphBreaking(text) {
+  // תיקון פיסוק בסיסי
+  text = text
+    .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
+    .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
+    .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
+    .replace(/([א-ת])\?([א-ת])/g, '$1? $2')   // שאלה עם רווח
+    .replace(/([א-ת]):([א-ת])/g, '$1: $2')    // נקודתיים עם רווח
+    .replace(/([א-ת]);([א-ת])/g, '$1; $2')    // נקודה-פסיק עם רווח
+    .replace(/([א-ת])"([א-ת])/g, '$1" $2')    // גרשיים עם רווח
+    .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
+    .trim();
+
+  // חלק למשפטים
+  const sentences = text.split(/([.!?:]\s+)/).filter(s => s.trim().length > 0);
+  const paragraphs = [];
+  let currentParagraph = '';
+  let sentenceCount = 0;
+
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i].trim();
+
+    if (sentence.match(/[.!?:]$/)) {
+      // זה משפט שלם
+      currentParagraph += sentence + ' ';
+      sentenceCount++;
+
+      // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-150 תווים
+      if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 150)) {
+        paragraphs.push(currentParagraph.trim());
+        currentParagraph = '';
+        sentenceCount = 0;
+      }
+    } else if (sentence.length > 0) {
+      // זה חלק ממשפט
+      currentParagraph += sentence + ' ';
+    }
+  }
+
+  // הוסף את הפסקה האחרונה אם יש
+  if (currentParagraph.trim().length > 0) {
+    paragraphs.push(currentParagraph.trim());
+  }
+
+  console.log(`📝 Applied paragraph breaking: ${paragraphs.length} paragraphs created`);
+  return paragraphs.join('\n\n');
 }
 
 // Helper function to clean filename for display
@@ -942,8 +996,8 @@ async function createWordDocument(transcription, filename, duration) {
           currentParagraph += sentence + ' ';
           sentenceCount++;
 
-          // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-200 תווים
-          if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 200)) {
+          // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-150 תווים
+          if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 150)) {
             paragraphs.push(currentParagraph.trim());
             currentParagraph = '';
             sentenceCount = 0;
