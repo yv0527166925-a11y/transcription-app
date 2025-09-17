@@ -922,7 +922,30 @@ async function createWordDocument(transcription, filename, duration) {
     }
 
     // צור פסקאות קצרות מכל הטקסט
-    const fullText = sections.join(' ').trim();
+    let fullText = sections.join(' ').trim();
+
+    // נקה סוגריים מרובעים של רעש רקע ומוזיקה
+    fullText = fullText
+      .replace(/\[מוזיקה\]/gi, '')
+      .replace(/\[רעש רקע\]/gi, '')
+      .replace(/\[צלילים\]/gi, '')
+      .replace(/\[רעש\]/gi, '')
+      .replace(/\[קולות\]/gi, '')
+      .replace(/\[מוזיקת רקע\]/gi, '')
+      .replace(/\[הפסקה\]/gi, '')
+      .replace(/\[שקט\]/gi, '')
+      .replace(/\[בלתי ברור\]/gi, '')
+      .replace(/\[לא ברור\]/gi, '')
+      .replace(/\[אי-ברור\]/gi, '')
+      .replace(/\[\?\?\?\]/gi, '')
+      .replace(/\[MUSIC\]/gi, '')
+      .replace(/\[BACKGROUND\]/gi, '')
+      .replace(/\[NOISE\]/gi, '')
+      .replace(/\[SOUNDS\]/gi, '')
+      .replace(/\[UNCLEAR\]/gi, '')
+      .replace(/\s{2,}/g, ' ')  // נקה רווחים כפולים שנוצרו
+      .trim();
+
     const shortParagraphs = createShortParagraphs(fullText);
 
     // יצירת XML לכל פסקה קצרה
