@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
@@ -14,6 +15,14 @@ const PORT = process.env.PORT || 3000;
 
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Initialize SendGrid
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('📧 SendGrid configured');
+} else {
+  console.log('⚠️ SendGrid API key not found');
+}
 
 // Email transporter with timeout settings
 const transporter = nodemailer.createTransport({
@@ -1164,7 +1173,7 @@ async function createWordDocumentFallback(transcription, filename, duration) {
 }
 
 
-// Enhanced email with failure reporting
+// Enhanced email with failure reporting - using SendGrid
 async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions = []) {
   try {
     console.log(`📧 Preparing enhanced email for: ${userEmail}`);
@@ -1205,11 +1214,14 @@ const attachments = transcriptions.map(trans => {
       `;
     }
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: userEmail,
-      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
-      html: `
+    // Try SendGrid first, fallback to nodemailer
+    if (process.env.SENDGRID_API_KEY) {
+      // SendGrid email
+      const msg = {
+        to: userEmail,
+        from: process.env.EMAIL_USER || 'noreply@transcription.app',
+        subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+        html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
@@ -1261,12 +1273,35 @@ const attachments = transcriptions.map(trans => {
             </p>
           </div>
         </div>
-      `,
-      attachments: attachments
-    };
+      `
+      };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Enhanced email sent successfully to: ${userEmail}`);
+      // Add attachments to SendGrid
+      if (attachments && attachments.length > 0) {
+        msg.attachments = attachments.map(att => ({
+          content: att.content.toString('base64'),
+          filename: att.filename,
+          type: att.contentType,
+          disposition: 'attachment'
+        }));
+      }
+
+      await sgMail.send(msg);
+      console.log(`✅ SendGrid email sent successfully to: ${userEmail}`);
+
+    } else {
+      // Fallback to nodemailer
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: userEmail,
+        subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+        html: htmlContent,
+        attachments: attachments
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`✅ Nodemailer email sent successfully to: ${userEmail}`);
+    }
 
   } catch (error) {
     console.error('❌ Email sending error:', error.message);
