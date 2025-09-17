@@ -429,9 +429,12 @@ ${contextPrompt}
 - שמור על רציפות טבעית
 תתחיל עכשיו עם התמלול:`;
 
-    console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks}...`);
+    const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
+    const startTime = Date.now();
+    console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    const result = await model.generateContent([
+    // Add timeout wrapper - 5 minutes per chunk
+    const transcriptionPromise = model.generateContent([
       {
         inlineData: {
           mimeType: 'audio/wav',
@@ -441,9 +444,20 @@ ${contextPrompt}
       prompt
     ]);
 
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Transcription timeout after 5 minutes')), 5 * 60 * 1000)
+    );
+
+    const result = await Promise.race([transcriptionPromise, timeoutPromise]);
+
     const response = await result.response;
     let transcription = response.text();
-    
+
+    // Validate transcription
+    if (!transcription || transcription.trim().length < 10) {
+      throw new Error(`Invalid transcription: too short (${transcription ? transcription.length : 0} characters)`);
+    }
+
     // Clean the transcription
     transcription = transcription
       .replace(/\r\n/g, '\n')
@@ -451,12 +465,14 @@ ${contextPrompt}
       .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
       .replace(/\n{3,}/g, '\n\n')
       .trim();
-    
-    console.log(`✅ Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters`);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
     return transcription;
-    
+
   } catch (error) {
-    console.error(`❌ Error transcribing chunk ${chunkIndex + 1}:`, error);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`❌ Error transcribing chunk ${chunkIndex + 1} after ${duration}s:`, error.message);
     throw error;
   }
 }
@@ -706,32 +722,57 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       throw new Error('No chunks were created');
     }
     
-    // Transcribe each chunk
+    // Transcribe each chunk with retry mechanism
     const transcriptions = [];
+    const maxRetries = 2;
+
     for (let i = 0; i < chunksData.chunks.length; i++) {
       const chunk = chunksData.chunks[i];
-      
-      try {
-        const chunkTranscription = await transcribeAudioChunk(
-          chunk.path, 
-          i, 
-          chunksData.chunks.length, 
-          filename, 
-          language
-        );
-        
-        transcriptions.push(chunkTranscription);
-        
-        // Small delay between chunks to avoid rate limiting
-        if (i < chunksData.chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
+      let retryCount = 0;
+      let chunkTranscription = null;
+
+      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length}`);
+
+      while (retryCount <= maxRetries && !chunkTranscription) {
+        try {
+          if (retryCount > 0) {
+            console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
+            // Longer delay between retries
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+
+          chunkTranscription = await transcribeAudioChunk(
+            chunk.path,
+            i,
+            chunksData.chunks.length,
+            filename,
+            language
+          );
+
+          transcriptions.push(chunkTranscription);
+          console.log(`✅ Chunk ${i + 1} completed successfully`);
+
+          // Delay between chunks to avoid rate limiting
+          if (i < chunksData.chunks.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+
+        } catch (chunkError) {
+          retryCount++;
+          console.error(`❌ Failed to transcribe chunk ${i + 1} (attempt ${retryCount}):`, chunkError.message);
+
+          if (retryCount > maxRetries) {
+            console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
+            transcriptions.push(`[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`);
+          } else {
+            // Wait before retry
+            console.log(`⏳ Waiting before retry for chunk ${i + 1}...`);
+          }
         }
-        
-      } catch (chunkError) {
-        console.error(`❌ Failed to transcribe chunk ${i + 1}:`, chunkError);
-        // Continue with other chunks - don't fail the entire process
-        transcriptions.push(`[שגיאה בתמלול קטע ${i + 1}]`);
       }
+
+      // Status update
+      console.log(`📊 Progress: ${i + 1}/${chunksData.chunks.length} chunks processed (${Math.round((i + 1) / chunksData.chunks.length * 100)}%)`);
     }
     
     // Merge all transcriptions
