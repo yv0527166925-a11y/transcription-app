@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const sgMail = require('@sendgrid/mail');
+const { Resend } = require('resend');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
@@ -16,12 +16,13 @@ const PORT = process.env.PORT || 3000;
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Initialize SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('📧 SendGrid configured');
+// Initialize Resend
+let resend;
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  console.log('📧 Resend configured');
 } else {
-  console.log('⚠️ SendGrid API key not found');
+  console.log('⚠️ Resend API key not found');
 }
 
 // Email transporter with timeout settings
@@ -1214,11 +1215,11 @@ const attachments = transcriptions.map(trans => {
       `;
     }
 
-    // Try SendGrid first, fallback to nodemailer
-    if (process.env.SENDGRID_API_KEY) {
-      // SendGrid email
-      const msg = {
-        to: userEmail,
+    // Try Resend first, fallback to nodemailer
+    if (process.env.RESEND_API_KEY && resend) {
+      // Resend email
+      const emailData = {
+        to: [userEmail],
         from: process.env.EMAIL_USER || 'noreply@transcription.app',
         subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
         html: `
@@ -1276,18 +1277,20 @@ const attachments = transcriptions.map(trans => {
       `
       };
 
-      // Add attachments to SendGrid
+      // Add attachments to Resend
       if (attachments && attachments.length > 0) {
-        msg.attachments = attachments.map(att => ({
-          content: att.content.toString('base64'),
+        emailData.attachments = attachments.map(att => ({
+          content: att.content,
           filename: att.filename,
-          type: att.contentType,
-          disposition: 'attachment'
+          contentType: att.contentType
         }));
       }
 
-      await sgMail.send(msg);
-      console.log(`✅ SendGrid email sent successfully to: ${userEmail}`);
+      const { data, error } = await resend.emails.send(emailData);
+      if (error) {
+        throw new Error(error.message);
+      }
+      console.log(`✅ Resend email sent successfully to: ${userEmail}`);
 
     } else {
       // Fallback to nodemailer
