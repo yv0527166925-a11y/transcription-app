@@ -100,25 +100,28 @@ def create_hebrew_word_document(transcription, title, output_path):
         all_text = ' '.join(sections)
         all_text = fix_hebrew_punctuation(all_text)
 
-        # חלוקה לפסקאות של 2-3 משפטים
+        # חלוקה לפסקאות - שומרים על שלמות המירכאות
         import re
-        sentences = re.split(r'([.!?:])', all_text)
+
+        # חלוקה בזהירות למשפטים, אבל לא אם יש מירכאה פתוחה
+        words = all_text.split()
         current_para = ""
-        sentence_count = 0
+        word_count = 0
 
-        i = 0
-        while i < len(sentences) - 1:
-            if i + 1 < len(sentences):
-                sentence = (sentences[i].strip() + sentences[i+1]).strip()
-                if sentence:
-                    current_para += sentence + " "
-                    sentence_count += 1
+        for word in words:
+            current_para += word + " "
+            word_count += 1
 
-                    # יצירת פסקה חדשה כל 2-3 משפטים
-                    if sentence_count >= 3 or len(current_para) > 300:
-                        para_text = current_para.strip()
-                        if para_text:
-                            content_paragraph = f'''
+            # יצירת פסקה חדשה רק אם:
+            # 1. יש מספיק מילים
+            # 2. אין מירכאה פתוחה (זוגי של מירכאות)
+            # 3. המשפט מסתיים
+            if (word_count >= 40 or len(current_para) > 400) and word.endswith(('.', '!', '?', ':')):
+                quote_count = current_para.count('"')
+                if quote_count % 2 == 0:  # זוגי מירכאות = לא באמצע ציטוט
+                    para_text = current_para.strip()
+                    if para_text:
+                        content_paragraph = f'''
 <w:p>
   <w:pPr>
     <w:jc w:val="right"/>
@@ -132,10 +135,9 @@ def create_hebrew_word_document(transcription, title, output_path):
     <w:t>{escape_xml(para_text)}</w:t>
   </w:r>
 </w:p>'''
-                            new_paragraphs.append(content_paragraph)
-                        current_para = ""
-                        sentence_count = 0
-            i += 2
+                        new_paragraphs.append(content_paragraph)
+                    current_para = ""
+                    word_count = 0
 
         # פסקה אחרונה
         if current_para.strip():
@@ -339,18 +341,28 @@ def escape_xml(text):
 
 def fix_hebrew_punctuation(text):
     """
-    מתקן רווחים סביב סימני פיסוק בעברית - ללא תיקון מירכאות
+    מתקן רווחים ופיסוק בעברית
     """
     import re
 
-    # רק תיקון רווחים אחרי סימני פיסוק - ללא נגיעה במירכאות!
+    # תיקון נקודות מרובות למשולש נקודות
+    text = re.sub(r'\.{3,}', '...', text)  # 3+ נקודות -> ...
+    text = re.sub(r'\.\s*\.\s*\.', '...', text)  # . . . -> ...
+
+    # ניקוי נקודות מיותרות בתחילת משפט
+    text = re.sub(r'^\s*\.+\s*', '', text, flags=re.MULTILINE)
+
+    # תיקון רווחים אחרי סימני פיסוק
     text = re.sub(r'([.!?:;,])([א-ת])', r'\1 \2', text)
+
+    # ניקוי רווחים מיותרים לפני פיסוק
+    text = re.sub(r'\s+([.!?:;,])', r'\1', text)
 
     # ניקוי רווחים כפולים
     text = re.sub(r'\s{2,}', ' ', text)
 
-    # ניקוי רווחים בתחילת ובסוף
-    text = text.strip()
+    # ניקוי רווחים בתחילת ובסוף שורות
+    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
 
     return text
 
