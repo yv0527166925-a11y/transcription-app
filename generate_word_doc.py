@@ -96,24 +96,62 @@ def create_hebrew_word_document(transcription, title, output_path):
         # שורה ריקה
         new_paragraphs.append('<w:p></w:p>')
 
-        # פסקאות תוכן
-        for section in sections:
-            lines = [line.strip() for line in section.split('\n') if line.strip()]
-            combined_text = ' '.join(lines).strip()
+        # פסקאות תוכן - פשוט עם רווחים תקינים
+        all_text = ' '.join(sections)
+        all_text = fix_hebrew_punctuation(all_text)
 
-            if combined_text and not combined_text[-1] in '.!?:':
-                combined_text += '.'
+        # חלוקה לפסקאות של 2-3 משפטים
+        import re
+        sentences = re.split(r'([.!?:])', all_text)
+        current_para = ""
+        sentence_count = 0
 
-            content_paragraph = f'''
-<w:p w14:paraId="13B47B51" w14:textId="77777777">
+        i = 0
+        while i < len(sentences) - 1:
+            if i + 1 < len(sentences):
+                sentence = (sentences[i].strip() + sentences[i+1]).strip()
+                if sentence:
+                    current_para += sentence + " "
+                    sentence_count += 1
+
+                    # יצירת פסקה חדשה כל 2-3 משפטים
+                    if sentence_count >= 3 or len(current_para) > 300:
+                        para_text = current_para.strip()
+                        if para_text:
+                            content_paragraph = f'''
+<w:p>
   <w:pPr>
     <w:jc w:val="right"/>
+    <w:spacing w:after="240"/>
   </w:pPr>
   <w:r>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+      <w:sz w:val="28"/>
     </w:rPr>
-    <w:t>{escape_xml(combined_text)}</w:t>
+    <w:t>{escape_xml(para_text)}</w:t>
+  </w:r>
+</w:p>'''
+                            new_paragraphs.append(content_paragraph)
+                        current_para = ""
+                        sentence_count = 0
+            i += 2
+
+        # פסקה אחרונה
+        if current_para.strip():
+            para_text = current_para.strip()
+            content_paragraph = f'''
+<w:p>
+  <w:pPr>
+    <w:jc w:val="right"/>
+    <w:spacing w:after="240"/>
+  </w:pPr>
+  <w:r>
+    <w:rPr>
+      <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+      <w:sz w:val="28"/>
+    </w:rPr>
+    <w:t>{escape_xml(para_text)}</w:t>
   </w:r>
 </w:p>'''
             new_paragraphs.append(content_paragraph)
