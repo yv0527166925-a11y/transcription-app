@@ -1363,8 +1363,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           throw new Error(`תמלול קצר מדי: "${transcription}"`);
         }
 
-        // Check if transcription looks like binary data or PDF
-        if (transcription.includes('%PDF') || transcription.includes('<<') || transcription.length > 10000) {
+        // Check if transcription looks like binary data or PDF (only check for actual PDF content)
+        if (transcription.includes('%PDF') && transcription.includes('/Type/Catalog')) {
           throw new Error('התמלול נראה כמו קובץ PDF או נתונים בינאריים במקום טקסט');
         }
         
