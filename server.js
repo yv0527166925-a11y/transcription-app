@@ -1556,10 +1556,12 @@ app.get('/api/download/:filename', (req, res) => {
 });
 
 app.get('/api/test', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'API is working!',
     geminiConfigured: !!process.env.GEMINI_API_KEY,
+    geminiKeyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
+    geminiKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + '...' : 'none',
     emailConfigured: !!process.env.EMAIL_USER,
     ffmpegAvailable: checkFFmpegAvailability()
   });
