@@ -31,18 +31,27 @@ def create_hebrew_word_document(transcription, title, output_path):
         # בדיקה אם קיימת תבנית עובדת
         possible_templates = [
             'חזר מהשרת תקין 2.docx',
+            'דוגמה_Word_מושלמת.docx',
+            'בדיקה_תבנית_עובדת.docx',
             'template.docx',
             'simple-template.docx'
         ]
 
         template_path = None
+        print(f"Looking for templates in directory: {os.getcwd()}", file=sys.stderr)
+        print(f"Directory contents: {os.listdir('.')[:10]}...", file=sys.stderr)
+
         for template in possible_templates:
+            print(f"Checking template: {template}", file=sys.stderr)
             if os.path.exists(template):
                 template_path = template
+                print(f"Found working template: {template}", file=sys.stderr)
                 break
+            else:
+                print(f"Template not found: {template}", file=sys.stderr)
 
         if not template_path:
-            print("No working template found, falling back to basic creation")
+            print("No working template found, falling back to basic creation", file=sys.stderr)
             return create_basic_hebrew_document(transcription, title, output_path)
 
         # העתקת התבנית
@@ -147,50 +156,75 @@ def create_hebrew_word_document(transcription, title, output_path):
 
 def create_basic_hebrew_document(transcription, title, output_path):
     """
-    יצירת מסמך בסיסי אם אין תבנית
+    יצירת מסמך בסיסי אם אין תבנית - עם הגדרות RTL משופרות
     """
     try:
         # Import docx here too
         from docx import Document
         from docx.shared import Pt
         from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
 
+        print("Creating basic Hebrew document with RTL settings", file=sys.stderr)
         doc = Document()
+
+        # הגדרת השפה העיקרית של המסמך לעברית
+        doc_element = doc.element
+        doc_element.set(qn('xml:lang'), 'he-IL')
+
     except Exception as e:
         print(f"Error creating basic document: {str(e)}", file=sys.stderr)
         # אם גם זה נכשל, ניצור מסמך HTML פשוט
         return create_html_fallback(transcription, title, output_path)
 
-    # כותרת פשוטה
-    title_paragraph = doc.add_paragraph()
-    title_run = title_paragraph.add_run(title)
-    title_run.font.name = 'David'
-    title_run.font.size = Pt(16)
-    title_run.bold = True
-    title_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    try:
+        # כותרת עם הגדרות RTL מחוזקות
+        title_paragraph = doc.add_paragraph()
+        title_run = title_paragraph.add_run(title)
+        title_run.font.name = 'David'
+        title_run.font.size = Pt(18)
+        title_run.bold = True
+        title_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    # שורה ריקה
-    doc.add_paragraph()
+        # הוספת הגדרות RTL לכותרת
+        set_rtl_paragraph(title_paragraph)
 
-    # תוכן
-    clean_text = transcription.replace('\r\n', '\n').replace('\n\n\n', '\n\n').strip()
-    sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
+        # שורה ריקה
+        doc.add_paragraph()
 
-    for section in sections:
-        lines = [line.strip() for line in section.split('\n') if line.strip()]
-        combined_text = ' '.join(lines).strip()
+        # עיבוד התוכן
+        clean_text = transcription.replace('\r\n', '\n').replace('\n\n\n', '\n\n').strip()
+        clean_text = fix_hebrew_punctuation(clean_text)
+        sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
 
-        if combined_text and not combined_text[-1] in '.!?:':
-            combined_text += '.'
+        print(f"Creating {len(sections)} content paragraphs", file=sys.stderr)
 
-        paragraph = doc.add_paragraph()
-        run = paragraph.add_run(combined_text)
-        run.font.name = 'David'
-        run.font.size = Pt(12)
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        for i, section in enumerate(sections):
+            lines = [line.strip() for line in section.split('\n') if line.strip()]
+            combined_text = ' '.join(lines).strip()
 
-    doc.save(output_path)
-    return True
+            if combined_text and not combined_text[-1] in '.!?:':
+                combined_text += '.'
+
+            paragraph = doc.add_paragraph()
+            run = paragraph.add_run(combined_text)
+            run.font.name = 'David'
+            run.font.size = Pt(14)
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+            # הוספת הגדרות RTL לכל פסקה
+            set_rtl_paragraph(paragraph)
+
+            print(f"Added paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
+
+        doc.save(output_path)
+        print(f"Basic document saved successfully: {output_path}", file=sys.stderr)
+        return True
+
+    except Exception as e:
+        print(f"Error in basic document creation process: {str(e)}", file=sys.stderr)
+        return create_html_fallback(transcription, title, output_path)
 
 def create_html_fallback(transcription, title, output_path):
     """
@@ -287,9 +321,12 @@ def fix_hebrew_punctuation(text):
 
 def set_rtl_paragraph(paragraph):
     """
-    מגדיר פסקה כ-RTL (ימין לשמאל)
+    מגדיר פסקה כ-RTL (ימין לשמאל) - גרסה משופרת
     """
     try:
+        from docx.oxml.ns import qn
+        from docx.oxml import OxmlElement
+
         # הוספת הגדרת RTL ל-XML של הפסקה
         p = paragraph._element
         pPr = p.get_or_add_pPr()
@@ -304,8 +341,15 @@ def set_rtl_paragraph(paragraph):
         textDirection.set(qn('w:val'), 'rl')
         pPr.append(textDirection)
 
+        # הוספת יישור ימין חזק
+        jc = OxmlElement('w:jc')
+        jc.set(qn('w:val'), 'right')
+        pPr.append(jc)
+
+        print(f"RTL settings applied to paragraph", file=sys.stderr)
+
     except Exception as e:
-        print(f"Warning: Cannot set RTL: {str(e)}")
+        print(f"Warning: Cannot set RTL: {str(e)}", file=sys.stderr)
 
 def main():
     """

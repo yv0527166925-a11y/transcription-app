@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
-const mailjet = require('node-mailjet');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
@@ -16,17 +15,6 @@ const PORT = process.env.PORT || 3000;
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Initialize Mailjet
-let mailjetClient;
-if (process.env.MAILJET_API_KEY && process.env.MAILJET_SECRET_KEY) {
-  mailjetClient = mailjet.apiConnect(
-    process.env.MAILJET_API_KEY,
-    process.env.MAILJET_SECRET_KEY
-  );
-  console.log('📧 Mailjet configured');
-} else {
-  console.log('⚠️ Mailjet API keys not found');
-}
 
 // Email transporter with timeout settings
 const transporter = nodemailer.createTransport({
@@ -1033,7 +1021,7 @@ async function createWordDocumentPython(transcription, filename, duration) {
 
     // קריאה לסקריפט Python
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python3', ['generate_word_doc.py', pythonData], {
+      const pythonProcess = spawn('python', ['generate_word_doc.py', pythonData], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -1218,20 +1206,8 @@ const attachments = transcriptions.map(trans => {
       `;
     }
 
-    // Try Mailjet first, fallback to nodemailer
-    if (mailjetClient) {
-      // Mailjet email
-      const emailData = {
-        Messages: [{
-          From: {
-            Email: process.env.EMAIL_USER || 'noreply@transcription.app',
-            Name: 'מערכת התמלול החכמה'
-          },
-          To: [{
-            Email: userEmail
-          }],
-          Subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
-          HTMLPart: `
+    // Create HTML content for email
+    const htmlContent = `
         <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
@@ -1239,24 +1215,24 @@ const attachments = transcriptions.map(trans => {
               עם טכנולוגיית חלוקה למקטעים מתקדמת
             </p>
           </div>
-          
+
           <div style="background: #f8f9ff; padding: 30px; border-radius: 0 0 10px 10px;">
             <p style="font-size: 16px; margin-bottom: 25px;">שלום וברכה,</p>
-            
+
             <p style="font-size: 16px; margin-bottom: 25px;">
-              התמלול המלא והמפורט שלך הושלם! 
+              התמלול המלא והמפורט שלך הושלם!
               מצורפים קבצי Word מעוצבים עם תמלול שלם מההתחלה עד הסוף:
             </p>
-            
+
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #4caf50;">
               <h3 style="color: #2e7d32; margin-bottom: 15px; font-size: 18px;">✅ קבצים שהושלמו בהצלחה:</h3>
               <ul style="margin: 10px 0; font-size: 16px;">
                 ${successList}
               </ul>
             </div>
-            
+
             ${failureSection}
-            
+
             <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
               <h3 style="color: #1565c0; margin-bottom: 15px; font-size: 18px;">🔥 שיפורים בגרסה המשופרת:</h3>
               <ul style="margin: 0; font-size: 15px; line-height: 1.8; color: #1565c0;">
@@ -1269,13 +1245,13 @@ const attachments = transcriptions.map(trans => {
                 <li>💬 <strong>זיהוי דוברים וציטוטים</strong> - במירכאות נכונות</li>
               </ul>
             </div>
-            
+
            <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
                 🎉 תמלול מלא ושלם - אפילו לקבצים של שעות!
               </p>
             </div>
-            
+
             <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px;">
               בברכה,<br>
               <strong>צוות התמלול החכם</strong><br>
@@ -1283,35 +1259,19 @@ const attachments = transcriptions.map(trans => {
             </p>
           </div>
         </div>
-          `
-        }]
-      };
+          `;
 
-      // Add attachments to Mailjet
-      if (attachments && attachments.length > 0) {
-        emailData.Messages[0].Attachments = attachments.map(att => ({
-          ContentType: att.contentType,
-          Filename: att.filename,
-          Base64Content: att.content.toString('base64')
-        }));
-      }
+    // Send email using Gmail/nodemailer
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: userEmail,
+      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+      html: htmlContent,
+      attachments: attachments
+    };
 
-      const result = await mailjetClient.post('send', { version: 'v3.1' }).request(emailData);
-      console.log(`✅ Mailjet email sent successfully to: ${userEmail}`);
-
-    } else {
-      // Fallback to nodemailer
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: userEmail,
-        subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
-        html: htmlContent,
-        attachments: attachments
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log(`✅ Nodemailer email sent successfully to: ${userEmail}`);
-    }
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Gmail email sent successfully to: ${userEmail}`);
 
   } catch (error) {
     console.error('❌ Email sending error:', error.message);
@@ -1517,10 +1477,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 function checkPythonAvailability() {
   try {
     const { execSync } = require('child_process');
-    execSync('python3 --version', { timeout: 5000, stdio: 'ignore' });
+    execSync('python --version', { timeout: 5000, stdio: 'ignore' });
     return true;
   } catch (error) {
-    console.log('⚠️ Python3 not available:', error.message);
+    console.log('⚠️ Python not available:', error.message);
     return false;
   }
 }
@@ -1579,9 +1539,9 @@ app.get('/test-python', async (req, res) => {
   try {
     const { spawn } = require('child_process');
 
-    const pythonProcess = spawn('python3', ['-c', `
+    const pythonProcess = spawn('python', ['-c', `
 import sys
-from python_docx import Document
+from docx import Document
 print("Python and python-docx are working!")
 print(f"Python version: {sys.version}")
     `]);
