@@ -872,54 +872,11 @@ async function createWordDocument(transcription, filename, duration) {
         </w:r>
       </w:p>`;
 
-    // יצירת פסקאות נפרדות עם הגדרות RTL
-    const contentParagraphs = sections.map(section => {
-      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      let combinedSection = lines.join(' ').trim();
 
-      // השתמש בטקסט מוכן שעובד - ללא עיבוד כלל
-      if (section.includes("טקסט לבדיקה")) {
-        combinedSection = "זה טקסט לבדיקה של פיסוק, כמו זה. האם הוא עובד כהלכה? כן אני חושב: זה נראה טוב; לא יודע.";
-      } else {
-        // רק ניקוי רווחים כפולים
-        combinedSection = combinedSection.replace(/\s{2,}/g, ' ').trim();
-      }
-
-      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
-        combinedSection += '.';
-      }
-
-      return `
-        <w:p w14:paraId="346CE71B" w14:textId="424A57EE" w:rsidR="009550AA" w:rsidRPr="009F17F4" w:rsidRDefault="0056303E" w:rsidP="0056303E">
-          <w:pPr>
-            <w:jc w:val="right"/>
-            <w:bidi w:val="1"/>
-            <w:textDirection w:val="rl"/>
-            <w:spacing w:after="240"/>
-            <w:rPr>
-              <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-              <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
-              <w:rtl/>
-            </w:rPr>
-          </w:pPr>
-          <w:r w:rsidRPr="0056303E">
-            <w:rPr>
-              <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-              <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
-              <w:rtl/>
-            </w:rPr>
-            <w:t>${escapeXml(combinedSection)}</w:t>
-          </w:r>
-        </w:p>`;
-    });
-
-    // עכשיו פסקה אחת עם line breaks
-    let allText = sections.map(section => {
-      const lines = section.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      let combinedSection = lines.join(' ').trim();
-
-      // תיקון פיסוק פשוט
-      combinedSection = combinedSection
+    // חלוקה לפסקאות קצרות (2-3 משפטים)
+    function createShortParagraphs(text) {
+      // תיקון פיסוק בסיסי
+      text = text
         .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
         .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
         .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
@@ -930,31 +887,69 @@ async function createWordDocument(transcription, filename, duration) {
         .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
         .trim();
 
-      if (!combinedSection.endsWith('.') && !combinedSection.endsWith('!') && !combinedSection.endsWith('?') && !combinedSection.endsWith(':')) {
-        combinedSection += '.';
+      // חלק למשפטים
+      const sentences = text.split(/([.!?:]\s+)/).filter(s => s.trim().length > 0);
+      const paragraphs = [];
+      let currentParagraph = '';
+      let sentenceCount = 0;
+
+      for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i].trim();
+
+        if (sentence.match(/[.!?:]$/)) {
+          // זה משפט שלם
+          currentParagraph += sentence + ' ';
+          sentenceCount++;
+
+          // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-200 תווים
+          if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 200)) {
+            paragraphs.push(currentParagraph.trim());
+            currentParagraph = '';
+            sentenceCount = 0;
+          }
+        } else if (sentence.length > 0) {
+          // זה חלק ממשפט
+          currentParagraph += sentence + ' ';
+        }
       }
 
-      return combinedSection;
-    }).join('\n\n'); // הפרד בשורות ריקות
+      // הוסף את הפסקה האחרונה אם יש
+      if (currentParagraph.trim().length > 0) {
+        paragraphs.push(currentParagraph.trim());
+      }
 
-    // פסקה יחידה עם כל התוכן
-    const contentParagraph = `
+      return paragraphs;
+    }
+
+    // צור פסקאות קצרות מכל הטקסט
+    const fullText = sections.join(' ').trim();
+    const shortParagraphs = createShortParagraphs(fullText);
+
+    // יצירת XML לכל פסקה קצרה
+    const paragraphElements = shortParagraphs.map(paragraph => `
       <w:p w14:paraId="346CE71B" w14:textId="424A57EE" w:rsidR="009550AA" w:rsidRPr="009F17F4" w:rsidRDefault="0056303E" w:rsidP="0056303E">
         <w:pPr>
+          <w:jc w:val="right"/>
+          <w:bidi w:val="1"/>
+          <w:textDirection w:val="rl"/>
           <w:spacing w:after="240"/>
           <w:rPr>
             <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+            <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
+            <w:rtl/>
           </w:rPr>
         </w:pPr>
         <w:r w:rsidRPr="0056303E">
           <w:rPr>
             <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+            <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
+            <w:rtl/>
           </w:rPr>
-          <w:t xml:space="preserve">${escapeXml(allText)}</w:t>
+          <w:t>${escapeXml(paragraph)}</w:t>
         </w:r>
-      </w:p>`;
+      </w:p>`);
 
-    const newParagraphs = [titleParagraph, contentParagraph];
+    const newParagraphs = [titleParagraph, ...paragraphElements];
 
     // החלפת התוכן בתבנית
     let newDocXml = docXml
