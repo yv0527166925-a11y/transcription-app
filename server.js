@@ -1012,18 +1012,29 @@ async function createWordDocument(transcription, filename, duration) {
     let cleanedText = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
-      // תיקון בעיות פיסוק חמורות
-      .replace(/\."(\s*)\[/g, '." [')  // תיקון: חי."  מקום.[מוזיקה]
-      .replace(/\]"([א-ת])/g, '] "$1')    // תיקון: [מוזיקה]"אתם
-      .replace(/([א-ת])\."(\s*)([א-ת])/g, '$1." $3')  // תיקון: חי."אתה
-      .replace(/\."\s*"([א-ת])/g, '." "$1')  // תיקון גרשיים כפולים
-      .replace(/([א-ת]):"\s*([א-ת])/g, '$1: "$2')  // תיקון: יודע:"אבל
-      // תיקון רווחים סביב סוגריים מרובעים
-      .replace(/\s*\[/g, ' [')
-      .replace(/\]\s*/g, '] ')
-      // תיקון גרשיים וציטוטים
-      .replace(/"([^"]*?)"/g, ' "$1" ')  // רווח לפני ואחרי ציטוטים
-      .replace(/\s{2,}/g, ' ')  // ניקוי רווחים כפולים
+      // תיקון בעיות פיסוק לפי חוקי עברית
+      // תיקון רווחים אחרי סימני פיסוק ולפני גרשיים/מילים
+      .replace(/\.\"([א-ת])/g, '." $1')         // פגומים."ומלאכים → פגומים." ומלאכים
+      .replace(/\.([א-ת])/g, '. $1')            // משפט.משפט → משפט. משפט
+      .replace(/!([א-ת])/g, '! $1')             // משפט!משפט → משפט! משפט
+      .replace(/\?([א-ת])/g, '? $1')            // משפט?משפט → משפט? משפט
+      .replace(/,([א-ת])/g, ', $1')             // מילה,מילה → מילה, מילה
+      .replace(/:([א-ת])/g, ': $1')             // מילה:מילה → מילה: מילה
+      .replace(/;([א-ת])/g, '; $1')             // מילה;מילה → מילה; מילה
+
+      // תיקון גרשיים - הסרת רווחים מיותרים בתוך ציטוטים
+      .replace(/\s*"\s*([^"]+?)\s*"\s*/g, ' "$1" ')  // " טקסט " → " טקסט "
+      .replace(/([א-ת])\"([א-ת])/g, '$1 "$2')        // מילה"מילה → מילה "מילה
+      .replace(/\"([א-ת])([^"]*?)\"([א-ת])/g, '"$1$2" $3')  // "טקסט"מילה → "טקסט" מילה
+
+      // תיקון סוגריים מרובעים
+      .replace(/\[([א-ת])/g, '[$1')             // ודא שהסוגר צמוד לתוכן
+      .replace(/([א-ת])\]/g, '$1]')             // ודא שהסוגר צמוד לתוכן
+      .replace(/\]\s*([א-ת])/g, '] $1')         // [טקסט]מילה → [טקסט] מילה
+      .replace(/([א-ת])\s*\[/g, '$1 [')         // מילה[טקסט] → מילה [טקסט]
+
+      // ניקוי רווחים כפולים וחיצוניים
+      .replace(/\s{2,}/g, ' ')                  // רווחים כפולים
       .trim();
 
     const sections = cleanedText.split(/\n\s*\n/)
@@ -2810,21 +2821,9 @@ async function processEmailTranscription(user, emailData, senderEmail) {
         const tempFilePath = path.join(tempDir, `email_${Date.now()}_${attachment.filename}`);
         console.log(`📧 Downloading attachment to: ${tempFilePath}`);
 
-        // Download the attachment content from IMAP
+        // Download the actual attachment from the email
         await downloadAttachmentFromEmail(emailData, attachment, tempFilePath);
-
         console.log(`📧 File downloaded successfully, starting transcription...`);
-
-        // Perform real transcription using Gemini
-        let realTranscription;
-        try {
-          realTranscription = await realGeminiTranscription(tempFilePath, attachment.filename, 'he', '');
-          console.log(`📧 Transcription completed: ${realTranscription.length} characters`);
-        } catch (transcriptionError) {
-          console.warn(`⚠️ Real transcription failed, creating demo transcription:`, transcriptionError.message);
-          // Fallback to demo transcription if real transcription fails
-          realTranscription = `תמלול אימייל אוטומטי עבור קובץ: ${attachment.filename}\n\nתמלול זה נוצר עבור קובץ שנשלח באימייל. במידה ותרצה תמלול מלא, אנא העלה את הקובץ דרך האתר.`;
-        }
 
         // Get actual audio duration for accurate billing
         let actualDuration;
@@ -2838,6 +2837,25 @@ async function processEmailTranscription(user, emailData, senderEmail) {
           actualDuration = isVideo ? (fileSizeMB / 3) * 60 : (fileSizeMB / 1.2) * 60;
         }
         const durationMinutes = Math.ceil(actualDuration / 60);
+
+        console.log(`📧 Starting real transcription of ${attachment.filename} (${durationMinutes} minutes)`);
+
+        // Transcribe the real audio file using our transcription system
+        let realTranscription;
+        try {
+          if (durationMinutes <= 15) {
+            // Direct transcription for short files
+            realTranscription = await directGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew');
+          } else {
+            // Chunked transcription for longer files
+            realTranscription = await chunkedGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', durationMinutes, null);
+          }
+        } catch (transcriptionError) {
+          console.error(`📧 Transcription failed for ${attachment.filename}:`, transcriptionError);
+          throw new Error(`שגיאה בתמלול הקובץ ${attachment.filename}: ${transcriptionError.message}`);
+        }
+
+        console.log(`📧 Real transcription completed: ${realTranscription.length} characters`);
 
         // Create Word document with real transcription
         const wordFilePath = await createWordDocument(realTranscription, attachment.filename, durationMinutes);
