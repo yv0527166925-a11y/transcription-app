@@ -2412,10 +2412,13 @@ function extractAttachments(struct, emailData) {
       (!struct.disposition && struct.params?.name);
 
     if (isAttachment) {
-      const filename =
+      const rawFilename =
         struct.disposition?.params?.filename ||
         struct.params?.name ||
         `unknown_${Date.now()}.${struct.subtype}`;
+
+      // Decode filename if it's encoded
+      const filename = decodeEmailSubject(rawFilename);
 
       const type = struct.type + '/' + struct.subtype;
 
@@ -2455,17 +2458,24 @@ function isAudioVideoFile(filename, mimeType) {
   return hasValidExtension || hasValidMimeType;
 }
 
-// Decode email subject if it's encoded
+// Decode email subject or filename if it's encoded
 function decodeEmailSubject(subject) {
   if (!subject) return '';
 
-  // Handle UTF-8 Base64 encoded subjects like =?UTF-8?B?...?=
-  const encodedMatch = subject.match(/=\?UTF-8\?B\?([^?]+)\?=/);
-  if (encodedMatch) {
+  // Handle multiple UTF-8 Base64 encoded parts like =?UTF-8?B?...?= =?UTF-8?B?...?=
+  let decoded = subject;
+  const encodedMatches = subject.match(/=\?UTF-8\?B\?([^?]+)\?=/g);
+
+  if (encodedMatches) {
     try {
-      return Buffer.from(encodedMatch[1], 'base64').toString('utf8');
+      for (const match of encodedMatches) {
+        const base64Part = match.match(/=\?UTF-8\?B\?([^?]+)\?=/)[1];
+        const decodedPart = Buffer.from(base64Part, 'base64').toString('utf8');
+        decoded = decoded.replace(match, decodedPart);
+      }
+      return decoded.trim();
     } catch (error) {
-      console.log('📧 Failed to decode subject, using original');
+      console.log('📧 Failed to decode subject/filename, using original');
       return subject;
     }
   }
@@ -2647,6 +2657,9 @@ async function processEmailTranscription(user, emailData, senderEmail) {
     user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
 
     // Add to transaction history
+    if (!user.transactions) {
+      user.transactions = [];
+    }
     user.transactions.push({
       type: 'usage',
       amount: -actualMinutesUsed,
