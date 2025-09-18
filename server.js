@@ -2585,23 +2585,161 @@ async function sendRegistrationInfoEmail(senderEmail) {
   }
 }
 
-// Download attachment from email data
+// Find and download specific attachment from email structure
+async function findAndDownloadAttachment(struct, targetFilename, imap, seqno, outputPath) {
+  return new Promise((resolve, reject) => {
+    function searchStruct(structure, partId = '') {
+      if (Array.isArray(structure)) {
+        structure.forEach((part, index) => {
+          const newPartId = partId ? `${partId}.${index + 1}` : `${index + 1}`;
+          searchStruct(part, newPartId);
+        });
+      } else {
+        const filename = structure.disposition?.params?.filename || structure.params?.name;
+        const decodedFilename = decodeEmailSubject(filename || '');
+
+        if (decodedFilename === targetFilename) {
+          console.log(`📧 Found attachment ${targetFilename} at part ${partId}`);
+
+          // Download this specific part
+          const fetch = imap.fetch([seqno], {
+            bodies: partId,
+            struct: false
+          });
+
+          let attachmentData = Buffer.alloc(0);
+
+          fetch.on('message', function(msg, seqno) {
+            msg.on('body', function(stream, info) {
+              let buffer = Buffer.alloc(0);
+
+              stream.on('data', function(chunk) {
+                buffer = Buffer.concat([buffer, chunk]);
+              });
+
+              stream.once('end', function() {
+                // Decode based on encoding
+                let finalData = buffer;
+
+                if (structure.encoding === 'base64') {
+                  finalData = Buffer.from(buffer.toString(), 'base64');
+                } else if (structure.encoding === 'quoted-printable') {
+                  // Handle quoted-printable if needed
+                  finalData = buffer;
+                }
+
+                attachmentData = finalData;
+              });
+            });
+          });
+
+          fetch.once('end', function() {
+            try {
+              fs.writeFileSync(outputPath, attachmentData);
+              console.log(`📧 ✅ Attachment downloaded successfully: ${outputPath} (${attachmentData.length} bytes)`);
+              resolve();
+            } catch (writeError) {
+              console.error(`📧 Error writing attachment:`, writeError);
+              reject(writeError);
+            }
+          });
+
+          fetch.once('error', function(err) {
+            console.error('📧 Error downloading attachment part:', err);
+            reject(err);
+          });
+        }
+      }
+    }
+
+    searchStruct(struct);
+  });
+}
+
+// Download attachment from email data using IMAP
 async function downloadAttachmentFromEmail(emailData, attachment, tempFilePath) {
   return new Promise((resolve, reject) => {
-    console.log(`📧 Simulating download of ${attachment.filename} to ${tempFilePath}`);
+    console.log(`📧 Starting real download of ${attachment.filename} to ${tempFilePath}`);
 
-    // For now, create a dummy file for testing
-    // In a full IMAP implementation, this would download the actual attachment
-    const dummyContent = Buffer.from('dummy audio content for testing');
+    const imap = new Imap(imapConfig);
 
-    try {
-      fs.writeFileSync(tempFilePath, dummyContent);
-      console.log(`📧 Attachment downloaded (simulated): ${tempFilePath}`);
-      resolve();
-    } catch (error) {
-      console.error(`📧 Error downloading attachment:`, error);
-      reject(error);
-    }
+    imap.once('ready', function() {
+      imap.openBox('INBOX', true, function(err, box) {
+        if (err) {
+          console.error('📧 Error opening inbox for download:', err);
+          return reject(err);
+        }
+
+        // Search for recent emails with the target attachment
+        const criteria = [
+          'UNSEEN',
+          ['SINCE', new Date(Date.now() - 24 * 60 * 60 * 1000)]
+        ];
+
+        imap.search(criteria, function(err, results) {
+          if (err) {
+            console.error('📧 Error searching for email:', err);
+            return reject(err);
+          }
+
+          if (!results || results.length === 0) {
+            return reject(new Error('No emails found for attachment download'));
+          }
+
+          console.log(`📧 Searching through ${results.length} emails for attachment ${attachment.filename}`);
+
+          // Fetch emails to find the one with our attachment
+          const fetch = imap.fetch(results, {
+            bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)'],
+            struct: true
+          });
+
+          let attachmentFound = false;
+
+          fetch.on('message', function(msg, seqno) {
+            msg.once('attributes', function(attrs) {
+              if (attrs.struct && !attachmentFound) {
+                findAndDownloadAttachment(attrs.struct, attachment.filename, imap, seqno, tempFilePath)
+                  .then(() => {
+                    attachmentFound = true;
+                    imap.end();
+                    resolve();
+                  })
+                  .catch((downloadError) => {
+                    console.log(`📧 Attachment not found in email ${seqno}, continuing search...`);
+                    // Continue searching in other emails
+                  });
+              }
+            });
+          });
+
+          fetch.once('error', function(err) {
+            console.error('📧 Fetch error during download:', err);
+            reject(err);
+          });
+
+          fetch.once('end', function() {
+            if (!attachmentFound) {
+              reject(new Error(`Attachment ${attachment.filename} not found in any recent emails`));
+            }
+          });
+        });
+      });
+    });
+
+    imap.once('error', function(err) {
+      console.error('📧 IMAP error during download:', err);
+      reject(err);
+    });
+
+    // Add timeout for download
+    setTimeout(() => {
+      if (!imap.state || imap.state === 'disconnected') {
+        reject(new Error('IMAP download timeout after 30 seconds'));
+      }
+    }, 30000);
+
+    imap.connect();
   });
 }
 
