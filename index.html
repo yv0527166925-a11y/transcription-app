@@ -914,7 +914,7 @@
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
-                        <input type="file" id="folderInput" class="file-input" webkitdirectory accept="audio/*,video/*">
+                        <input type="file" id="folderInput" class="file-input" webkitdirectory directory multiple accept="audio/*,video/*">
                     </div>
 
                     <!-- Upload options buttons -->
@@ -922,7 +922,7 @@
                         <button type="button" class="btn-upload-option" onclick="selectFiles()">
                             📄 בחר קבצים
                         </button>
-                        <button type="button" class="btn-upload-option" onclick="selectFolder()">
+                        <button type="button" class="btn-upload-option" onclick="selectFolder()" title="בחר תיקייה עם כל הקבצים שבתוכה">
                             📂 בחר תיקייה שלמה
                         </button>
                     </div>
@@ -1470,9 +1470,12 @@
         const folderInput = document.getElementById('folderInput');
         folderInput.addEventListener('change', (e) => {
             console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
-            if (e.target.files.length > 0) {
-                handleFolderSelection(e.target.files);
+            if (e.target.files.length === 0) {
+                console.log('📂 לא נבחרו קבצים - ייתכן שהמשתמש ביטל או שיש בעיה עם הדפדפן');
+                showStatus('לא נבחרו קבצים. אם ביטלת, לא נורא. אם לא, נסה דפדפן אחר', 'warning');
+                return;
             }
+            handleFolderSelection(e.target.files);
         });
 
         // Upload option functions
@@ -1481,6 +1484,7 @@
         }
 
         function selectFolder() {
+            console.log('📂 פותח דיאלוג בחירת תיקייה');
             folderInput.click();
         }
 
