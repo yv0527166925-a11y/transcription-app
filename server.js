@@ -576,22 +576,49 @@ function applyParagraphBreaking(text) {
     .replace(/שו\s*["\u0022\u201C\u201D]\s*ת/g, 'שו"ת')
     .replace(/מהר\s*["\u0022\u201C\u201D]\s*ל/g, 'מהר"ל')
 
+    // תיקון קיצורים שנפרדו כבר בתמלול
+    .replace(/חז\s+"\s*ל/g, 'חז"ל')
+    .replace(/רש\s+"\s*י/g, 'רש"י')
+    .replace(/ר'\s/g, 'ר\' ')
+    .replace(/ר"/g, 'ר\'')
+
+    // תיקון מיתוקים שגויים במילים עבריות
+    .replace(/אמן-ים/g, 'אמנים')
+    .replace(/בן-אדם/g, 'בן אדם')
+    .replace(/יהודי-ים/g, 'יהודים')
+    .replace(/תלמיד-ים/g, 'תלמידים')
+    .replace(/ילד-ים/g, 'ילדים')
+    .replace(/שנ-ים/g, 'שנים')
+    .replace(/חכמ-ים/g, 'חכמים')
+    .replace(/רשע-ים/g, 'רשעים')
+
     // תיקון גרשיים וציטוטים מתקדם - פתרון חזק וסופי
     // שלב 1: נקה סוגי גרשיים שונים לאחיד
     .replace(/["\u0022\u201C\u201D]/g, '"')
 
-    // שלב 2: הוסף רווחים לפני גרשיים שצמודים למילים עבריות
-    .replace(/([א-ת])"([א-ת])/g, '$1 "$2')          // כותבת"המצוות -> כותבת "המצוות
+    // שלב 2: תקן גרשיים כפולים סביב שמות (ה "אוהב ישראל" -> ה"אוהב ישראל")
+    .replace(/ה\s+"([^"]+)"/g, 'ה"$1"')            // ה "שם" -> ה"שם"
+    .replace(/([א-ת])\s+"([^"]+)"/g, '$1"$2"')     // מילה "שם" -> מילה"שם"
 
-    // שלב 3: תקן גרשיים שיש להם רווח מיותר לפני הם
+    // שלב 3: הוסף רווחים לפני גרשיים שצמודים למילים עבריות (רק לציטוטים)
+    .replace(/([א-ת])"([א-ת][^"]*[א-ת])"([.,!?\s])/g, '$1 "$2"$3')  // ציטוטים ארוכים
+    .replace(/([א-ת])"([א-ת]{2,})/g, '$1 "$2')     // כותבת"המצוות -> כותבת "המצוות
+
+    // שלב 4: תקן גרשיים שיש להם רווח מיותר לפני הם
     .replace(/([א-ת])\s{2,}"([א-ת])/g, '$1 "$2')   // רווחים כפולים
 
-    // שלב 4: תקן גרשיים עם פיסוק - צמוד למילה לפני הפיסוק
+    // שלב 5: תקן גרשיים עם פיסוק - צמוד למילה לפני הפיסוק
     .replace(/([א-ת])"([.,!?])/g, '$1"$2')          // מילה"? -> מילה"?
 
-    // שלב 5: תקן תחילת ציטוטים
+    // שלב 6: תקן תחילת ציטוטים
     .replace(/\s"([א-ת])/g, ' "$1')                 // רווח לפני גרשיים פותחים
     .replace(/^"([א-ת])/gm, '"$1')                  // תחילת שורה
+
+    // שלב 7: תקן גרשיים סוגרים צמודים למילה הבאה
+    .replace(/([.,!?])"([א-ת])/g, '$1" $2')        // "בתשובה?"סיפר -> "בתשובה?" סיפר
+    .replace(/([א-ת])"([א-ת])/g, '$1" $2')         // גרשיים סוגרים בין מילים עבריות
+    .replace(/(\s)"([א-ת])/g, '$1"$2')             // שמור גרשיים פותחים אחרי רווח
+    .replace(/^"([א-ת])/gm, '"$1')                 // שמור גרשיים פותחים בתחילת שורה
 
     // תיקון פיסוק חזק יותר - הסרת רווחים לפני פיסוק
     .replace(/\s+([.,!?:;])/g, '$1')                           // הסר כל רווח לפני פיסוק
@@ -705,14 +732,24 @@ function applyParagraphBreaking(text) {
       nextSentence.match(/^[א-ת]+\s+(אמר|אומר|שאל|ענה|הוסיף|המשיך)/i)
     );
 
+    // זיהוי דיאלוג רצוף - אל תפצל באמצע דיאלוג
+    const currentHasQuote = sentence.includes('"');
+    const nextHasQuote = nextSentence && nextSentence.includes('"');
+    const inMiddleOfDialogue = currentHasQuote && nextHasQuote;
+
+    // זיהוי שאלה ותשובה רצופה
+    const currentEndsWithQuestion = sentence.match(/[?]"?\s*$/);
+    const nextStartsWithAnswer = nextSentence && nextSentence.match(/^"?(כן|לא|אמר|אומר|ענה)/);
+    const questionAnswerPair = currentEndsWithQuestion && nextStartsWithAnswer;
+
     // תנאים לפיצול פסקה
     const wordCount = currentParagraph.split(' ').length;
     const shouldBreak =
-      sentenceCount >= 4 ||                               // מקסימום 4 משפטים
-      (sentenceCount >= 2 && startsNewTopic) ||          // 2 משפטים + נושא חדש
-      (sentenceCount >= 2 && endsIdea) ||                // 2 משפטים + סוף רעיון
-      (sentenceCount >= 2 && speakerChange) ||           // 2 משפטים + החלפת דובר
-      wordCount >= 60;                                    // מקסימום 60 מילים
+      sentenceCount >= 6 ||                               // מקסימום 6 משפטים (הוגדל)
+      (sentenceCount >= 3 && startsNewTopic && !inMiddleOfDialogue) ||    // 3 משפטים + נושא חדש (אם לא דיאלוג)
+      (sentenceCount >= 3 && endsIdea && !inMiddleOfDialogue) ||          // 3 משפטים + סוף רעיון (אם לא דיאלוג)
+      (sentenceCount >= 3 && speakerChange && !questionAnswerPair) ||     // 3 משפטים + החלפת דובר (אם לא שאלה-תשובה)
+      wordCount >= 80;                                    // מקסימום 80 מילים (הוגדל)
 
     if (shouldBreak && currentParagraph.trim()) {
       paragraphs.push(currentParagraph.trim());
