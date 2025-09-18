@@ -166,6 +166,96 @@
             box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
         }
 
+        .btn-upload-option {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            min-width: 140px;
+        }
+
+        .btn-upload-option:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-upload-option:active {
+            transform: translateY(0);
+        }
+
+        .folder-preview {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .folder-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .folder-files {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+        }
+
+        .folder-file-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s ease;
+        }
+
+        .folder-file-item:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .folder-file-item:last-child {
+            border-bottom: none;
+        }
+
+        .folder-file-checkbox {
+            margin-left: 10px;
+            margin-right: 10px;
+        }
+
+        .folder-file-info {
+            flex: 1;
+        }
+
+        .folder-file-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .folder-file-size {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .folder-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
 
         .text-center {
             text-align: center;
@@ -824,9 +914,39 @@
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
+                        <input type="file" id="folderInput" class="file-input" webkitdirectory accept="audio/*,video/*">
+                    </div>
+
+                    <!-- Upload options buttons -->
+                    <div style="display: flex; gap: 15px; justify-content: center; margin: 20px 0; flex-wrap: wrap;">
+                        <button type="button" class="btn-upload-option" onclick="selectFiles()">
+                            📄 בחר קבצים
+                        </button>
+                        <button type="button" class="btn-upload-option" onclick="selectFolder()">
+                            📂 בחר תיקייה שלמה
+                        </button>
                     </div>
 
                     <div id="selectedFiles"></div>
+
+                    <!-- Folder preview (shown when folder is selected) -->
+                    <div id="folderPreview" class="folder-preview">
+                        <div class="folder-title">📂 קבצים בתיקייה: <span id="folderName"></span></div>
+                        <div class="folder-files" id="folderFiles">
+                            <!-- Files will be populated here -->
+                        </div>
+                        <div class="folder-actions">
+                            <button type="button" class="btn-secondary" onclick="selectAllFolderFiles()">
+                                ✅ בחר הכל
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="deselectAllFolderFiles()">
+                                ❌ בטל הכל
+                            </button>
+                            <button type="button" class="btn" onclick="addSelectedFolderFiles()">
+                                ➕ הוסף קבצים נבחרים
+                            </button>
+                        </div>
+                    </div>
 
                     <!-- Clear all button (shown when files are selected) -->
                     <div id="clearAllContainer" style="display: none; margin: 15px 0; text-align: center;">
@@ -838,6 +958,27 @@
                     <div id="estimatedCost" style="display: none;" class="insufficient-minutes">
                         <strong>אמידת זמן תמלול:</strong> <span id="estimatedMinutes">0</span> דקות<br>
                         <strong>יתרה נוכחית:</strong> <span id="currentBalance">0</span> דקות
+                    </div>
+
+                    <!-- Email Upload Info Box -->
+                    <div style="background: rgba(102, 126, 234, 0.1); padding: 20px; border-radius: 15px; margin: 20px 0; border-right: 4px solid #667eea; direction: rtl;">
+                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                            <span style="font-size: 1.5em; margin-left: 10px;">📧</span>
+                            <strong style="color: #667eea; font-size: 1.1em;">ניתן לשלוח קבצים לתמלול גם דרך האימייל</strong>
+                        </div>
+                        <div style="color: #555; font-size: 0.95em; line-height: 1.6;">
+                            <div style="margin-bottom: 8px;">
+                                <strong>כתובת:</strong>
+                                <span style="background: rgba(102, 126, 234, 0.2); padding: 3px 8px; border-radius: 5px; font-family: monospace; color: #667eea;">yv0527166925@gmail.com</span>
+                            </div>
+                            <div style="margin-bottom: 8px;">
+                                <strong>שורת נושא:</strong>
+                                <span style="background: rgba(102, 126, 234, 0.2); padding: 3px 8px; border-radius: 5px; font-family: monospace; color: #667eea;">תמלול</span>
+                            </div>
+                            <div style="font-size: 0.9em; color: #666;">
+                                💡 צרף את קובץ השמע/וידאו למייל ותקבל את התמלול בחזרה כקובץ Word
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -930,6 +1071,7 @@
         let selectedFiles = [];
         let selectedPayment = null;
         let currentTranscriptionId = null; // Track current transcription for cancellation
+        let folderFiles = []; // Store folder files for preview
 
         // Debug function
         function updateDebugInfo(message) {
@@ -1323,6 +1465,174 @@
                 handleFiles(filesArray, true); // true = add to existing files
             }
         });
+
+        // Folder input listener
+        const folderInput = document.getElementById('folderInput');
+        folderInput.addEventListener('change', (e) => {
+            console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
+            if (e.target.files.length > 0) {
+                handleFolderSelection(e.target.files);
+            }
+        });
+
+        // Upload option functions
+        function selectFiles() {
+            fileInput.click();
+        }
+
+        function selectFolder() {
+            folderInput.click();
+        }
+
+        // Handle folder selection and preview
+        async function handleFolderSelection(files) {
+            console.log(`📂 מעבד תיקייה עם ${files.length} קבצים`);
+
+            // Filter valid audio/video files
+            const validFiles = Array.from(files).filter(file =>
+                file.type.startsWith('audio/') ||
+                file.type.startsWith('video/') ||
+                file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
+            );
+
+            if (validFiles.length === 0) {
+                showStatus('לא נמצאו קבצי אודיו או וידאו תקינים בתיקייה', 'error');
+                return;
+            }
+
+            // Get folder name from first file
+            const folderPath = files[0].webkitRelativePath;
+            const folderName = folderPath.split('/')[0];
+
+            console.log(`📂 תיקייה: ${folderName}, קבצים תקינים: ${validFiles.length}/${files.length}`);
+
+            // Store files and show preview
+            folderFiles = validFiles;
+            await showFolderPreview(folderName, validFiles);
+        }
+
+        // Show folder preview with file list
+        async function showFolderPreview(folderName, files) {
+            document.getElementById('folderName').textContent = folderName;
+            const folderFilesDiv = document.getElementById('folderFiles');
+            const folderPreview = document.getElementById('folderPreview');
+
+            // Clear previous files
+            folderFilesDiv.innerHTML = '';
+
+            showStatus('<div class="spinner"></div>קורא זמן אמיתי לקבצים בתיקייה...', 'processing');
+
+            // Process each file to get duration
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                try {
+                    const duration = await getRealAudioDuration(file);
+
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'folder-file-item';
+                    fileItem.innerHTML = `
+                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
+                        <div class="folder-file-info">
+                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
+                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⏱️ ${duration} דקות</div>
+                        </div>
+                    `;
+                    folderFilesDiv.appendChild(fileItem);
+
+                    // Store duration info
+                    files[i].estimatedDuration = duration;
+
+                } catch (error) {
+                    console.error('Error processing file:', file.name, error);
+
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'folder-file-item';
+                    fileItem.innerHTML = `
+                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
+                        <div class="folder-file-info">
+                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
+                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⚠️ לא ניתן לקרוא זמן</div>
+                        </div>
+                    `;
+                    folderFilesDiv.appendChild(fileItem);
+
+                    // Fallback duration estimate
+                    const fileSizeMB = file.size / (1024 * 1024);
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    files[i].estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
+                        ? Math.max(1, Math.ceil(fileSizeMB / 3))
+                        : Math.max(1, Math.ceil(fileSizeMB / 1.2));
+                }
+            }
+
+            // Show the preview
+            folderPreview.style.display = 'block';
+            showStatus(`✅ נמצאו ${files.length} קבצים בתיקייה "${folderName}"`, 'success');
+
+            setTimeout(() => {
+                const status = document.getElementById('status');
+                if (status) status.style.display = 'none';
+            }, 3000);
+        }
+
+        // Folder management functions
+        function selectAllFolderFiles() {
+            const checkboxes = document.querySelectorAll('.folder-file-checkbox');
+            checkboxes.forEach(checkbox => checkbox.checked = true);
+        }
+
+        function deselectAllFolderFiles() {
+            const checkboxes = document.querySelectorAll('.folder-file-checkbox');
+            checkboxes.forEach(checkbox => checkbox.checked = false);
+        }
+
+        function addSelectedFolderFiles() {
+            const checkboxes = document.querySelectorAll('.folder-file-checkbox:checked');
+            const selectedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index));
+
+            if (selectedIndices.length === 0) {
+                showStatus('אנא בחר לפחות קובץ אחד', 'error');
+                return;
+            }
+
+            const filesToAdd = selectedIndices.map(index => ({
+                file: folderFiles[index],
+                duration: folderFiles[index].estimatedDuration || 1
+            }));
+
+            console.log(`📂 מוסיף ${filesToAdd.length} קבצים מהתיקייה`);
+
+            // Add files to selectedFiles (avoid duplicates)
+            filesToAdd.forEach(item => {
+                const isDuplicate = selectedFiles.some(selected =>
+                    selected.file.name === item.file.name &&
+                    selected.file.size === item.file.size &&
+                    selected.file.lastModified === item.file.lastModified
+                );
+
+                if (!isDuplicate) {
+                    selectedFiles.push(item);
+                    displayFile(item.file, item.duration);
+                }
+            });
+
+            // Update UI
+            updateSubmitButton();
+            updateCostEstimate();
+
+            // Hide folder preview
+            document.getElementById('folderPreview').style.display = 'none';
+
+            showStatus(`✅ נוספו ${filesToAdd.length} קבצים מהתיקייה לרשימת התמלול`, 'success');
+            setTimeout(() => {
+                const status = document.getElementById('status');
+                if (status) status.style.display = 'none';
+            }, 2000);
+
+            // Reset folder input
+            folderInput.value = '';
+        }
 
 
         async function handleFiles(files, addToExisting = false) {
