@@ -97,11 +97,14 @@ def create_hebrew_word_document(transcription, title, output_path):
         new_paragraphs.append('<w:p></w:p>')
 
         # פסקאות תוכן - Python מעבד הכל כאן
+        import re
         all_text = ' '.join(sections)
+        # תיקון ירידות שורה באמצע משפט
+        all_text = re.sub(r'\n+', ' ', all_text)  # החלף ירידות שורה ברווח
+        all_text = re.sub(r'\s{2,}', ' ', all_text)  # רווחים כפולים לרווח יחיד
         all_text = fix_hebrew_punctuation(all_text)  # Python עושה את כל העיבוד העברי
 
         # חלוקה לפסקאות - שומרים על שלמות המירכאות
-        import re
 
         # חלוקה בזהירות למשפטים, אבל לא אם יש מירכאה פתוחה
         words = all_text.split()
@@ -113,10 +116,10 @@ def create_hebrew_word_document(transcription, title, output_path):
             word_count += 1
 
             # יצירת פסקה חדשה רק אם:
-            # 1. יש מספיק מילים
+            # 1. יש מספיק מילים (קוצר מ-40 ל-25)
             # 2. אין מירכאה פתוחה (זוגי של מירכאות)
             # 3. המשפט מסתיים
-            if (word_count >= 40 or len(current_para) > 400) and word.endswith(('.', '!', '?', ':')):
+            if (word_count >= 25 or len(current_para) > 300) and word.endswith(('.', '!', '?', ':')):
                 quote_count = current_para.count('"')
                 if quote_count % 2 == 0:  # זוגי מירכאות = לא באמצע ציטוט
                     para_text = current_para.strip()
@@ -399,6 +402,20 @@ def fix_hebrew_punctuation(text):
     text = text.replace('ום."ו', 'ום". ו')
     text = text.replace('".היום', '". היום')
 
+    # תיקונים נוספים לבעיות שהתגלו
+    text = text.replace('שליט\"א', 'שליט"א')           # תיקון גרש במקום גרשיים
+    text = text.replace('נפלאים.בעזרת', 'נפלאים. בעזרת')  # רווח אחרי נקודה
+    text = text.replace('חז\"ל', 'חז"ל')               # תיקון גרשיים
+    text = text.replace('רש\"י', 'רש"י')               # תיקון גרשיים
+    text = text.replace('זה.כשאדם', 'זה. כשאדם')        # רווח אחרי נקודה
+
+    # תיקון גרשיים חסרים בתחילת ציטוט
+    text = re.sub(r'([א-ת])\s+([א-ת][^"]*)"', r'\1 "\2"', text)  # מילה מילה" -> מילה "מילה"
+
+    # תיקון נקודות צמודות למילים
+    text = text.replace('נמאס.מאיפה', 'נמאס. מאיפה')
+    text = text.replace('ההצלחה.דוד', 'ההצלחה. דוד')
+
     # תיקונים כלליים
     text = re.sub(r'\"\.([א-ת])', r'\". \1', text)
 
@@ -410,9 +427,10 @@ def fix_hebrew_punctuation(text):
     text = re.sub(r'([א-ת]+)-ים\b', r'\1ים', text)
 
     # ניקוי כללי
-    text = re.sub(r'\s+([.,!?:;])', r'\1', text)
-    text = re.sub(r'([.,!?:;])\s+', r'\1 ', text)
-    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'\s+([.,!?:;])', r'\1', text)              # הסר רווח לפני פיסוק
+    text = re.sub(r'([.,!?:;])([א-ת])', r'\1 \2', text)       # הוסף רווח אחרי פיסוק לפני עברית
+    text = re.sub(r'([.,!?:;])\s+', r'\1 ', text)             # רווח יחיד אחרי פיסוק
+    text = re.sub(r'\s{2,}', ' ', text)                       # רווחים כפולים
     text = text.strip()
 
     print('✅ Comprehensive Hebrew processing completed in Python', file=sys.stderr)
