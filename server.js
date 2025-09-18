@@ -1008,10 +1008,22 @@ async function createWordDocument(transcription, filename, duration) {
     const zip = await JSZip.loadAsync(templateData);
     const docXml = await zip.file('word/document.xml').async('text');
 
-    // עיבוד התמלול
+    // עיבוד התמלול עם תיקון פיסוק מתקדם
     let cleanedText = transcription
       .replace(/\r\n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
+      // תיקון בעיות פיסוק חמורות
+      .replace(/\."(\s*)\[/g, '." [')  // תיקון: חי."  מקום.[מוזיקה]
+      .replace(/\]"([א-ת])/g, '] "$1')    // תיקון: [מוזיקה]"אתם
+      .replace(/([א-ת])\."(\s*)([א-ת])/g, '$1." $3')  // תיקון: חי."אתה
+      .replace(/\."\s*"([א-ת])/g, '." "$1')  // תיקון גרשיים כפולים
+      .replace(/([א-ת]):"\s*([א-ת])/g, '$1: "$2')  // תיקון: יודע:"אבל
+      // תיקון רווחים סביב סוגריים מרובעים
+      .replace(/\s*\[/g, ' [')
+      .replace(/\]\s*/g, '] ')
+      // תיקון גרשיים וציטוטים
+      .replace(/"([^"]*?)"/g, ' "$1" ')  // רווח לפני ואחרי ציטוטים
+      .replace(/\s{2,}/g, ' ')  // ניקוי רווחים כפולים
       .trim();
 
     const sections = cleanedText.split(/\n\s*\n/)
@@ -1162,6 +1174,17 @@ async function createWordDocument(transcription, filename, duration) {
 
     // הוספת הפסקאות החדשות לפני סוגר ה-body
     newDocXml = newDocXml.replace('</w:body>', newParagraphs.join('') + '</w:body>');
+
+    // תיקון הגדרות שפה - החלפת כל הגדרה של ערבית לעברית
+    newDocXml = newDocXml
+      .replace(/w:lang w:val="ar-SA"/g, 'w:lang w:val="he-IL"')
+      .replace(/w:lang w:eastAsia="ar-SA"/g, 'w:lang w:eastAsia="he-IL"')
+      .replace(/w:lang w:bidi="ar-SA"/g, 'w:lang w:bidi="he-IL"')
+      .replace(/w:lang w:val="ar"/g, 'w:lang w:val="he-IL"')
+      .replace(/w:lang w:eastAsia="ar"/g, 'w:lang w:eastAsia="he-IL"')
+      .replace(/w:lang w:bidi="ar"/g, 'w:lang w:bidi="he-IL"');
+
+    console.log('📝 Fixed language settings from Arabic to Hebrew in Word document');
 
     // יצירת ZIP חדש
     const newZip = new JSZip();
