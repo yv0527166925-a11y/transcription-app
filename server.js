@@ -558,94 +558,123 @@ function mergeTranscriptionChunks(chunks) {
   return merged;
 }
 
-// Helper function to break long paragraphs into shorter ones
+// Helper function to break long paragraphs into shorter ones - ENHANCED VERSION
 function applyParagraphBreaking(text) {
-  // תיקון פיסוק בסיסי וקיצורים עבריים
+  console.log(`🔧 Starting enhanced paragraph breaking...`);
+
+  // שלב 1: תיקון פיסוק מתקדם וקיצורים עבריים
   text = text
-    // תיקון קיצורים עבריים נפוצים
-    .replace(/רש\s*"\s*י/g, 'רש"י')           // רש"י
-    .replace(/חז\s*"\s*ל/g, 'חז"ל')           // חז"ל
-    .replace(/החיד\s*"\s*א/g, 'החיד"א')       // החיד"א
-    .replace(/הגר\s*"\s*א/g, 'הגר"א')         // הגר"א
-    .replace(/רמב\s*"\s*ם/g, 'רמב"ם')         // רמב"ם
-    .replace(/רמב\s*"\s*ן/g, 'רמב"ן')         // רמב"ן
-    .replace(/משנ\s*"\s*ב/g, 'משנ"ב')         // משנ"ב
-    .replace(/שו\s*"\s*ע/g, 'שו"ע')           // שו"ע
-    .replace(/שו\s*"\s*ת/g, 'שו"ת')           // שו"ת
+    // תיקון קיצורים עבריים נפוצים עם רווחים תקינים
+    .replace(/רש\s*["\u0022\u201C\u201D]\s*י/g, 'רש"י')
+    .replace(/חז\s*["\u0022\u201C\u201D]\s*ל/g, 'חז"ל')
+    .replace(/החיד\s*["\u0022\u201C\u201D]\s*א/g, 'החיד"א')
+    .replace(/הגר\s*["\u0022\u201C\u201D]\s*א/g, 'הגר"א')
+    .replace(/רמב\s*["\u0022\u201C\u201D]\s*ם/g, 'רמב"ם')
+    .replace(/רמב\s*["\u0022\u201C\u201D]\s*ן/g, 'רמב"ן')
+    .replace(/משנ\s*["\u0022\u201C\u201D]\s*ב/g, 'משנ"ב')
+    .replace(/שו\s*["\u0022\u201C\u201D]\s*ע/g, 'שו"ע')
+    .replace(/שו\s*["\u0022\u201C\u201D]\s*ת/g, 'שו"ת')
+    .replace(/מהר\s*["\u0022\u201C\u201D]\s*ל/g, 'מהר"ל')
 
-    // תיקון פיסוק עם רווחים
-    .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
-    .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
-    .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
-    .replace(/([א-ת])\?([א-ת])/g, '$1? $2')   // שאלה עם רווח
-    .replace(/([א-ת]):([א-ת])/g, '$1: $2')    // נקודתיים עם רווח
-    .replace(/([א-ת]);([א-ת])/g, '$1; $2')    // נקודה-פסיק עם רווח
+    // תיקון גרשיים וציטוטים מתקדם
+    .replace(/([א-ת])\s*["\u0022\u201C]\s*([א-ת])/g, '$1" $2')  // גרשיים באמצע עם רווח
+    .replace(/["\u0022\u201C]\s*([א-ת])/g, '"$1')              // גרשיים פתיחה צמודים למילה
+    .replace(/([א-ת])\s*["\u0022\u201D]/g, '$1"')              // גרשיים סגירה צמודים למילה
+    .replace(/([א-ת])\s*["\u0022\u201D]\s*([.,!?])/g, '$1"$2') // גרשיים לפני פיסוק
 
-    // טיפול מתקדם בציטוטים וגרשיים
-    .replace(/([א-ת])\s*"\s*([א-ת])/g, '$1" $2')  // גרשיים עם רווח נכון
-    .replace(/"\s*([א-ת])/g, '"$1')                // גרשיים פתיחה צמודים
-    .replace(/([א-ת])\s*"/g, '$1"')                // גרשיים סגירה צמודים
+    // תיקון פיסוק חזק יותר - הסרת רווחים לפני פיסוק
+    .replace(/\s+([.,!?:;])/g, '$1')                           // הסר כל רווח לפני פיסוק
+    .replace(/([.,!?:;])\s+/g, '$1 ')                          // רווח יחיד אחרי פיסוק
 
-    // ניקוי רווחים כפולים
-    .replace(/\s{2,}/g, ' ')
+    // תיקון פיסוק עם מילים עבריות
+    .replace(/([א-ת])([.,!?:;])([א-ת])/g, '$1$2 $3')          // רווח אחרי פיסוק בין מילים עבריות
+
+    // ניקוי רווחים מיותרים
+    .replace(/\s{2,}/g, ' ')                                   // רווחים כפולים לרווח יחיד
+    .replace(/^\s+|\s+$/gm, '')                                // רווחים בתחילת/סוף שורות
     .trim();
 
-  // חלוקה חכמה לפי משפטים שלמים
+  console.log(`✅ Punctuation fixing completed`);
+
+  // שלב 2: זיהוי משפטים מלאים עם הגיון מתקדם
   const sentences = [];
   let currentSentence = '';
   const words = text.split(/\s+/);
 
-  // בניית משפטים שלמים
+  console.log(`📝 Processing ${words.length} words into complete sentences...`);
+
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
+    const nextWord = i < words.length - 1 ? words[i + 1] : '';
+    const prevWord = i > 0 ? words[i - 1] : '';
+
     currentSentence += word + ' ';
 
-    // זיהוי סוף משפט אמיתי
+    // זיהוי סוף משפט אמיתי עם בדיקות מתקדמות
     const endsWithPunctuation = word.match(/[.!?]$/);
-    const nextWord = i < words.length - 1 ? words[i + 1] : '';
 
-    // וודא שזה לא קיצור או מספר
-    const isAbbreviation = word.match(/^(רש"י|חז"ל|החיד"א|הגר"א|רמב"ם|רמב"ן|משנ"ב|שו"ע|שו"ת|מהר"ל|ר"ת|תוס'|ע"ש|ע"פ|כו'|וכו'|שם|שם)\.?$/);
-    const isNumber = word.match(/^\d+\.$/);
+    if (endsWithPunctuation) {
+      // בדיקות שזה לא קיצור או מספר
+      const isCommonAbbreviation = word.match(/^(רש"י|חז"ל|החיד"א|הגר"א|רמב"ם|רמב"ן|משנ"ב|שו"ע|שו"ת|מהר"ל|ר"ת|תוס'|ע"ש|ע"פ|כו'|וכו'|שם|דף|עמ'|פס'|סי'|ח"א|ח"ב|ח"ג|ח"ד|ח"ה)\.?$/);
+      const isNumber = word.match(/^\d+\.$/);
+      const isInitials = word.match(/^[א-ת]"[א-ת]\.$/);
 
-    if (endsWithPunctuation && !isAbbreviation && !isNumber && nextWord && nextWord.match(/^[א-ת]/)) {
-      sentences.push(currentSentence.trim());
-      currentSentence = '';
+      // זיהוי שהמילה הבאה מתחילה משפט חדש
+      const nextStartsNewSentence = nextWord && (
+        nextWord.match(/^[א-ת]/i) ||  // מילה עברית
+        nextWord.match(/^[A-Z]/)      // מילה באנגלית עם אות גדולה
+      );
+
+      // תנאי סיום משפט
+      if (!isCommonAbbreviation && !isNumber && !isInitials && nextStartsNewSentence) {
+        sentences.push(currentSentence.trim());
+        currentSentence = '';
+      }
     }
   }
 
-  // הוסף משפט אחרון אם נשאר
+  // הוסף משפט אחרון
   if (currentSentence.trim()) {
     sentences.push(currentSentence.trim());
   }
 
-  // חלוקה לפסקאות
+  console.log(`✅ Created ${sentences.length} complete sentences`);
+
+  // שלב 3: חלוקה חכמה לפסקאות על פי תוכן
   const paragraphs = [];
   let currentParagraph = '';
   let sentenceCount = 0;
 
   for (let i = 0; i < sentences.length; i++) {
     const sentence = sentences[i];
+    const nextSentence = i < sentences.length - 1 ? sentences[i + 1] : '';
+
     currentParagraph += sentence + ' ';
     sentenceCount++;
 
-    const nextSentence = i < sentences.length - 1 ? sentences[i + 1] : '';
-
-    // זיהוי תחילת נושא חדש
-    const isNewTopic = nextSentence.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|לדוגמה|בפרט|מכאן|שהסיבה|והשאלה|בפרשת|כיוון|היינו|נמצא|הוכחה)/);
+    // זיהוי תחילת נושא/רעיון חדש
+    const startsNewTopic = nextSentence && nextSentence.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|לדוגמה|בפרט|מכאן|שהסיבה|והשאלה|בפרשת|כיוון|היינו|נמצא|הוכחה|וכן|ועוד|בנוסף|למשל|לדוגמה)/);
 
     // זיהוי סוף רעיון מלא
-    const isIdeaEnd = sentence.match(/\b(הקדוש ברוך הוא|חז"ל|רש"י|רמב"ם|התורה|הגמרא|המשנה)\b.*[.!?]\s*$/) ||
-                     sentence.match(/\b(לכן|אם כן|ומכאן|לסיכום|בסופו של דבר)\b.*[.!?]\s*$/);
+    const endsIdea = sentence.match(/\b(הקדוש ברוך הוא|חז"ל|רש"י|רמב"ם|התורה|הגמרא|המשנה|התלמוד|המדרש)\b.*[.!?]\s*$/) ||
+                    sentence.match(/\b(לכן|אם כן|ומכאן|לסיכום|בסופו של דבר|זהו|זו|לסיום|בסוף|לבסוף)\b.*[.!?]\s*$/);
 
-    // תנאי פיצול מאוזנים
+    // זיהוי מעבר בין דוברים
+    const speakerChange = nextSentence && (
+      nextSentence.match(/^(הרב|המורה|השואל|המשיב|המלמד|התלמיד)/i) ||
+      nextSentence.match(/^[א-ת]+\s+(אמר|אומר|שאל|ענה|הוסיף|המשיך)/i)
+    );
+
+    // תנאים לפיצול פסקה
+    const wordCount = currentParagraph.split(' ').length;
     const shouldBreak =
-      sentenceCount >= 3 ||  // מקסימום 3 משפטים לפסקה
-      (sentenceCount >= 2 && isNewTopic) ||  // 2 משפטים ונושא חדש
-      (sentenceCount >= 2 && isIdeaEnd) ||   // 2 משפטים וסוף רעיון
-      currentParagraph.split(' ').length >= 45;  // מקסימום 45 מילים
+      sentenceCount >= 4 ||                               // מקסימום 4 משפטים
+      (sentenceCount >= 2 && startsNewTopic) ||          // 2 משפטים + נושא חדש
+      (sentenceCount >= 2 && endsIdea) ||                // 2 משפטים + סוף רעיון
+      (sentenceCount >= 2 && speakerChange) ||           // 2 משפטים + החלפת דובר
+      wordCount >= 60;                                    // מקסימום 60 מילים
 
-    if (shouldBreak) {
+    if (shouldBreak && currentParagraph.trim()) {
       paragraphs.push(currentParagraph.trim());
       currentParagraph = '';
       sentenceCount = 0;
@@ -657,7 +686,9 @@ function applyParagraphBreaking(text) {
     paragraphs.push(currentParagraph.trim());
   }
 
-  console.log(`📝 Applied enhanced paragraph breaking: ${paragraphs.length} paragraphs created`);
+  console.log(`📝 Enhanced paragraph breaking completed: ${paragraphs.length} logical paragraphs created`);
+  console.log(`📊 Average paragraph length: ${Math.round(text.length / paragraphs.length)} characters`);
+
   return paragraphs.join('\n\n');
 }
 
