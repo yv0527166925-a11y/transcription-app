@@ -1480,21 +1480,26 @@
         function selectFolder() {
             console.log('📂 פותח דיאלוג בחירת תיקייה');
 
-            // Create a new input element each time to ensure clean state
+            // Remove existing input completely
             const existingInput = document.getElementById('folderInput');
-            const newInput = document.createElement('input');
+            if (existingInput) {
+                existingInput.remove();
+            }
 
-            // Set all necessary attributes for folder selection
+            // Create completely new input with folder attributes set from the beginning
+            const newInput = document.createElement('input');
             newInput.type = 'file';
             newInput.id = 'folderInput';
             newInput.className = 'file-input';
             newInput.style.display = 'none';
-            newInput.setAttribute('webkitdirectory', '');
-            newInput.setAttribute('directory', '');
-            newInput.setAttribute('multiple', '');
+
+            // Set folder-specific attributes BEFORE adding to DOM
+            newInput.webkitdirectory = true;
+            newInput.directory = true;
+            newInput.multiple = true;
             newInput.accept = 'audio/*,video/*';
 
-            // Add event listener to new input
+            // Add event listener
             newInput.addEventListener('change', (e) => {
                 console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
                 if (e.target.files.length === 0) {
@@ -1504,14 +1509,12 @@
                 handleFolderSelection(e.target.files);
             });
 
-            // Replace the old input with the new one
-            existingInput.parentNode.replaceChild(newInput, existingInput);
+            // Add to DOM
+            document.body.appendChild(newInput);
 
-            // Trigger the folder picker immediately
-            setTimeout(() => {
-                newInput.click();
-                console.log('📂 דיאלוג בחירת תיקייה הופעל');
-            }, 100);
+            // Trigger immediately
+            newInput.click();
+            console.log('📂 דיאלוג בחירת תיקייה הופעל');
         }
 
         // Handle folder selection and preview
