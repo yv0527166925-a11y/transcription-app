@@ -96,9 +96,9 @@ def create_hebrew_word_document(transcription, title, output_path):
         # שורה ריקה
         new_paragraphs.append('<w:p></w:p>')
 
-        # פסקאות תוכן - פשוט עם רווחים תקינים
+        # פסקאות תוכן - Python מעבד הכל כאן
         all_text = ' '.join(sections)
-        all_text = fix_hebrew_punctuation(all_text)
+        all_text = fix_hebrew_punctuation(all_text)  # Python עושה את כל העיבוד העברי
 
         # חלוקה לפסקאות - שומרים על שלמות המירכאות
         import re
@@ -187,7 +187,7 @@ def create_hebrew_word_document(transcription, title, output_path):
         # החלפת הקובץ הסופי
         shutil.move(temp_path, output_path)
 
-        print(f"Word document created successfully: {output_path}")
+        print(f"Word document created successfully: {output_path}", file=sys.stderr)
         return True
 
     except Exception as e:
@@ -341,32 +341,81 @@ def escape_xml(text):
 
 def fix_hebrew_punctuation(text):
     """
-    מתקן רווחים ופיסוק בעברית
+    עיבוד מושלם לטקסט עברי - כל הלוגיקה מועברת מ-Node.js
     """
     import re
 
-    # תיקון נקודות מרובות למשולש נקודות
-    text = re.sub(r'\.{3,}', '...', text)  # 3+ נקודות -> ...
-    text = re.sub(r'\.\s*\.\s*\.', '...', text)  # . . . -> ...
+    print('🔧 Starting comprehensive Hebrew processing in Python...', file=sys.stderr)
 
-    # ניקוי נקודות מיותרות בתחילת משפט
-    text = re.sub(r'^\s*\.+\s*', '', text, flags=re.MULTILINE)
+    # קודם כל - נקה את כל הגרשיים לסוג אחיד
+    text = re.sub(r'["\u0022\u201C\u201D]', '"', text)
 
-    # תיקון רווחים אחרי סימני פיסוק
-    text = re.sub(r'([.!?:;,])([א-ת])', r'\1 \2', text)
+    # **שלב א: תיקון קיצורים נפוצים**
+    hebrew_abbreviations = [
+        ['רש', 'י'], ['חז', 'ל'], ['שליט', 'א'], ['החיד', 'א'],
+        ['הגר', 'א'], ['רמב', 'ם'], ['רמב', 'ן'], ['משנ', 'ב'],
+        ['שו', 'ע'], ['שו', 'ת'], ['מהר', 'ל'], ['בק', 'ב'],
+        ['ב', 'ה'], ['ד', 'ה']
+    ]
 
-    # תיקון רווח אחרי סוגריים מרובעים לפני מירכאות
-    text = re.sub(r'\](["\'])', r'] \1', text)
+    for first, second in hebrew_abbreviations:
+        patterns = [
+            f'{first}\\s*"\\s*{second}',    # רש " י
+            f'{first}\\s+"\\s*{second}',    # רש  " י
+            f'{first}"\\s*{second}',        # רש" י
+            f'{first}\\s*"{second}',        # רש "י
+        ]
 
-    # ניקוי רווחים מיותרים לפני פיסוק
-    text = re.sub(r'\s+([.!?:;,])', r'\1', text)
+        for pattern in patterns:
+            text = re.sub(pattern, f'{first}"{second}', text)
 
-    # ניקוי רווחים כפולים
+    # **שלב ב: תיקון מילה + גרשיים + אות**
+    text = re.sub(r'([א-ת]{2,})\s*"\s*([א-ת])', r'\1"\2', text)
+
+    # **שלב ג: תיקון שמות עם גרשיים**
+    text = re.sub(r'ה\s+"([^"]+)"', r'ה"\1"', text)
+    text = re.sub(r'([א-ת])\s+"([^"]+)"', r'\1"\2"', text)
+
+    # **שלב ד: מילים מתחלקות**
+    text = re.sub(r'חז\s*"\s*לים', 'חז"לים', text)
+    text = re.sub(r'([א-ת]+)לי\s*"\s*ם', r'\1לים', text)
+
+    # **שלב ה: מילים צמודות**
+    word_fixes = {
+        'יודעתראו': 'יודעת ראו',
+        'אומרתאני': 'אומרת אני',
+        'שאלתיאותו': 'שאלתי אותו',
+        'אמרתיכן': 'אמרתי כן'
+    }
+    for wrong, correct in word_fixes.items():
+        text = text.replace(wrong, correct)
+
+    # **שלב ו: תיקונים מתקדמים עם גרשיים ופיסוק**
+    text = re.sub(r'([א-ת])\.\"', r'\1\".', text)              # נקודה לפני גרשיים
+    text = re.sub(r'([א-ת])\"([א-ת])', r'\1 \"\2', text)      # רווח לפני גרשיים פותחים
+
+    # תיקונים ספציפיים
+    text = text.replace('אומר "שאל', 'אומר" שאל')
+    text = text.replace('ום."ו', 'ום". ו')
+    text = text.replace('".היום', '". היום')
+
+    # תיקונים כלליים
+    text = re.sub(r'\"\.([א-ת])', r'\". \1', text)
+
+    # תיקון מילים עם ר'
+    text = re.sub(r'ר\s*\'\s*([א-ת])', r'ר\' \1', text)
+
+    # תיקון מיתוקים
+    text = text.replace('אמן-ים', 'אמנים')
+    text = re.sub(r'([א-ת]+)-ים\b', r'\1ים', text)
+
+    # ניקוי כללי
+    text = re.sub(r'\s+([.,!?:;])', r'\1', text)
+    text = re.sub(r'([.,!?:;])\s+', r'\1 ', text)
     text = re.sub(r'\s{2,}', ' ', text)
+    text = text.strip()
 
-    # ניקוי רווחים בתחילת ובסוף שורות
-    text = re.sub(r'^\s+|\s+$', '', text, flags=re.MULTILINE)
-
+    print('✅ Comprehensive Hebrew processing completed in Python', file=sys.stderr)
     return text
 
 def set_rtl_paragraph(paragraph):

@@ -551,9 +551,8 @@ function mergeTranscriptionChunks(chunks) {
 
   console.log(`✅ Merge completed: ${merged.length} total characters`);
 
-  // Apply paragraph breaking logic to merged content to ensure short paragraphs
-  console.log(`📝 Applying paragraph breaking to merged transcription...`);
-  merged = applyParagraphBreaking(merged);
+  // Python will handle all text processing - no Node.js processing needed
+  console.log(`📝 Sending raw transcription to Python for processing...`);
 
   return merged;
 }
