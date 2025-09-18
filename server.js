@@ -2402,18 +2402,36 @@ function extractAttachments(struct, emailData) {
   if (Array.isArray(struct)) {
     struct.forEach(part => extractAttachments(part, emailData));
   } else {
-    if (struct.disposition && struct.disposition.type === 'attachment') {
-      const filename = struct.disposition.params?.filename;
+    console.log(`📧 Checking email part: type=${struct.type}/${struct.subtype}, disposition=${struct.disposition?.type}`);
+
+    // Check for attachments in multiple ways
+    const isAttachment =
+      (struct.disposition && struct.disposition.type === 'attachment') ||
+      (struct.disposition && struct.disposition.type === 'inline') ||
+      (struct.disposition && struct.disposition.params?.filename) ||
+      (!struct.disposition && struct.params?.name);
+
+    if (isAttachment) {
+      const filename =
+        struct.disposition?.params?.filename ||
+        struct.params?.name ||
+        `unknown_${Date.now()}.${struct.subtype}`;
+
       const type = struct.type + '/' + struct.subtype;
+
+      console.log(`📧 Found potential attachment: ${filename}, type: ${type}`);
 
       // Check if it's an audio/video file
       if (isAudioVideoFile(filename, type)) {
+        console.log(`📧 ✅ Valid audio/video file: ${filename}`);
         emailData.attachments.push({
           filename: filename,
           type: type,
           encoding: struct.encoding,
           size: struct.size
         });
+      } else {
+        console.log(`📧 ❌ Not audio/video file: ${filename} (${type})`);
       }
     }
   }
