@@ -1449,7 +1449,7 @@ const attachments = transcriptions.map(trans => {
 // Global transcription tracking for cancellation
 let activeTranscriptions = new Map(); // Map of transcriptionId -> { userEmail, files, cancelled: boolean }
 
-async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes, transcriptionId) {
+async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes, transcriptionId, customInstructions = '') {
   console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
   console.log(`📧 Processing for user: ${userEmail} (ID: ${transcriptionId})`);
 
@@ -1972,7 +1972,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     const transcriptionId = `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Start enhanced async processing with the ACCURATE minutes
-    processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId);
+    processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId, customInstructions);
 
     console.log('✅ Enhanced transcription started successfully with accurate minute count.');
     res.json({
