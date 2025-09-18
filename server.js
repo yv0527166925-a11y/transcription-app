@@ -1022,16 +1022,42 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/:([א-ת])/g, ': $1')             // מילה:מילה → מילה: מילה
       .replace(/;([א-ת])/g, '; $1')             // מילה;מילה → מילה; מילה
 
-      // תיקון גרשיים - הסרת רווחים מיותרים בתוך ציטוטים
+      // תיקון גרשיים וציטוטים
       .replace(/\s*"\s*([^"]+?)\s*"\s*/g, ' "$1" ')  // " טקסט " → " טקסט "
       .replace(/([א-ת])\"([א-ת])/g, '$1 "$2')        // מילה"מילה → מילה "מילה
       .replace(/\"([א-ת])([^"]*?)\"([א-ת])/g, '"$1$2" $3')  // "טקסט"מילה → "טקסט" מילה
+      .replace(/"([^"]*?)"([א-ת])/g, '"$1" $2')      // "טקסט"מילה → "טקסט" מילה (נוספת)
+      .replace(/([א-ת])"([^"]*?)"/g, '$1 "$2"')      // מילה"טקסט" → מילה "טקסט"
+
+      // תיקון גרשיים כפולים וריווח
+      .replace(/""([א-ת])/g, '" $1')                 // ""מילה → " מילה
+      .replace(/([א-ת])""/g, '$1 "')                 // מילה"" → מילה "
+      .replace(/"([א-ת])"/g, '" $1 "')               // "מ"ילה → " מ " ילה
 
       // תיקון סוגריים מרובעים
       .replace(/\[([א-ת])/g, '[$1')             // ודא שהסוגר צמוד לתוכן
       .replace(/([א-ת])\]/g, '$1]')             // ודא שהסוגר צמוד לתוכן
       .replace(/\]\s*([א-ת])/g, '] $1')         // [טקסט]מילה → [טקסט] מילה
       .replace(/([א-ת])\s*\[/g, '$1 [')         // מילה[טקסט] → מילה [טקסט]
+
+      // תיקון משפטים ארוכים - פיצול פסיקים לנקודות במקומות מתאימים
+      .replace(/([א-ת]{20,}[^.!?]*?),(\s*)([א-ת]*?[א-ת]{20,})/g, '$1.$2$3')  // משפט ארוך, משפט ארוך → משפט ארוך. משפט ארוך
+
+      // תיקון מקפים מיותרים
+      .replace(/(\d+)\s*-\s*([א-ת]+)ים/g, '$1 $2ים')  // 90 - אמנים → 90 אמנים
+      .replace(/(\d+)\s*-\s*([א-ת]+)/g, '$1 $2')      // מספר - מילה → מספר מילה
+
+      // תיקון מילים דבוקות (שגיאות תמלול נפוצות)
+      .replace(/([א-ת])תראו([א-ת])/g, '$1 תראו $2')    // מילהתראומילה → מילה תראו מילה
+      .replace(/([א-ת])את([א-ת])/g, '$1 את $2')        // מילהאתמילה → מילה את מילה (זהירות)
+      .replace(/([א-ת])של([א-ת])/g, '$1 של $2')        // מילהשלמילה → מילה של מילה (זהירות)
+
+      // זיהוי מעברי נושא ויצירת פסקאות חדשות
+      .replace(/([.!?])\s*(אבל|אז|עכשיו|בואו|הנה|אגב|דרך אגב|בקשר|יש לי|אני רוצה|בעצם|למעשה|כמו כן|נוסף על כך|חוץ מזה|יותר מזה)/g, '$1\n\n$2')
+      .replace(/([.!?])\s*(סיפור|פעם אחת|היה מעשה|אני זוכר|פעם|בזמן|לפני|בעבר|פעם ראיתי|ידוע|מסופר|נאמר)/g, '$1\n\n$2')
+      .replace(/([.!?])\s*(השאלה|הנקודה|הדבר|העניין|הבעיה|הפתרון|המסר|הלקח|התשובה|המטרה|הכוונה)/g, '$1\n\n$2')
+      .replace(/([.!?])\s*(בנוסף|כמו כן|באופן דומה|לעומת זאת|מצד אחד|מצד שני|לכן|אם כך|בכל מקרה)/g, '$1\n\n$2')
+      .replace(/([.!?])\s*(עכשיו אני|בואו נראה|בואו נדבר|אני אומר|הגעתי למסקנה|מה שאני|הדבר החשוב)/g, '$1\n\n$2')
 
       // ניקוי רווחים כפולים וחיצוניים
       .replace(/\s{2,}/g, ' ')                  // רווחים כפולים
@@ -2426,14 +2452,109 @@ function processEmails(imap, uids) {
     });
 
     msg.once('end', function() {
-      // Process this email for transcription
-      handleTranscriptionEmail(emailData, imap, seqno);
+      // Download attachments immediately while IMAP connection is still active
+      if (emailData.attachments.length > 0) {
+        downloadAttachmentsInPlace(emailData, imap, seqno)
+          .then(() => {
+            // Process this email for transcription
+            handleTranscriptionEmail(emailData, imap, seqno);
+          })
+          .catch((error) => {
+            console.error('📧 Error downloading attachments in place:', error);
+            // Try to process anyway
+            handleTranscriptionEmail(emailData, imap, seqno);
+          });
+      } else {
+        // Process this email for transcription
+        handleTranscriptionEmail(emailData, imap, seqno);
+      }
     });
   });
 
   fetch.once('error', function(err) {
     console.error('📧 Fetch error:', err);
   });
+}
+
+// Download attachments immediately while IMAP connection is active
+async function downloadAttachmentsInPlace(emailData, imap, seqno) {
+  const tempDir = path.join(__dirname, 'temp_email_attachments');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  console.log(`📧 Downloading ${emailData.attachments.length} attachments in place for seqno ${seqno}`);
+
+  for (let i = 0; i < emailData.attachments.length; i++) {
+    const attachment = emailData.attachments[i];
+    if (!attachment.downloadNeeded) continue;
+
+    try {
+      const tempFilePath = path.join(tempDir, `${seqno}_${attachment.filename}`);
+      console.log(`📧 Downloading ${attachment.filename} to ${tempFilePath}`);
+
+      await new Promise((resolve, reject) => {
+        const fetch = imap.fetch([seqno], {
+          bodies: attachment.partId,
+          struct: false
+        });
+
+        let attachmentData = Buffer.alloc(0);
+
+        fetch.on('message', function(msg, fetchSeqno) {
+          msg.on('body', function(stream, info) {
+            let buffer = Buffer.alloc(0);
+
+            stream.on('data', function(chunk) {
+              buffer = Buffer.concat([buffer, chunk]);
+            });
+
+            stream.once('end', function() {
+              // Decode based on encoding
+              let finalData = buffer;
+
+              if (attachment.encoding === 'base64') {
+                finalData = Buffer.from(buffer.toString(), 'base64');
+              } else if (attachment.encoding === 'quoted-printable') {
+                // Handle quoted-printable if needed
+                finalData = buffer;
+              }
+
+              attachmentData = finalData;
+            });
+          });
+        });
+
+        fetch.once('end', function() {
+          try {
+            fs.writeFileSync(tempFilePath, attachmentData);
+            console.log(`📧 ✅ Downloaded ${attachment.filename}: ${attachmentData.length} bytes`);
+
+            // Update attachment info
+            attachment.downloadedPath = tempFilePath;
+            attachment.downloadNeeded = false;
+            attachment.actualSize = attachmentData.length;
+
+            resolve();
+          } catch (writeError) {
+            console.error(`📧 Error writing ${attachment.filename}:`, writeError);
+            reject(writeError);
+          }
+        });
+
+        fetch.once('error', function(err) {
+          console.error(`📧 Error downloading ${attachment.filename}:`, err);
+          reject(err);
+        });
+      });
+
+    } catch (error) {
+      console.error(`📧 Failed to download ${attachment.filename}:`, error);
+      // Continue with other attachments
+    }
+  }
+
+  console.log(`📧 ✅ All attachments downloaded for seqno ${seqno}`);
 }
 
 // Extract attachments from email structure
@@ -2474,7 +2595,8 @@ function extractAttachments(struct, emailData, partId = '') {
           type: type,
           encoding: struct.encoding,
           size: struct.size,
-          partId: partId
+          partId: partId,
+          downloadNeeded: true
         });
       } else {
         console.log(`📧 ❌ Not audio/video file: ${filename} (${type})`);
@@ -2699,89 +2821,23 @@ async function findAndDownloadAttachment(struct, targetFilename, imap, seqno, ou
   });
 }
 
-// Download attachment from email data using IMAP
+// Download attachment from email data - now just copies pre-downloaded file
 async function downloadAttachmentFromEmail(emailData, attachment, tempFilePath) {
-  return new Promise((resolve, reject) => {
-    console.log(`📧 Starting download of ${attachment.filename} from email UID:${emailData.uid}, part:${attachment.partId}`);
+  console.log(`📧 Copying pre-downloaded ${attachment.filename} to ${tempFilePath}`);
 
-    const imap = new Imap(imapConfig);
-
-    imap.once('ready', function() {
-      imap.openBox('INBOX', true, function(err, box) {
-        if (err) {
-          console.error('📧 Error opening inbox for download:', err);
-          return reject(err);
-        }
-
-        // Use the specific UID and partId we already know
-        console.log(`📧 Fetching attachment from UID ${emailData.uid}, part ${attachment.partId}`);
-
-        const fetch = imap.fetch([emailData.uid], {
-          bodies: attachment.partId,
-          struct: false
-        });
-
-        let attachmentData = Buffer.alloc(0);
-
-        fetch.on('message', function(msg, seqno) {
-          msg.on('body', function(stream, info) {
-            let buffer = Buffer.alloc(0);
-
-            stream.on('data', function(chunk) {
-              buffer = Buffer.concat([buffer, chunk]);
-            });
-
-            stream.once('end', function() {
-              // Decode based on encoding
-              let finalData = buffer;
-
-              if (attachment.encoding === 'base64') {
-                finalData = Buffer.from(buffer.toString(), 'base64');
-              } else if (attachment.encoding === 'quoted-printable') {
-                // Handle quoted-printable if needed
-                finalData = buffer;
-              }
-
-              attachmentData = finalData;
-            });
-          });
-        });
-
-        fetch.once('end', function() {
-          try {
-            fs.writeFileSync(tempFilePath, attachmentData);
-            console.log(`📧 ✅ Attachment downloaded successfully: ${tempFilePath} (${attachmentData.length} bytes)`);
-            imap.end();
-            resolve();
-          } catch (writeError) {
-            console.error(`📧 Error writing attachment:`, writeError);
-            imap.end();
-            reject(writeError);
-          }
-        });
-
-        fetch.once('error', function(err) {
-          console.error('📧 Error downloading attachment:', err);
-          imap.end();
-          reject(err);
-        });
-      });
-    });
-
-    imap.once('error', function(err) {
-      console.error('📧 IMAP error during download:', err);
-      reject(err);
-    });
-
-    // Add timeout for download
-    setTimeout(() => {
-      if (!imap.state || imap.state === 'disconnected') {
-        reject(new Error('IMAP download timeout after 30 seconds'));
-      }
-    }, 30000);
-
-    imap.connect();
-  });
+  if (attachment.downloadedPath && fs.existsSync(attachment.downloadedPath)) {
+    try {
+      fs.copyFileSync(attachment.downloadedPath, tempFilePath);
+      console.log(`📧 ✅ Attachment copied successfully: ${tempFilePath} (${attachment.actualSize} bytes)`);
+      return;
+    } catch (error) {
+      console.error(`📧 Error copying pre-downloaded file:`, error);
+      throw error;
+    }
+  } else {
+    console.error(`📧 Pre-downloaded file not found: ${attachment.downloadedPath}`);
+    throw new Error(`Pre-downloaded attachment not found: ${attachment.filename}`);
+  }
 }
 
 // Process email transcription (download attachments and transcribe)
