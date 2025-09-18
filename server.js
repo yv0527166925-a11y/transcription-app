@@ -567,18 +567,27 @@ function applyParagraphBreaking(text) {
     currentParagraph += word + ' ';
     wordCount++;
 
-    // חדש פסקה אם:
-    // 1. המילה מסתיימת בנקודה/שאלה/קריאה וכבר יש מספיק מילים
-    // 2. יש יותר מ-100 מילים בפסקה
-    // 3. המילה הבאה מתחילה במילה שמסמנת תחילת נושא חדש
+    // בדיקת נקודת סיום טבעית
     const endsWithPunctuation = word.match(/[.!?]$/);
     const nextWord = i < words.length - 1 ? words[i + 1] : '';
-    const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו)$/);
 
+    // מילות מפתח שמסמנות תחילת נושא חדש - הרחבתי את הרשימה
+    const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|אדרבה|רצתה|היות|תירוץ|הוכחה|ומכאן|שהסיבה|והשאלה|בפרשת|בגלל|כיוון)$/);
+
+    // ביטויים שמסמנים סוף רעיון
+    const endsIdea = word.match(/^(בכור|הארון|קהת|גרשון|התורה|חכם|קודם)\.$/) ||
+                    currentParagraph.match(/\bחז\"ל\b.*\.$/) ||
+                    currentParagraph.match(/\bתלמיד חכם\b.*\.$/) ||
+                    currentParagraph.match(/\bכלי יקר\b.*\.$/) ||
+                    currentParagraph.match(/\bהקדוש ברוך הוא\b.*\.$/);
+
+    // תנאי פיצול מחמירים יותר - הורדתי את המקסימום ל-50 מילים
     const shouldBreak =
-      (endsWithPunctuation && wordCount >= 15) || // מינימום 15 מילים למשפט
-      wordCount >= 100 || // מקסימום 100 מילים לפסקה
-      (endsWithPunctuation && isNewTopicStart && wordCount >= 10); // פסקה קצרה אם יש נושא חדש
+      wordCount >= 50 || // מקסימום 50 מילים לפסקה (הורדתי מ-100)
+      (endsWithPunctuation && wordCount >= 25) || // פסקה של 25+ מילים עם נקודה
+      (endsWithPunctuation && isNewTopicStart && wordCount >= 15) || // נושא חדש אחרי 15+ מילים
+      (endsIdea && wordCount >= 20) || // סוף רעיון מוגדר
+      (endsWithPunctuation && wordCount >= 30 && nextWord.match(/^[א-ת]/)); // כל משפט של 30+ מילים
 
     if (shouldBreak) {
       paragraphs.push(currentParagraph.trim());
@@ -998,18 +1007,27 @@ async function createWordDocument(transcription, filename, duration) {
         currentParagraph += word + ' ';
         wordCount++;
 
-        // חדש פסקה אם:
-        // 1. המילה מסתיימת בנקודה/שאלה/קריאה וכבר יש מספיק מילים
-        // 2. יש יותר מ-100 מילים בפסקה
-        // 3. המילה הבאה מתחילה במילה שמסמנת תחילת נושא חדש
+        // בדיקת נקודת סיום טבעית
         const endsWithPunctuation = word.match(/[.!?]$/);
         const nextWord = i < words.length - 1 ? words[i + 1] : '';
-        const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו)$/);
 
+        // מילות מפתח שמסמנות תחילת נושא חדש - הרחבתי את הרשימה
+        const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|אדרבה|רצתה|היות|תירוץ|הוכחה|ומכאן|שהסיבה|והשאלה|בפרשת|בגלל|כיוון)$/);
+
+        // ביטויים שמסמנים סוף רעיון
+        const endsIdea = word.match(/^(בכור|הארון|קהת|גרשון|התורה|חכם|קודם)\.$/) ||
+                        currentParagraph.match(/\bחז\"ל\b.*\.$/) ||
+                        currentParagraph.match(/\bתלמיד חכם\b.*\.$/) ||
+                        currentParagraph.match(/\bכלי יקר\b.*\.$/) ||
+                        currentParagraph.match(/\bהקדוש ברוך הוא\b.*\.$/);
+
+        // תנאי פיצול מחמירים יותר - הורדתי את המקסימום ל-50 מילים
         const shouldBreak =
-          (endsWithPunctuation && wordCount >= 15) || // מינימום 15 מילים למשפט
-          wordCount >= 100 || // מקסימום 100 מילים לפסקה
-          (endsWithPunctuation && isNewTopicStart && wordCount >= 10); // פסקה קצרה אם יש נושא חדש
+          wordCount >= 50 || // מקסימום 50 מילים לפסקה (הורדתי מ-100)
+          (endsWithPunctuation && wordCount >= 25) || // פסקה של 25+ מילים עם נקודה
+          (endsWithPunctuation && isNewTopicStart && wordCount >= 15) || // נושא חדש אחרי 15+ מילים
+          (endsIdea && wordCount >= 20) || // סוף רעיון מוגדר
+          (endsWithPunctuation && wordCount >= 30 && nextWord.match(/^[א-ת]/)); // כל משפט של 30+ מילים
 
         if (shouldBreak) {
           paragraphs.push(currentParagraph.trim());
