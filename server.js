@@ -560,64 +560,104 @@ function mergeTranscriptionChunks(chunks) {
 
 // Helper function to break long paragraphs into shorter ones
 function applyParagraphBreaking(text) {
-  // תיקון פיסוק בסיסי
+  // תיקון פיסוק בסיסי וקיצורים עבריים
   text = text
+    // תיקון קיצורים עבריים נפוצים
+    .replace(/רש\s*"\s*י/g, 'רש"י')           // רש"י
+    .replace(/חז\s*"\s*ל/g, 'חז"ל')           // חז"ל
+    .replace(/החיד\s*"\s*א/g, 'החיד"א')       // החיד"א
+    .replace(/הגר\s*"\s*א/g, 'הגר"א')         // הגר"א
+    .replace(/רמב\s*"\s*ם/g, 'רמב"ם')         // רמב"ם
+    .replace(/רמב\s*"\s*ן/g, 'רמב"ן')         // רמב"ן
+    .replace(/משנ\s*"\s*ב/g, 'משנ"ב')         // משנ"ב
+    .replace(/שו\s*"\s*ע/g, 'שו"ע')           // שו"ע
+    .replace(/שו\s*"\s*ת/g, 'שו"ת')           // שו"ת
+
+    // תיקון פיסוק עם רווחים
     .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
     .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
     .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
     .replace(/([א-ת])\?([א-ת])/g, '$1? $2')   // שאלה עם רווח
     .replace(/([א-ת]):([א-ת])/g, '$1: $2')    // נקודתיים עם רווח
     .replace(/([א-ת]);([א-ת])/g, '$1; $2')    // נקודה-פסיק עם רווח
-    .replace(/([א-ת])"([א-ת])/g, '$1" $2')    // גרשיים עם רווח
-    .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
+
+    // טיפול מתקדם בציטוטים וגרשיים
+    .replace(/([א-ת])\s*"\s*([א-ת])/g, '$1" $2')  // גרשיים עם רווח נכון
+    .replace(/"\s*([א-ת])/g, '"$1')                // גרשיים פתיחה צמודים
+    .replace(/([א-ת])\s*"/g, '$1"')                // גרשיים סגירה צמודים
+
+    // ניקוי רווחים כפולים
+    .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // חלק למשפטים על פי סימני פיסוק ומילות חיבור
+  // חלוקה חכמה לפי משפטים שלמים
+  const sentences = [];
+  let currentSentence = '';
   const words = text.split(/\s+/);
-  const paragraphs = [];
-  let currentParagraph = '';
-  let wordCount = 0;
 
+  // בניית משפטים שלמים
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
-    currentParagraph += word + ' ';
-    wordCount++;
+    currentSentence += word + ' ';
 
-    // בדיקת נקודת סיום טבעית
+    // זיהוי סוף משפט אמיתי
     const endsWithPunctuation = word.match(/[.!?]$/);
     const nextWord = i < words.length - 1 ? words[i + 1] : '';
 
-    // מילות מפתח שמסמנות תחילת נושא חדש - הרחבתי את הרשימה
-    const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|אדרבה|רצתה|היות|תירוץ|הוכחה|ומכאן|שהסיבה|והשאלה|בפרשת|בגלל|כיוון)$/);
+    // וודא שזה לא קיצור או מספר
+    const isAbbreviation = word.match(/^(רש"י|חז"ל|החיד"א|הגר"א|רמב"ם|רמב"ן|משנ"ב|שו"ע|שו"ת|מהר"ל|ר"ת|תוס'|ע"ש|ע"פ|כו'|וכו'|שם|שם)\.?$/);
+    const isNumber = word.match(/^\d+\.$/);
 
-    // ביטויים שמסמנים סוף רעיון
-    const endsIdea = word.match(/^(בכור|הארון|קהת|גרשון|התורה|חכם|קודם)\.$/) ||
-                    currentParagraph.match(/\bחז\"ל\b.*\.$/) ||
-                    currentParagraph.match(/\bתלמיד חכם\b.*\.$/) ||
-                    currentParagraph.match(/\bכלי יקר\b.*\.$/) ||
-                    currentParagraph.match(/\bהקדוש ברוך הוא\b.*\.$/);
+    if (endsWithPunctuation && !isAbbreviation && !isNumber && nextWord && nextWord.match(/^[א-ת]/)) {
+      sentences.push(currentSentence.trim());
+      currentSentence = '';
+    }
+  }
 
-    // תנאי פיצול מחמירים יותר - הורדתי את המקסימום ל-50 מילים
+  // הוסף משפט אחרון אם נשאר
+  if (currentSentence.trim()) {
+    sentences.push(currentSentence.trim());
+  }
+
+  // חלוקה לפסקאות
+  const paragraphs = [];
+  let currentParagraph = '';
+  let sentenceCount = 0;
+
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i];
+    currentParagraph += sentence + ' ';
+    sentenceCount++;
+
+    const nextSentence = i < sentences.length - 1 ? sentences[i + 1] : '';
+
+    // זיהוי תחילת נושא חדש
+    const isNewTopic = nextSentence.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|לדוגמה|בפרט|מכאן|שהסיבה|והשאלה|בפרשת|כיוון|היינו|נמצא|הוכחה)/);
+
+    // זיהוי סוף רעיון מלא
+    const isIdeaEnd = sentence.match(/\b(הקדוש ברוך הוא|חז"ל|רש"י|רמב"ם|התורה|הגמרא|המשנה)\b.*[.!?]\s*$/) ||
+                     sentence.match(/\b(לכן|אם כן|ומכאן|לסיכום|בסופו של דבר)\b.*[.!?]\s*$/);
+
+    // תנאי פיצול מאוזנים
     const shouldBreak =
-      wordCount >= 50 || // מקסימום 50 מילים לפסקה (הורדתי מ-100)
-      (endsWithPunctuation && wordCount >= 25) || // פסקה של 25+ מילים עם נקודה
-      (endsWithPunctuation && isNewTopicStart && wordCount >= 15) || // נושא חדש אחרי 15+ מילים
-      (endsIdea && wordCount >= 20) || // סוף רעיון מוגדר
-      (endsWithPunctuation && wordCount >= 30 && nextWord.match(/^[א-ת]/)); // כל משפט של 30+ מילים
+      sentenceCount >= 3 ||  // מקסימום 3 משפטים לפסקה
+      (sentenceCount >= 2 && isNewTopic) ||  // 2 משפטים ונושא חדש
+      (sentenceCount >= 2 && isIdeaEnd) ||   // 2 משפטים וסוף רעיון
+      currentParagraph.split(' ').length >= 45;  // מקסימום 45 מילים
 
     if (shouldBreak) {
       paragraphs.push(currentParagraph.trim());
       currentParagraph = '';
-      wordCount = 0;
+      sentenceCount = 0;
     }
   }
 
-  // הוסף את הפסקה האחרונה אם יש
-  if (currentParagraph.trim().length > 0) {
+  // הוסף את הפסקה האחרונה
+  if (currentParagraph.trim()) {
     paragraphs.push(currentParagraph.trim());
   }
 
-  console.log(`📝 Applied paragraph breaking: ${paragraphs.length} paragraphs created`);
+  console.log(`📝 Applied enhanced paragraph breaking: ${paragraphs.length} paragraphs created`);
   return paragraphs.join('\n\n');
 }
 
