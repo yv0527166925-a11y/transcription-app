@@ -576,11 +576,22 @@ function applyParagraphBreaking(text) {
     .replace(/שו\s*["\u0022\u201C\u201D]\s*ת/g, 'שו"ת')
     .replace(/מהר\s*["\u0022\u201C\u201D]\s*ל/g, 'מהר"ל')
 
-    // תיקון גרשיים וציטוטים מתקדם
-    .replace(/([א-ת])\s*["\u0022\u201C]\s*([א-ת])/g, '$1" $2')  // גרשיים באמצע עם רווח
-    .replace(/["\u0022\u201C]\s*([א-ת])/g, '"$1')              // גרשיים פתיחה צמודים למילה
-    .replace(/([א-ת])\s*["\u0022\u201D]/g, '$1"')              // גרשיים סגירה צמודים למילה
-    .replace(/([א-ת])\s*["\u0022\u201D]\s*([.,!?])/g, '$1"$2') // גרשיים לפני פיסוק
+    // תיקון גרשיים וציטוטים מתקדם - פתרון חזק וסופי
+    // שלב 1: נקה סוגי גרשיים שונים לאחיד
+    .replace(/["\u0022\u201C\u201D]/g, '"')
+
+    // שלב 2: הוסף רווחים לפני גרשיים שצמודים למילים עבריות
+    .replace(/([א-ת])"([א-ת])/g, '$1 "$2')          // כותבת"המצוות -> כותבת "המצוות
+
+    // שלב 3: תקן גרשיים שיש להם רווח מיותר לפני הם
+    .replace(/([א-ת])\s{2,}"([א-ת])/g, '$1 "$2')   // רווחים כפולים
+
+    // שלב 4: תקן גרשיים עם פיסוק - צמוד למילה לפני הפיסוק
+    .replace(/([א-ת])"([.,!?])/g, '$1"$2')          // מילה"? -> מילה"?
+
+    // שלב 5: תקן תחילת ציטוטים
+    .replace(/\s"([א-ת])/g, ' "$1')                 // רווח לפני גרשיים פותחים
+    .replace(/^"([א-ת])/gm, '"$1')                  // תחילת שורה
 
     // תיקון פיסוק חזק יותר - הסרת רווחים לפני פיסוק
     .replace(/\s+([.,!?:;])/g, '$1')                           // הסר כל רווח לפני פיסוק
@@ -596,12 +607,14 @@ function applyParagraphBreaking(text) {
 
   console.log(`✅ Punctuation fixing completed`);
 
-  // שלב 2: זיהוי משפטים מלאים עם הגיון מתקדם
+  // שלב 2: זיהוי משפטים מלאים עם הגיון מתקדם וטיפול בציטוטים
   const sentences = [];
   let currentSentence = '';
+  let insideQuotation = false;
+  let quotationDepth = 0;
   const words = text.split(/\s+/);
 
-  console.log(`📝 Processing ${words.length} words into complete sentences...`);
+  console.log(`📝 Processing ${words.length} words into complete sentences with quotation handling...`);
 
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
@@ -610,10 +623,22 @@ function applyParagraphBreaking(text) {
 
     currentSentence += word + ' ';
 
+    // זיהוי גרשיים פתיחה וסגירה
+    const hasOpenQuote = word.includes('"') && word.match(/^[^"]*"[^"]*$/);
+    const hasCloseQuote = word.includes('"') && word.match(/[^"]*"[^"]*$/);
+
+    // ספירת גרשיים בתוך המילה
+    const quoteCount = (word.match(/"/g) || []).length;
+
+    if (quoteCount > 0) {
+      quotationDepth += quoteCount % 2 === 1 ? (insideQuotation ? -1 : 1) : 0;
+      insideQuotation = quotationDepth > 0;
+    }
+
     // זיהוי סוף משפט אמיתי עם בדיקות מתקדמות
     const endsWithPunctuation = word.match(/[.!?]$/);
 
-    if (endsWithPunctuation) {
+    if (endsWithPunctuation && !insideQuotation) {
       // בדיקות שזה לא קיצור או מספר
       const isCommonAbbreviation = word.match(/^(רש"י|חז"ל|החיד"א|הגר"א|רמב"ם|רמב"ן|משנ"ב|שו"ע|שו"ת|מהר"ל|ר"ת|תוס'|ע"ש|ע"פ|כו'|וכו'|שם|דף|עמ'|פס'|סי'|ח"א|ח"ב|ח"ג|ח"ד|ח"ה)\.?$/);
       const isNumber = word.match(/^\d+\.$/);
@@ -622,11 +647,26 @@ function applyParagraphBreaking(text) {
       // זיהוי שהמילה הבאה מתחילה משפט חדש
       const nextStartsNewSentence = nextWord && (
         nextWord.match(/^[א-ת]/i) ||  // מילה עברית
-        nextWord.match(/^[A-Z]/)      // מילה באנגלית עם אות גדולה
+        nextWord.match(/^[A-Z]/) ||   // מילה באנגלית עם אות גדולה
+        nextWord.match(/^"[א-ת]/)     // ציטוט חדש
       );
 
-      // תנאי סיום משפט
+      // תנאי סיום משפט - רק אם לא בתוך ציטוט
       if (!isCommonAbbreviation && !isNumber && !isInitials && nextStartsNewSentence) {
+        sentences.push(currentSentence.trim());
+        currentSentence = '';
+        insideQuotation = false;
+        quotationDepth = 0;
+      }
+    }
+
+    // אם אנחנו בתוך ציטוט ורואים גרשיים סוגרים, המשך לבדוק סוף משפט
+    if (insideQuotation && word.includes('"') && word.match(/[.!?]"$/)) {
+      insideQuotation = false;
+      quotationDepth = 0;
+
+      // בדוק אם זה סוף משפט אמיתי אחרי סגירת הציטוט
+      if (nextWord && nextWord.match(/^[א-ת]/i)) {
         sentences.push(currentSentence.trim());
         currentSentence = '';
       }
