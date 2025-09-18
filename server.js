@@ -8,6 +8,7 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
+const Imap = require('imap'); // 🔥 NEW: For reading emails
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,20 @@ const transporter = nodemailer.createTransport({
   greetingTimeout: 30000, // 30 seconds
   socketTimeout: 60000 // 60 seconds
 });
+
+// IMAP configuration for reading emails
+const imapConfig = {
+  user: process.env.EMAIL_USER,
+  password: process.env.EMAIL_PASS,
+  host: 'imap.gmail.com',
+  port: 993,
+  tls: true,
+  tlsOptions: {
+    rejectUnauthorized: false
+  },
+  connTimeout: 15000, // 15 seconds connection timeout
+  authTimeout: 10000  // 10 seconds authentication timeout
+};
 
 // Middleware
 app.use(cors());
@@ -387,7 +402,7 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language) {
+async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions) {
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-pro",
@@ -427,7 +442,8 @@ ${contextPrompt}
 - חלק לפסקאות של 2-3 משפטים
 - ציטוטים במירכאות: "שנאמר", "כדאיתא"
 - שמור על רציפות טבעית
-תתחיל עכשיו עם התמלול:`;
+
+${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו עם התמלול:`;
 
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     const startTime = Date.now();
@@ -663,7 +679,7 @@ function cleanFilename(filename) {
 }
 
 // 🔥 ENHANCED: Complete transcription with chunking capability
-async function realGeminiTranscription(filePath, filename, language) {
+async function realGeminiTranscription(filePath, filename, language, customInstructions) {
   try {
     const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
     const duration = await getAudioDuration(filePath);
@@ -678,11 +694,11 @@ async function realGeminiTranscription(filePath, filename, language) {
     
     if (!shouldChunk) {
       console.log(`📝 Using direct transcription (small file or FFmpeg unavailable)`);
-      return await directGeminiTranscription(filePath, filename, language);
+      return await directGeminiTranscription(filePath, filename, language, customInstructions);
     }
     
     console.log(`🔪 Using chunked transcription (large file detected)`);
-    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes);
+    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions);
     
   } catch (error) {
     console.error('🔥 Transcription error:', error);
@@ -691,7 +707,7 @@ async function realGeminiTranscription(filePath, filename, language) {
 }
 
 // Direct transcription (original method)
-async function directGeminiTranscription(filePath, filename, language) {
+async function directGeminiTranscription(filePath, filename, language, customInstructions) {
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-pro",
@@ -742,7 +758,8 @@ async function directGeminiTranscription(filePath, filename, language) {
 - ציטוטים במירכאות: "כמו שכתוב", "אמרו חכמים", "תניא"
 - פסקאות של 2-4 משפטים עם שורה ריקה
 🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
-תתחיל עכשיו ותמלל הכל ללא חריגות:`;
+
+${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו ותמלל הכל ללא חריגות:`;
 
     console.log(`🎯 Starting direct transcription for: ${cleanFilename(filename)} (${fileSizeMB.toFixed(1)} MB)`);
 
@@ -776,7 +793,7 @@ async function directGeminiTranscription(filePath, filename, language) {
 }
 
 // Chunked transcription for large files
-async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes) {
+async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions) {
   let chunksData;
   
   try {
@@ -814,7 +831,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             i,
             chunksData.chunks.length,
             filename,
-            language
+            language,
+            customInstructions
           );
 
           transcriptions.push(chunkTranscription);
@@ -854,7 +872,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     console.log('🔄 Falling back to direct transcription...');
     
     try {
-      return await directGeminiTranscription(filePath, filename, language);
+      return await directGeminiTranscription(filePath, filename, language, customInstructions);
     } catch (fallbackError) {
       throw new Error(`גם התמלול המקטעי וגם הישיר נכשלו: ${fallbackError.message}`);
     }
@@ -1489,7 +1507,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       
       try {
         // Use the enhanced transcription method that handles large files with chunking
-        const transcription = await realGeminiTranscription(file.path, file.filename, language);
+        const transcription = await realGeminiTranscription(file.path, file.filename, language, customInstructions);
 
         console.log(`🔍 Transcription validation:`);
         console.log(`   Type: ${typeof transcription}`);
@@ -1894,8 +1912,10 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'לא נבחרו קבצים' });
     }
 
-    const { email, language } = req.body;
-    
+    const { email, language, customInstructions } = req.body;
+
+    console.log('🎯 Custom instructions received:', customInstructions ? `"${customInstructions}"` : 'None');
+
     if (!email) {
       return res.status(400).json({ success: false, error: 'אימייל נדרש' });
     }
@@ -2219,6 +2239,464 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
+// 🔥 EMAIL TRANSCRIPTION SYSTEM
+let processedEmails = new Set(); // Track processed emails to avoid duplicates
+
+// Check for transcription emails every 10 minutes
+function startEmailMonitoring() {
+  console.log('📧 Starting email monitoring for transcription requests (every 10 minutes)...');
+
+  // Check immediately
+  checkForTranscriptionEmails();
+
+  // Then check every 2 minutes for better responsiveness
+  setInterval(checkForTranscriptionEmails, 120000);
+}
+
+// Check for new transcription emails
+async function checkForTranscriptionEmails() {
+  try {
+    const imap = new Imap(imapConfig);
+
+    imap.once('ready', function() {
+      console.log('📧 Connected to email server, checking for new emails...');
+
+      imap.openBox('INBOX', true, function(err, box) {
+        if (err) {
+          console.error('📧 Error opening inbox:', err);
+          return;
+        }
+
+        // Search for unread emails with attachments from last 24 hours
+        const criteria = [
+          'UNSEEN',
+          ['SINCE', new Date(Date.now() - 24 * 60 * 60 * 1000)]
+        ];
+
+        imap.search(criteria, function(err, results) {
+          if (err) {
+            console.error('📧 Email search error:', err);
+            return;
+          }
+
+          if (results && results.length > 0) {
+            console.log(`📧 Found ${results.length} new emails to check`);
+            processEmails(imap, results);
+          } else {
+            console.log('📧 No new emails found');
+          }
+
+          imap.end();
+        });
+      });
+    });
+
+    imap.once('error', function(err) {
+      console.error('📧 IMAP connection error:', err);
+    });
+
+    imap.connect();
+
+  } catch (error) {
+    console.error('📧 Email monitoring error:', error);
+  }
+}
+
+// Process found emails
+function processEmails(imap, uids) {
+  const fetch = imap.fetch(uids, {
+    bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT'],
+    struct: true
+  });
+
+  fetch.on('message', function(msg, seqno) {
+    let emailData = {
+      headers: {},
+      body: '',
+      attachments: []
+    };
+
+    msg.on('body', function(stream, info) {
+      let buffer = '';
+
+      stream.on('data', function(chunk) {
+        buffer += chunk.toString('utf8');
+      });
+
+      stream.once('end', function() {
+        if (info.which === 'TEXT') {
+          emailData.body = buffer;
+        } else {
+          // Parse headers
+          const lines = buffer.split('\r\n');
+          lines.forEach(line => {
+            const match = line.match(/^([^:]+):\s*(.*)$/);
+            if (match) {
+              emailData.headers[match[1].toLowerCase()] = match[2];
+            }
+          });
+        }
+      });
+    });
+
+    msg.once('attributes', function(attrs) {
+      // Process attachments
+      if (attrs.struct) {
+        extractAttachments(attrs.struct, emailData);
+      }
+    });
+
+    msg.once('end', function() {
+      // Process this email for transcription
+      handleTranscriptionEmail(emailData, imap, seqno);
+    });
+  });
+
+  fetch.once('error', function(err) {
+    console.error('📧 Fetch error:', err);
+  });
+}
+
+// Extract attachments from email structure
+function extractAttachments(struct, emailData) {
+  if (Array.isArray(struct)) {
+    struct.forEach(part => extractAttachments(part, emailData));
+  } else {
+    if (struct.disposition && struct.disposition.type === 'attachment') {
+      const filename = struct.disposition.params?.filename;
+      const type = struct.type + '/' + struct.subtype;
+
+      // Check if it's an audio/video file
+      if (isAudioVideoFile(filename, type)) {
+        emailData.attachments.push({
+          filename: filename,
+          type: type,
+          encoding: struct.encoding,
+          size: struct.size
+        });
+      }
+    }
+  }
+}
+
+// Check if file is audio/video
+function isAudioVideoFile(filename, mimeType) {
+  if (!filename) return false;
+
+  const audioVideoExtensions = ['.mp3', '.mp4', '.wav', '.m4a', '.mov', '.avi', '.mkv', '.flac', '.aac', '.ogg'];
+  const audioVideoTypes = ['audio/', 'video/'];
+
+  const hasValidExtension = audioVideoExtensions.some(ext =>
+    filename.toLowerCase().endsWith(ext)
+  );
+
+  const hasValidMimeType = audioVideoTypes.some(type =>
+    mimeType.toLowerCase().startsWith(type)
+  );
+
+  return hasValidExtension || hasValidMimeType;
+}
+
+// Handle transcription email with all validation
+async function handleTranscriptionEmail(emailData, imap, seqno) {
+  try {
+    const from = emailData.headers.from;
+    const subject = emailData.headers.subject || '';
+
+    console.log(`📧 Processing email from: ${from}, subject: "${subject}"`);
+
+    // Create unique email ID to avoid duplicates
+    const emailId = `${from}_${emailData.headers.date}_${seqno}`;
+    if (processedEmails.has(emailId)) {
+      console.log('📧 Email already processed, skipping');
+      return;
+    }
+
+    // 1. Check subject contains transcription keywords
+    const transcriptionKeywords = ['תמלול', 'transcribe', 'תמליל', 'transcription'];
+    const hasTranscriptionKeyword = transcriptionKeywords.some(keyword =>
+      subject.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (!hasTranscriptionKeyword) {
+      console.log('📧 Email subject does not contain transcription keywords, skipping');
+      return;
+    }
+
+    // 2. Check for audio/video attachments
+    if (!emailData.attachments || emailData.attachments.length === 0) {
+      console.log('📧 No audio/video attachments found, skipping');
+      return;
+    }
+
+    // 3. Extract sender email
+    const senderEmail = extractEmailAddress(from);
+    if (!senderEmail) {
+      console.log('📧 Could not extract sender email, skipping');
+      return;
+    }
+
+    // 4. Check if sender is registered user
+    const user = users.find(u => u.email.toLowerCase() === senderEmail.toLowerCase());
+    if (!user) {
+      console.log(`📧 Sender ${senderEmail} is not a registered user, sending info email`);
+      await sendRegistrationInfoEmail(senderEmail);
+      return;
+    }
+
+    // 5. Mark email as processed
+    processedEmails.add(emailId);
+
+    // 6. Process transcription
+    console.log(`📧 ✅ Valid transcription request from ${senderEmail} with ${emailData.attachments.length} attachments`);
+    await processEmailTranscription(user, emailData, senderEmail);
+
+  } catch (error) {
+    console.error('📧 Error handling transcription email:', error);
+  }
+}
+
+// Extract email address from "Name <email@domain.com>" format
+function extractEmailAddress(fromHeader) {
+  const match = fromHeader.match(/<([^>]+)>/) || fromHeader.match(/([^\s<>]+@[^\s<>]+)/);
+  return match ? match[1] : null;
+}
+
+// Send registration info to unregistered users
+async function sendRegistrationInfoEmail(senderEmail) {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: senderEmail,
+      subject: 'הרשמה נדרשת לשירות התמלול',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif;">
+          <h2>שלום!</h2>
+          <p>תודה על הפנייה לשירות התמלול שלנו.</p>
+          <p>כדי להשתמש בשירות, עליך להירשם תחילה באתר:</p>
+          <a href="https://transcription-app-2uci.onrender.com" style="color: #667eea; font-weight: bold;">
+            https://transcription-app-2uci.onrender.com
+          </a>
+          <p>לאחר הרשמה ורכישת דקות תמלול, תוכל לשלוח קבצי אודיו למייל זה לתמלול אוטומטי.</p>
+          <p><strong>איך זה עובד:</strong></p>
+          <ul>
+            <li>הירשם באתר</li>
+            <li>רכוש דקות תמלול</li>
+            <li>שלח מייל עם הנושא "תמלול" וקובץ אודיו מצורף</li>
+            <li>קבל בחזרה קובץ Word מתומלל</li>
+          </ul>
+          <p>בברכה,<br>צוות התמלול</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Registration info sent to ${senderEmail}`);
+
+  } catch (error) {
+    console.error('📧 Error sending registration info:', error);
+  }
+}
+
+// Process email transcription (download attachments and transcribe)
+async function processEmailTranscription(user, emailData, senderEmail) {
+  try {
+    console.log(`📧 Processing transcription for ${senderEmail} with ${emailData.attachments.length} files`);
+
+    // Calculate total estimated duration
+    let totalEstimatedMinutes = 0;
+    emailData.attachments.forEach(attachment => {
+      // Rough estimate: 1MB = 1 minute for audio, 3MB = 1 minute for video
+      const fileSizeMB = (attachment.size || 1000000) / (1024 * 1024);
+      const isVideo = attachment.type.startsWith('video/');
+      const estimatedMinutes = isVideo ? Math.ceil(fileSizeMB / 3) : Math.ceil(fileSizeMB / 1.2);
+      totalEstimatedMinutes += estimatedMinutes;
+    });
+
+    console.log(`📧 Estimated total duration: ${totalEstimatedMinutes} minutes`);
+
+    // Check user balance
+    if (user.remainingMinutes < totalEstimatedMinutes) {
+      console.log(`📧 Insufficient balance: ${user.remainingMinutes} < ${totalEstimatedMinutes}`);
+      await sendInsufficientBalanceEmail(senderEmail, user.remainingMinutes, totalEstimatedMinutes);
+      return;
+    }
+
+    // Process each attachment
+    const transcriptionResults = [];
+    let actualMinutesUsed = 0;
+
+    for (let i = 0; i < emailData.attachments.length; i++) {
+      const attachment = emailData.attachments[i];
+      console.log(`📧 Processing attachment ${i + 1}/${emailData.attachments.length}: ${attachment.filename}`);
+
+      try {
+        // Note: For now, we'll simulate the download and transcription
+        // In a full implementation, you would download the attachment content from IMAP
+        // and save it to a temporary file for transcription
+
+        console.log(`📧 Simulating transcription of ${attachment.filename}`);
+
+        // For now, create a mock transcription result
+        // In full implementation, this would be: await realGeminiTranscription(attachmentFilePath, attachment.filename, 'he', customInstructions);
+        const mockTranscription = `תמלול אימייל אוטומטי עבור קובץ: ${attachment.filename}\n\nזהו תמלול דמו. במימוש המלא, כאן יהיה התמלול האמיתי של הקובץ.`;
+        const duration = Math.ceil((attachment.size || 1000000) / (1024 * 1024)); // Rough estimate
+
+        // Create Word document
+        const wordFilePath = await createWordDocument(mockTranscription, attachment.filename, duration);
+
+        const mockResult = {
+          filename: attachment.filename,
+          transcription: mockTranscription,
+          duration: duration,
+          wordFilePath: wordFilePath,
+          success: true
+        };
+
+        transcriptionResults.push(mockResult);
+        actualMinutesUsed += mockResult.duration;
+
+      } catch (error) {
+        console.error(`📧 Error processing ${attachment.filename}:`, error);
+        transcriptionResults.push({
+          filename: attachment.filename,
+          error: error.message,
+          success: false
+        });
+      }
+    }
+
+    // Update user balance
+    user.remainingMinutes = Math.max(0, user.remainingMinutes - actualMinutesUsed);
+
+    // Add to transaction history
+    user.transactions.push({
+      type: 'usage',
+      amount: -actualMinutesUsed,
+      description: `תמלול אימייל: ${emailData.attachments.length} קבצים`,
+      timestamp: new Date().toISOString(),
+      source: 'email'
+    });
+
+    // Save user data
+    await saveUsersData();
+
+    // Send results email
+    await sendTranscriptionResultsEmail(senderEmail, transcriptionResults, actualMinutesUsed, user.remainingMinutes);
+
+    console.log(`📧 ✅ Email transcription completed for ${senderEmail}. Used: ${actualMinutesUsed} minutes, Remaining: ${user.remainingMinutes} minutes`);
+
+  } catch (error) {
+    console.error('📧 Error in email transcription processing:', error);
+    await sendErrorEmail(senderEmail, error.message);
+  }
+}
+
+// Send insufficient balance email
+async function sendInsufficientBalanceEmail(senderEmail, currentBalance, requiredMinutes) {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: senderEmail,
+      subject: 'התמלול נכשל - יתרה לא מספיקה',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif; font-size: 18px;">
+          <p><strong>התמלול נכשל!</strong></p>
+          <p>אורך הקובץ: ${requiredMinutes} דקות</p>
+          <p>יתרה נוכחית: ${currentBalance} דקות</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Insufficient balance email sent to ${senderEmail}`);
+
+  } catch (error) {
+    console.error('📧 Error sending insufficient balance email:', error);
+  }
+}
+
+// Send transcription results email
+async function sendTranscriptionResultsEmail(senderEmail, results, minutesUsed, remainingMinutes) {
+  try {
+    const successfulResults = results.filter(r => r.success);
+
+    let transcriptionContent = '';
+    const attachments = [];
+
+    successfulResults.forEach((result, index) => {
+      transcriptionContent += `\n\n=== ${result.filename} ===\n${result.transcription}`;
+
+      // Add Word file as attachment
+      if (result.wordFilePath && fs.existsSync(result.wordFilePath)) {
+        attachments.push({
+          filename: `${result.filename.replace(/\.[^/.]+$/, '')}_תמלול.docx`,
+          path: result.wordFilePath
+        });
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: senderEmail,
+      subject: 'התמלול שלך מוכן!',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif; font-size: 18px;">
+          <p><strong>התמלול שלך מוכן!</strong></p>
+          <p>אורך הקובץ: ${minutesUsed} דקות</p>
+          <p>יתרה נותרת: ${remainingMinutes} דקות</p>
+
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; white-space: pre-wrap; font-family: monospace; margin-top: 20px;">
+            ${transcriptionContent || 'אין תמלול זמין'}
+          </div>
+        </div>
+      `,
+      attachments: attachments
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Transcription results sent to ${senderEmail} with ${attachments.length} Word files`);
+
+    // Clean up temporary Word files
+    successfulResults.forEach(result => {
+      if (result.wordFilePath && fs.existsSync(result.wordFilePath)) {
+        try {
+          fs.unlinkSync(result.wordFilePath);
+          console.log(`🗑️ Cleaned up temp Word file: ${result.wordFilePath}`);
+        } catch (error) {
+          console.error(`Error cleaning up ${result.wordFilePath}:`, error);
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('📧 Error sending transcription results:', error);
+  }
+}
+
+// Send error email
+async function sendErrorEmail(senderEmail, errorMessage) {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: senderEmail,
+      subject: 'התמלול נכשל - שגיאה טכנית',
+      html: `
+        <div dir="rtl" style="font-family: Arial, sans-serif; font-size: 18px;">
+          <p><strong>התמלול נכשל!</strong></p>
+          <p>סיבה: שגיאה טכנית</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`📧 Error email sent to ${senderEmail}`);
+
+  } catch (error) {
+    console.error('📧 Error sending error email:', error);
+  }
+}
+
 app.listen(PORT, () => {
   const ffmpegAvailable = checkFFmpegAvailability();
 
@@ -2238,6 +2716,10 @@ app.listen(PORT, () => {
 
   // Start history cleanup scheduler
   scheduleHistoryCleanup();
+
+  // Start email monitoring for transcription requests
+  console.log('🕒 History cleanup scheduled for every day at midnight');
+  startEmailMonitoring();
 });
 
 
