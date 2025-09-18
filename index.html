@@ -104,7 +104,7 @@
             transition: border-color 0.3s ease;
         }
 
-        .form-group input:focus, .form-group select:focus {
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -145,14 +145,14 @@
             background: linear-gradient(45deg, #ff6b6b, #ee5a52);
             color: white;
             border: none;
-            border-radius: 8px;
-            padding: 8px 12px;
-            font-size: 0.9em;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 0.75em;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-            min-width: 80px;
+            box-shadow: 0 1px 4px rgba(255, 107, 107, 0.3);
+            min-width: 60px;
         }
 
         .btn-clear-all:hover {
@@ -841,15 +841,20 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="customInstructions">הנחייה אישית (אופציונלי):</label>
+                        <textarea id="customInstructions" placeholder="למשל: השתמש בסגנון פורמלי, הוסף סימני פיסוק מדויקים, התעלם מרעשי רקע, וכו'..." rows="3" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; transition: border-color 0.3s ease; resize: vertical; font-family: inherit;"></textarea>
+                        <small style="color: #666; font-size: 0.85em; margin-top: 5px; display: block;">💡 טיפ: תן הוראות ברורות למודל כדי לקבל תמלול מותאם לצרכים שלך</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="language">שפת התמלול:</label>
                         <select id="language">
                             <option value="he">עברית</option>
+                            <option value="yi">אידיש</option>
                             <option value="en">אנגלית</option>
-                            <option value="ar">עברית</option>
-                            <option value="es">ספרדית</option>
                             <option value="fr">צרפתית</option>
-                            <option value="de">גרמנית</option>
-                            <option value="auto">זיהוי אוטומטי</option>
+                            <option value="es">ספרדית</option>
+                            <option value="ru">רוסית</option>
                         </select>
                     </div>
 
@@ -1663,6 +1668,7 @@
             }
 
             const language = document.getElementById('language').value;
+            const customInstructions = document.getElementById('customInstructions').value.trim();
             const submitBtn = document.getElementById('submitBtn');
 
             submitBtn.disabled = true;
@@ -1691,6 +1697,9 @@
                 });
                 formData.append('email', currentUser.email);
                 formData.append('language', language);
+                if (customInstructions) {
+                    formData.append('customInstructions', customInstructions);
+                }
 
                 const response = await fetch(`${API_BASE}/transcribe`, {
                     method: 'POST',
@@ -1810,12 +1819,11 @@
         function getLanguageName(code) {
             const languages = {
                 'he': 'עברית',
+                'yi': 'אידיש',
                 'en': 'אנגלית',
-                'ar': 'עברית',
-                'es': 'ספרדית',
                 'fr': 'צרפתית',
-                'de': 'גרמנית',
-                'auto': 'זיהוי אוטומטי'
+                'es': 'ספרדית',
+                'ru': 'רוסית'
             };
             return languages[code] || code;
         }

@@ -556,29 +556,34 @@ function applyParagraphBreaking(text) {
     .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
     .trim();
 
-  // חלק למשפטים
-  const sentences = text.split(/([.!?:]\s+)/).filter(s => s.trim().length > 0);
+  // חלק למשפטים על פי סימני פיסוק ומילות חיבור
+  const words = text.split(/\s+/);
   const paragraphs = [];
   let currentParagraph = '';
-  let sentenceCount = 0;
+  let wordCount = 0;
 
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i].trim();
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    currentParagraph += word + ' ';
+    wordCount++;
 
-    if (sentence.match(/[.!?:]$/)) {
-      // זה משפט שלם
-      currentParagraph += sentence + ' ';
-      sentenceCount++;
+    // חדש פסקה אם:
+    // 1. המילה מסתיימת בנקודה/שאלה/קריאה וכבר יש מספיק מילים
+    // 2. יש יותר מ-100 מילים בפסקה
+    // 3. המילה הבאה מתחילה במילה שמסמנת תחילת נושא חדש
+    const endsWithPunctuation = word.match(/[.!?]$/);
+    const nextWord = i < words.length - 1 ? words[i + 1] : '';
+    const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו)$/);
 
-      // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-150 תווים
-      if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 150)) {
-        paragraphs.push(currentParagraph.trim());
-        currentParagraph = '';
-        sentenceCount = 0;
-      }
-    } else if (sentence.length > 0) {
-      // זה חלק ממשפט
-      currentParagraph += sentence + ' ';
+    const shouldBreak =
+      (endsWithPunctuation && wordCount >= 15) || // מינימום 15 מילים למשפט
+      wordCount >= 100 || // מקסימום 100 מילים לפסקה
+      (endsWithPunctuation && isNewTopicStart && wordCount >= 10); // פסקה קצרה אם יש נושא חדש
+
+    if (shouldBreak) {
+      paragraphs.push(currentParagraph.trim());
+      currentParagraph = '';
+      wordCount = 0;
     }
   }
 
@@ -968,7 +973,7 @@ async function createWordDocument(transcription, filename, duration) {
       </w:p>`;
 
 
-    // חלוקה לפסקאות קצרות (2-3 משפטים)
+    // חלוקה לפסקאות קצרות בהתבסס על מילים ונושאים
     function createShortParagraphs(text) {
       // תיקון פיסוק בסיסי
       text = text
@@ -982,29 +987,34 @@ async function createWordDocument(transcription, filename, duration) {
         .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
         .trim();
 
-      // חלק למשפטים
-      const sentences = text.split(/([.!?:]\s+)/).filter(s => s.trim().length > 0);
+      // חלק למשפטים על פי מילים ומספר תווים
+      const words = text.split(/\s+/);
       const paragraphs = [];
       let currentParagraph = '';
-      let sentenceCount = 0;
+      let wordCount = 0;
 
-      for (let i = 0; i < sentences.length; i++) {
-        const sentence = sentences[i].trim();
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        currentParagraph += word + ' ';
+        wordCount++;
 
-        if (sentence.match(/[.!?:]$/)) {
-          // זה משפט שלם
-          currentParagraph += sentence + ' ';
-          sentenceCount++;
+        // חדש פסקה אם:
+        // 1. המילה מסתיימת בנקודה/שאלה/קריאה וכבר יש מספיק מילים
+        // 2. יש יותר מ-100 מילים בפסקה
+        // 3. המילה הבאה מתחילה במילה שמסמנת תחילת נושא חדש
+        const endsWithPunctuation = word.match(/[.!?]$/);
+        const nextWord = i < words.length - 1 ? words[i + 1] : '';
+        const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו)$/);
 
-          // צור פסקה חדשה אחרי 2-3 משפטים או אם הפסקה ארוכה מ-150 תווים
-          if (sentenceCount >= 2 && (sentenceCount >= 3 || currentParagraph.length > 150)) {
-            paragraphs.push(currentParagraph.trim());
-            currentParagraph = '';
-            sentenceCount = 0;
-          }
-        } else if (sentence.length > 0) {
-          // זה חלק ממשפט
-          currentParagraph += sentence + ' ';
+        const shouldBreak =
+          (endsWithPunctuation && wordCount >= 15) || // מינימום 15 מילים למשפט
+          wordCount >= 100 || // מקסימום 100 מילים לפסקה
+          (endsWithPunctuation && isNewTopicStart && wordCount >= 10); // פסקה קצרה אם יש נושא חדש
+
+        if (shouldBreak) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = '';
+          wordCount = 0;
         }
       }
 
