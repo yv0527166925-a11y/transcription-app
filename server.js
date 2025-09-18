@@ -2387,7 +2387,9 @@ function processEmails(imap, uids) {
     let emailData = {
       headers: {},
       body: '',
-      attachments: []
+      attachments: [],
+      uid: null,
+      seqno: seqno
     };
 
     msg.on('body', function(stream, info) {
@@ -2414,6 +2416,9 @@ function processEmails(imap, uids) {
     });
 
     msg.once('attributes', function(attrs) {
+      // Save UID for later use
+      emailData.uid = attrs.uid;
+
       // Process attachments
       if (attrs.struct) {
         extractAttachments(attrs.struct, emailData);
@@ -2432,9 +2437,12 @@ function processEmails(imap, uids) {
 }
 
 // Extract attachments from email structure
-function extractAttachments(struct, emailData) {
+function extractAttachments(struct, emailData, partId = '') {
   if (Array.isArray(struct)) {
-    struct.forEach(part => extractAttachments(part, emailData));
+    struct.forEach((part, index) => {
+      const newPartId = partId ? `${partId}.${index + 1}` : `${index + 1}`;
+      extractAttachments(part, emailData, newPartId);
+    });
   } else {
     console.log(`📧 Checking email part: type=${struct.type}/${struct.subtype}, disposition=${struct.disposition?.type}`);
 
@@ -2465,7 +2473,8 @@ function extractAttachments(struct, emailData) {
           filename: filename,
           type: type,
           encoding: struct.encoding,
-          size: struct.size
+          size: struct.size,
+          partId: partId
         });
       } else {
         console.log(`📧 ❌ Not audio/video file: ${filename} (${type})`);
@@ -2693,7 +2702,7 @@ async function findAndDownloadAttachment(struct, targetFilename, imap, seqno, ou
 // Download attachment from email data using IMAP
 async function downloadAttachmentFromEmail(emailData, attachment, tempFilePath) {
   return new Promise((resolve, reject) => {
-    console.log(`📧 Starting real download of ${attachment.filename} to ${tempFilePath}`);
+    console.log(`📧 Starting download of ${attachment.filename} from email UID:${emailData.uid}, part:${attachment.partId}`);
 
     const imap = new Imap(imapConfig);
 
@@ -2704,59 +2713,57 @@ async function downloadAttachmentFromEmail(emailData, attachment, tempFilePath) 
           return reject(err);
         }
 
-        // Search for recent emails with the target attachment
-        const criteria = [
-          'UNSEEN',
-          ['SINCE', new Date(Date.now() - 24 * 60 * 60 * 1000)]
-        ];
+        // Use the specific UID and partId we already know
+        console.log(`📧 Fetching attachment from UID ${emailData.uid}, part ${attachment.partId}`);
 
-        imap.search(criteria, function(err, results) {
-          if (err) {
-            console.error('📧 Error searching for email:', err);
-            return reject(err);
-          }
+        const fetch = imap.fetch([emailData.uid], {
+          bodies: attachment.partId,
+          struct: false
+        });
 
-          if (!results || results.length === 0) {
-            return reject(new Error('No emails found for attachment download'));
-          }
+        let attachmentData = Buffer.alloc(0);
 
-          console.log(`📧 Searching through ${results.length} emails for attachment ${attachment.filename}`);
+        fetch.on('message', function(msg, seqno) {
+          msg.on('body', function(stream, info) {
+            let buffer = Buffer.alloc(0);
 
-          // Fetch emails to find the one with our attachment
-          const fetch = imap.fetch(results, {
-            bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)'],
-            struct: true
-          });
+            stream.on('data', function(chunk) {
+              buffer = Buffer.concat([buffer, chunk]);
+            });
 
-          let attachmentFound = false;
+            stream.once('end', function() {
+              // Decode based on encoding
+              let finalData = buffer;
 
-          fetch.on('message', function(msg, seqno) {
-            msg.once('attributes', function(attrs) {
-              if (attrs.struct && !attachmentFound) {
-                findAndDownloadAttachment(attrs.struct, attachment.filename, imap, seqno, tempFilePath)
-                  .then(() => {
-                    attachmentFound = true;
-                    imap.end();
-                    resolve();
-                  })
-                  .catch((downloadError) => {
-                    console.log(`📧 Attachment not found in email ${seqno}, continuing search...`);
-                    // Continue searching in other emails
-                  });
+              if (attachment.encoding === 'base64') {
+                finalData = Buffer.from(buffer.toString(), 'base64');
+              } else if (attachment.encoding === 'quoted-printable') {
+                // Handle quoted-printable if needed
+                finalData = buffer;
               }
+
+              attachmentData = finalData;
             });
           });
+        });
 
-          fetch.once('error', function(err) {
-            console.error('📧 Fetch error during download:', err);
-            reject(err);
-          });
+        fetch.once('end', function() {
+          try {
+            fs.writeFileSync(tempFilePath, attachmentData);
+            console.log(`📧 ✅ Attachment downloaded successfully: ${tempFilePath} (${attachmentData.length} bytes)`);
+            imap.end();
+            resolve();
+          } catch (writeError) {
+            console.error(`📧 Error writing attachment:`, writeError);
+            imap.end();
+            reject(writeError);
+          }
+        });
 
-          fetch.once('end', function() {
-            if (!attachmentFound) {
-              reject(new Error(`Attachment ${attachment.filename} not found in any recent emails`));
-            }
-          });
+        fetch.once('error', function(err) {
+          console.error('📧 Error downloading attachment:', err);
+          imap.end();
+          reject(err);
         });
       });
     });
