@@ -918,7 +918,7 @@
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
-                        <input type="file" id="folderInput" class="file-input" webkitdirectory directory multiple accept="audio/*,video/*">
+                        <input type="file" id="folderInput" class="file-input" webkitdirectory directory multiple accept="audio/*,video/*" style="display: none;">
                     </div>
 
                     <!-- Upload options buttons -->
@@ -1470,17 +1470,7 @@
             }
         });
 
-        // Folder input listener
-        const folderInput = document.getElementById('folderInput');
-        folderInput.addEventListener('change', (e) => {
-            console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
-            if (e.target.files.length === 0) {
-                console.log('📂 לא נבחרו קבצים - ייתכן שהמשתמש ביטל או שיש בעיה עם הדפדפן');
-                showStatus('לא נבחרו קבצים. אם ביטלת, לא נורא. אם לא, נסה דפדפן אחר', 'warning');
-                return;
-            }
-            handleFolderSelection(e.target.files);
-        });
+        // Note: Folder input listener is now created dynamically in selectFolder() function
 
         // Upload option functions
         function selectFiles() {
@@ -1489,7 +1479,39 @@
 
         function selectFolder() {
             console.log('📂 פותח דיאלוג בחירת תיקייה');
-            folderInput.click();
+
+            // Create a new input element each time to ensure clean state
+            const existingInput = document.getElementById('folderInput');
+            const newInput = document.createElement('input');
+
+            // Set all necessary attributes for folder selection
+            newInput.type = 'file';
+            newInput.id = 'folderInput';
+            newInput.className = 'file-input';
+            newInput.style.display = 'none';
+            newInput.setAttribute('webkitdirectory', '');
+            newInput.setAttribute('directory', '');
+            newInput.setAttribute('multiple', '');
+            newInput.accept = 'audio/*,video/*';
+
+            // Add event listener to new input
+            newInput.addEventListener('change', (e) => {
+                console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
+                if (e.target.files.length === 0) {
+                    console.log('📂 לא נבחרו קבצים - המשתמש ביטל');
+                    return;
+                }
+                handleFolderSelection(e.target.files);
+            });
+
+            // Replace the old input with the new one
+            existingInput.parentNode.replaceChild(newInput, existingInput);
+
+            // Trigger the folder picker immediately
+            setTimeout(() => {
+                newInput.click();
+                console.log('📂 דיאלוג בחירת תיקייה הופעל');
+            }, 100);
         }
 
         // Handle folder selection and preview
