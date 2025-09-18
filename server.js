@@ -1021,14 +1021,26 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/,([א-ת])/g, ', $1')             // מילה,מילה → מילה, מילה
       .replace(/:([א-ת])/g, ': $1')             // מילה:מילה → מילה: מילה
 
-      // 2. אחידות בציטוטים - מירכאות רגילות במקום גרשיים כפולים
+      // 2. תיקון גרשיים וציטוטים מתקדם
       .replace(/"/g, '"')                       // " → "
       .replace(/"/g, '"')                       // " → "
-      .replace(/([א-ת])\"([א-ת])/g, '$1 "$2')   // מילה"מילה → מילה "מילה
-      .replace(/\"([א-ת])/g, '"$1')             // "מילה → "מילה
-      .replace(/([א-ת])\"/g, '$1"')             // מילה" → מילה"
-      .replace(/\"\s+/g, '" ')                  // הוספת רווח אחרי מירכאות פותחות
-      .replace(/\s+\"/g, ' "')                  // הוספת רווח לפני מירכאות סוגרות
+
+      // תיקון מילים צמודות לגרשיים
+      .replace(/([א-ת])\"([א-ת][^"]*?)\"([א-ת])/g, '$1 "$2" $3')  // מילה"ציטוט"מילה → מילה "ציטוט" מילה
+      .replace(/([א-ת])\"([^"]*?)\"([א-ת])/g, '$1 "$2" $3')       // מילה"ציטוט"מילה → מילה "ציטוט" מילה
+      .replace(/([א-ת])\"([^"]*?)$/g, '$1 "$2"')                   // מילה"ציטוט בסוף שורה → מילה "ציטוט"
+      .replace(/^([^"]*?)\"([א-ת])/g, '"$1" $2')                   // ציטוט"מילה בתחילת שורה → "ציטוט" מילה
+
+      // תיקון גרשיים לא מזווגים
+      .replace(/([א-ת])\"\s*\n/g, '$1."\n')                       // מילה" בסוף שורה → מילה." (סגירת ציטוט חסר)
+      .replace(/\n\s*([^"]*?)([.!?])\s*\n/g, '\n"$1$2"\n')       // טקסט בשורה נפרדת → "טקסט" (ציטוט פתוח לא נסגר)
+
+      // רווחים נכונים סביב גרשיים
+      .replace(/([א-ת])\"([א-ת])/g, '$1 "$2')                     // מילה"מילה → מילה "מילה
+      .replace(/\"([א-ת])/g, '"$1')                               // "מילה → "מילה
+      .replace(/([א-ת])\"/g, '$1"')                               // מילה" → מילה"
+      .replace(/\"\s{2,}/g, '" ')                                 // גרשיים + רווחים מרובים
+      .replace(/\s{2,}\"/g, ' "')                                 // רווחים מרובים + גרשיים
 
       // 3. תיקון מילים דבוקות שגיאות תמלול נפוצות
       .replace(/([א-ת]+)תון/g, '$1תעון')        // שמע תון → שמעון
@@ -1046,37 +1058,30 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/\s{2,}/g, ' ')                  // רווחים כפולים
       .trim();
 
-    // 6. חלוקה לשורות - כל משפט בשורה נפרדת
-    // קודם נפצל לפי הפסקות כפולות (מעברי נושא)
-    const topicSections = cleanedText.split(/\n\s*\n/);
-
-    const sections = [];
-
-    topicSections.forEach(topicSection => {
-      if (!topicSection.trim()) return;
-
-      // כל קטע נושא נפצל למשפטים נפרדים
-      const sentences = topicSection
-        .split(/([.!?]\s+)/)
-        .reduce((acc, part, index, array) => {
-          if (index % 2 === 0) {
-            const sentence = part.trim();
-            const punctuation = array[index + 1] || '';
-            if (sentence && sentence.length > 5) {
-              acc.push(sentence + punctuation.trim());
+    // 6. חלוקה לשורות - כל משפט בשורה נפרדת (ללא פסקאות ארוכות)
+    const allSentences = cleanedText
+      // ראשית, נפצל לפי הפסקות כפולות (מעברי נושא)
+      .split(/\n\s*\n/)
+      .map(section => section.trim())
+      .filter(section => section.length > 0)
+      .flatMap(section => {
+        // כל קטע נפצל למשפטים נפרדים
+        return section
+          .split(/([.!?]\s+)/)
+          .reduce((acc, part, index, array) => {
+            if (index % 2 === 0) {
+              const sentence = part.trim();
+              const punctuation = array[index + 1] || '';
+              if (sentence && sentence.length > 3) {
+                acc.push(sentence + punctuation.trim());
+              }
             }
-          }
-          return acc;
-        }, []);
+            return acc;
+          }, []);
+      });
 
-      // הוספת הפסקה ריקה לפני מעבר נושא חדש (חוץ מהראשון)
-      if (sections.length > 0 && sentences.length > 0) {
-        sections.push(''); // הפסקה ריקה
-      }
-
-      // הוספת כל המשפטים של הנושא הנוכחי
-      sections.push(...sentences);
-    });
+    // הפיכת כל משפט למקטע נפרד (ללא פסקאות ארוכות)
+    const sections = allSentences;
 
     // יצירת כותרת גדולה ומודגשת - עותק מדויק מהקובץ שעבד
     const titleParagraph = `
