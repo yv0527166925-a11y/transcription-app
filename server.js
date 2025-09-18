@@ -2437,13 +2437,32 @@ function isAudioVideoFile(filename, mimeType) {
   return hasValidExtension || hasValidMimeType;
 }
 
+// Decode email subject if it's encoded
+function decodeEmailSubject(subject) {
+  if (!subject) return '';
+
+  // Handle UTF-8 Base64 encoded subjects like =?UTF-8?B?...?=
+  const encodedMatch = subject.match(/=\?UTF-8\?B\?([^?]+)\?=/);
+  if (encodedMatch) {
+    try {
+      return Buffer.from(encodedMatch[1], 'base64').toString('utf8');
+    } catch (error) {
+      console.log('📧 Failed to decode subject, using original');
+      return subject;
+    }
+  }
+
+  return subject;
+}
+
 // Handle transcription email with all validation
 async function handleTranscriptionEmail(emailData, imap, seqno) {
   try {
     const from = emailData.headers.from;
-    const subject = emailData.headers.subject || '';
+    const rawSubject = emailData.headers.subject || '';
+    const subject = decodeEmailSubject(rawSubject);
 
-    console.log(`📧 Processing email from: ${from}, subject: "${subject}"`);
+    console.log(`📧 Processing email from: ${from}, subject: "${subject}" (raw: "${rawSubject}")`);
 
     // Create unique email ID to avoid duplicates
     const emailId = `${from}_${emailData.headers.date}_${seqno}`;
