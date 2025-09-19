@@ -9,6 +9,14 @@ const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 const Imap = require('imap'); // 🔥 NEW: For reading emails
+const { connectDB } = require('./config/database'); // 🔥 NEW: MongoDB connection
+const User = require('./models/User'); // 🔥 NEW: User model
+const {
+  findOrCreateUser,
+  checkUserMinutes,
+  useUserMinutes,
+  addTranscriptionToHistory
+} = require('./utils/userHelpers'); // 🔥 NEW: User helper functions
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,6 +55,10 @@ const imapConfig = {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
+
+// API Routes
+const userRoutes = require('./routes/userRoutes');
+app.use('/api/users', userRoutes);
 
 // Enhanced file storage with proper UTF-8 encoding
 const storage = multer.diskStorage({
@@ -1762,7 +1774,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
   console.log(`📧 Processing for user: ${userEmail} (ID: ${transcriptionId})`);
 
-  const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+  const user = await findOrCreateUser(userEmail);
   if (!user) {
     console.error('❌ User not found during async processing:', userEmail);
     return;
@@ -1796,12 +1808,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
   try {
     // Deduct minutes immediately to prevent abuse (before actual processing)
-    user.remainingMinutes -= estimatedMinutes;
-    user.totalTranscribed += estimatedMinutes;
-    console.log(`💰 Minutes deducted upfront. User balance: ${user.remainingMinutes} minutes`);
+    await useUserMinutes(userEmail, estimatedMinutes);
+    console.log(`💰 Minutes deducted upfront. User balance: ${user.minutesRemaining} minutes`);
 
-    // Save user data immediately after minute deduction
-    saveUsersData();
+    // Minutes already saved to MongoDB by useUserMinutes function
 
     // ⚠️ CRITICAL: After this point, cancellation is no longer safe for refunds
     // Minutes have been deducted, transcription is considered "started"
@@ -1885,47 +1895,44 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       // Note: Minutes were already deducted at the start
       // No need to deduct again - just record the usage
 
-      // 🔧 NEW: Add each transcription to history
-      transcriptions.forEach(transcription => {
-        const historyEntry = {
-          date: new Date().toLocaleDateString('he-IL'),
-          timestamp: Date.now(), // Add timestamp for cleanup
-          fileName: cleanFilename(transcription.filename),
-          duration: Math.ceil(estimatedMinutes / transcriptions.length), // Distribute minutes across files
+      // 🔧 NEW: Add each transcription to MongoDB history
+      for (const transcription of transcriptions) {
+        const transcriptionData = {
+          fileName: transcription.downloadFilename,
+          originalName: cleanFilename(transcription.filename),
+          transcriptionText: transcription.text.substring(0, 1000), // Store first 1000 chars
+          wordDocumentPath: `/api/download/${transcription.downloadFilename}`,
+          fileSize: transcription.fileSize || 0,
+          processingTime: transcription.processingTime || 0,
+          audioLength: Math.ceil(estimatedMinutes / transcriptions.length * 60), // Convert to seconds
           language: language,
-          status: 'completed',
-          downloadUrl: `/api/download/${transcription.downloadFilename}` // Use actual saved filename
+          status: 'completed'
         };
 
-        if (!user.history) {
-          user.history = [];
-        }
-        user.history.push(historyEntry);
-        console.log(`📝 Added to history: ${historyEntry.fileName}`);
-      });
+        await addTranscriptionToHistory(userEmail, transcriptionData);
+        console.log(`📝 Added to MongoDB history: ${transcriptionData.originalName}`);
+      }
 
-      // 🔧 NEW: Add failed transcriptions to history
-      failedTranscriptions.forEach(failed => {
-        const historyEntry = {
-          date: new Date().toLocaleDateString('he-IL'),
-          timestamp: Date.now(), // Add timestamp for cleanup
-          fileName: cleanFilename(failed.filename),
-          duration: 0,
+      // 🔧 NEW: Add failed transcriptions to MongoDB history
+      for (const failed of failedTranscriptions) {
+        const failedData = {
+          fileName: failed.filename,
+          originalName: cleanFilename(failed.filename),
+          transcriptionText: '',
+          wordDocumentPath: null,
+          fileSize: failed.fileSize || 0,
+          processingTime: 0,
+          audioLength: 0,
           language: language,
-          status: 'failed',
-          downloadUrl: null
+          status: 'failed'
         };
 
-        if (!user.history) {
-          user.history = [];
-        }
-        user.history.push(historyEntry);
-        console.log(`📝 Added failed to history: ${historyEntry.fileName}`);
-      });
+        await addTranscriptionToHistory(userEmail, failedData);
+        console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
+      }
 
-      saveUsersData(); // Save after updating user data
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
-      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
+      console.log(`💰 Updated balance: ${user.minutesRemaining} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
     } else {
@@ -2232,15 +2239,11 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     // Check FFmpeg availability for chunking
     const ffmpegAvailable = checkFFmpegAvailability();
     
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    console.log('🔍 User lookup for transcription:', user ? 'Found' : 'Not found');
-    console.log('📧 Looking for email:', email);
-    console.log('📋 Available users:', users.map(u => u.email));
-    
-    if (!user) {
-      console.log('❌ User not found for transcription:', email);
-      return res.status(400).json({ success: false, error: `משתמש לא נמצא: ${email}` });
-    }
+    // מצא או יצור משתמש במסד הנתונים
+    const user = await findOrCreateUser(email);
+    console.log('🔍 User lookup for transcription: Found');
+    console.log('📧 Email:', email);
+    console.log('⏱️ User minutes remaining:', user.minutesRemaining);
 
    // Calculate total estimated minutes ACCURATELY
     let totalDurationSeconds = 0;
@@ -2259,9 +2262,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     // Convert total seconds to minutes and round up
     const accurateMinutes = Math.ceil(totalDurationSeconds / 60);
 
-    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.remainingMinutes}`);
+    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.minutesRemaining}`);
 
-    if (accurateMinutes > user.remainingMinutes) {
+    if (accurateMinutes > user.minutesRemaining) {
         console.log('❌ Insufficient minutes, deleting uploaded files.');
         // Clean up files immediately if not enough minutes
         for (const file of req.files) {
@@ -2273,7 +2276,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         }
         return res.status(400).json({
             success: false,
-            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.remainingMinutes}`
+            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.minutesRemaining}`
         });
     }
 
@@ -3295,30 +3298,47 @@ async function sendErrorEmail(senderEmail, errorMessage) {
   }
 }
 
-app.listen(PORT, () => {
-  const ffmpegAvailable = checkFFmpegAvailability();
+// Connect to MongoDB and start server
+const startServer = async () => {
+  try {
+    // חיבור למסד הנתונים
+    await connectDB();
 
-  console.log(`🚀 Enhanced server running on port ${PORT}`);
-  console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
-  console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
-  console.log(`📂 Data file: ${DATA_FILE}`);
-  console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
+    // הפעלת השרת
+    app.listen(PORT, () => {
+      const ffmpegAvailable = checkFFmpegAvailability();
 
-  if (ffmpegAvailable) {
-    console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
-  } else {
-    console.log(`⚠️ FFmpeg not available - using direct transcription only`);
+      console.log(`🚀 Enhanced server running on port ${PORT}`);
+      console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
+      console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
+      console.log(`🗄️ MongoDB connected and ready`);
+      console.log(`📂 Data file: ${DATA_FILE}`);
+      console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
+
+      if (ffmpegAvailable) {
+        console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
+      } else {
+        console.log(`⚠️ FFmpeg not available - using direct transcription only`);
+      }
+
+      console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
+
+      // Start history cleanup scheduler
+      scheduleHistoryCleanup();
+
+      // Start email monitoring for transcription requests
+      console.log('🕒 History cleanup scheduled for every day at midnight');
+      startEmailMonitoring();
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
+};
 
-  console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
-
-  // Start history cleanup scheduler
-  scheduleHistoryCleanup();
-
-  // Start email monitoring for transcription requests
-  console.log('🕒 History cleanup scheduled for every day at midnight');
-  startEmailMonitoring();
-});
+// התחל את השרת
+startServer();
 
 
 
