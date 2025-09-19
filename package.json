@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "check-ffmpeg": "ffmpeg -version",
+    "test-db": "node test-mongodb-connection.js",
     "setup": "npm install && npm run check-ffmpeg",
     "postinstall": "pip install -r requirements.txt || echo 'Python dependencies not installed, using HTML fallback'",
     "docker:build": "docker build -t transcription-app .",

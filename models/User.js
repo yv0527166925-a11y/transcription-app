@@ -50,8 +50,7 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// אינדקסים לחיפוש מהיר
-userSchema.index({ email: 1 });
+// אינדקסים לחיפוש מהיר (email כבר unique בסכמה)
 userSchema.index({ createdAt: -1 });
 userSchema.index({ 'transcriptionHistory.createdAt': -1 });
 

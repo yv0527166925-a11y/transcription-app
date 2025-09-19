@@ -13,12 +13,11 @@ const connectDB = async () => {
         console.log('🔗 Connecting to MongoDB...');
 
         const conn = await mongoose.connect(mongoURI, {
-            // הגדרות חיבור מומלצות
+            // הגדרות חיבור מומלצות (MongoDB 6.0+)
             maxPoolSize: 10, // מקסימום 10 חיבורים במאגר
             serverSelectionTimeoutMS: 5000, // זמן קצוב לבחירת שרת
             socketTimeoutMS: 45000, // זמן קצוב לסוקט
-            bufferMaxEntries: 0, // השבת באפר כאשר אין חיבור
-            bufferCommands: false,
+            // הסרנו bufferMaxEntries ו-bufferCommands (deprecated)
         });
 
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
