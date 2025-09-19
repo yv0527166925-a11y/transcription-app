@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
 
+// הגדרות Mongoose גלובליות - מניעת אזהרות
+mongoose.set('strictQuery', false);
+
 const connectDB = async () => {
     try {
         const mongoURI = process.env.MONGODB_URI;
@@ -13,11 +16,9 @@ const connectDB = async () => {
         console.log('🔗 Connecting to MongoDB...');
 
         const conn = await mongoose.connect(mongoURI, {
-            // הגדרות חיבור מומלצות (MongoDB 6.0+)
-            maxPoolSize: 10, // מקסימום 10 חיבורים במאגר
-            serverSelectionTimeoutMS: 5000, // זמן קצוב לבחירת שרת
-            socketTimeoutMS: 45000, // זמן קצוב לסוקט
-            // הסרנו bufferMaxEntries ו-bufferCommands (deprecated)
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+            bufferCommands: false,
         });
 
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);

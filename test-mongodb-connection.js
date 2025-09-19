@@ -20,9 +20,9 @@ async function testConnection() {
         console.log('🔌 Attempting connection...');
 
         const conn = await mongoose.connect(mongoURI, {
-            maxPoolSize: 10,
             serverSelectionTimeoutMS: 5000,
             socketTimeoutMS: 45000,
+            bufferCommands: false,
         });
 
         console.log(`✅ MongoDB Connected Successfully!`);

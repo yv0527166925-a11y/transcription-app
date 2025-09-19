@@ -17,9 +17,9 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true,
         lowercase: true,
-        trim: true
+        trim: true,
+        index: { unique: true }
     },
     minutesRemaining: {
         type: Number,
@@ -50,7 +50,7 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// אינדקסים לחיפוש מהיר (email כבר unique בסכמה)
+// אינדקסים לחיפוש מהיר (email כבר unique אוטומטית)
 userSchema.index({ createdAt: -1 });
 userSchema.index({ 'transcriptionHistory.createdAt': -1 });
 
