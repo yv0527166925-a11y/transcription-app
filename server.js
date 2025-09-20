@@ -2166,7 +2166,7 @@ app.post('/api/register', (req, res) => {
 });
 
 // Admin route to add minutes
-app.post('/api/admin/add-minutes', (req, res) => {
+app.post('/api/admin/add-minutes', async (req, res) => {
   try {
     console.log('🔧 Admin add-minutes endpoint called');
     console.log('🔧 Request body:', req.body);
@@ -2181,22 +2181,18 @@ app.post('/api/admin/add-minutes', (req, res) => {
       });
     }
     
-    const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
-    console.log('🔍 User lookup result:', user ? 'Found' : 'Not found');
-    console.log('📋 Available users:', users.map(u => u.email));
-    
-    if (!user) {
-      console.log('❌ User not found for email:', userEmail);
-      return res.status(404).json({ 
-        success: false, 
-        error: `משתמש לא נמצא: ${userEmail}` 
-      });
-    }
-    
-    const oldBalance = user.remainingMinutes;
-    user.remainingMinutes += minutes;
-    const newBalance = user.remainingMinutes;
-    saveUsersData(); // Save after updating balance
+    // Use MongoDB instead of JSON file
+    const user = await findOrCreateUser(userEmail);
+    console.log('🔍 MongoDB User lookup result: Found');
+    console.log('📧 Email:', user.email);
+    console.log('⏱️ Current balance:', user.minutesRemaining);
+
+    const oldBalance = user.minutesRemaining;
+    user.minutesRemaining += minutes;
+    const newBalance = user.minutesRemaining;
+
+    // Save to MongoDB
+    await user.save();
 
     console.log(`✅ Added ${minutes} minutes to ${userEmail}: ${oldBalance} → ${newBalance}`);
     
