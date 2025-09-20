@@ -51,7 +51,7 @@ const connectDB = async () => {
             console.log('💡 MongoDB connection timeout - check if MongoDB service is running');
         }
 
-        process.exit(1);
+        throw error; // Let the calling function handle the error
     }
 };
 

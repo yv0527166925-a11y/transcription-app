@@ -3332,8 +3332,27 @@ const startServer = async () => {
     });
 
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
+    console.error('❌ MongoDB connection failed:', error);
+    console.log('🚀 Starting server without MongoDB...');
+
+    app.listen(PORT, () => {
+      const ffmpegAvailable = checkFFmpegAvailability();
+
+      console.log(`🚀 Enhanced server running on port ${PORT} (without MongoDB)`);
+      console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
+      console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
+      console.log(`⚠️ MongoDB not connected - user management disabled`);
+      console.log(`📂 Data file: ${DATA_FILE}`);
+      console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
+
+      if (ffmpegAvailable) {
+        console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
+      } else {
+        console.log(`⚠️ FFmpeg not available - using direct transcription only`);
+      }
+
+      console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
+    });
   }
 };
 
