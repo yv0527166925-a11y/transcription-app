@@ -190,19 +190,20 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     if (userEmail) {
       try {
         user = await findOrCreateUser(userEmail);
-        console.log(`👤 User found: ${user.name} (${user.remainingMinutes} minutes left)`);
+        console.log(`👤 User found: ${user.email} (${user.minutesRemaining} minutes left)`);
 
         // Check if user has enough minutes
-        if (!checkUserMinutes(user, durationMinutes)) {
+        const minuteCheck = await checkUserMinutes(userEmail, durationMinutes);
+        if (!minuteCheck.hasEnough) {
           return res.status(403).json({
             error: 'Not enough minutes remaining',
-            remainingMinutes: user.remainingMinutes,
+            remainingMinutes: minuteCheck.remaining,
             requiredMinutes: durationMinutes
           });
         }
 
         // Deduct minutes
-        await useUserMinutes(user._id, durationMinutes);
+        await useUserMinutes(userEmail, durationMinutes);
         console.log(`💳 Deducted ${durationMinutes} minutes from user`);
       } catch (error) {
         console.error('❌ User management error:', error);
@@ -225,14 +226,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     // Add to user history if user exists
     if (user) {
       try {
-        await addTranscriptionToHistory(user._id, {
-          filename: cleanName,
-          savedFilename: savedFilename,
-          savedPath: savedPath,
-          duration: duration,
-          minutesUsed: durationMinutes,
-          transcriptionLength: transcription.length,
-          paragraphCount: transcription.split(/\n\s*\n/).filter(p => p.length > 0).length
+        await addTranscriptionToHistory(userEmail, {
+          fileName: savedFilename,
+          originalName: cleanName,
+          transcriptionText: transcription.substring(0, 1000), // First 1000 chars only
+          wordDocumentPath: savedPath,
+          fileSize: buffer.length,
+          processingTime: duration,
+          audioLength: durationMinutes,
+          language: 'hebrew',
+          status: 'completed'
         });
         console.log(`📚 Added to user history`);
       } catch (error) {
