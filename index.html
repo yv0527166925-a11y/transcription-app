@@ -2045,7 +2045,7 @@
                     formData.append('customInstructions', customInstructions);
                 }
 
-                const response = await fetch(`${API_BASE}/api/transcribe`, {
+                const response = await fetch(`${API_BASE}/transcribe`, {
                     method: 'POST',
                     body: formData
                 });
