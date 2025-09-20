@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Update User Balance</title>
+</head>
+<body>
+    <h2>עדכון יתרת משתמש</h2>
+    <button onclick="updateBalance()">עדכן יתרה ל-1000 דקות</button>
+    <div id="result"></div>
+
+    <script>
+    async function updateBalance() {
+        try {
+            const response = await fetch('/api/admin/add-minutes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userEmail: 'yv0527166925@gmail.com',
+                    minutes: 958  // 1000 - 42 = 958
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                document.getElementById('result').innerHTML =
+                    `✅ הצלחה! יתרה עודכנה: ${data.oldBalance} → ${data.newBalance} דקות`;
+            } else {
+                document.getElementById('result').innerHTML =
+                    `❌ שגיאה: ${data.error}`;
+            }
+        } catch (error) {
+            document.getElementById('result').innerHTML =
+                `❌ שגיאה: ${error.message}`;
+        }
+    }
+    </script>
+</body>
+</html>

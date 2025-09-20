@@ -2098,23 +2098,40 @@ app.get('/api/test', (req, res) => {
 });
 
 // Authentication routes
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   try {
     console.log('🔐 Login attempt:', req.body);
-    
+
     const { email, password } = req.body;
-    
+
     if (!email || !password) {
       return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
     }
-    
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    console.log('🔍 User found:', user ? 'Yes' : 'No');
-    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
-    
+
+    // Find user in MongoDB
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      password: password
+    });
+
+    console.log('🔍 User found in MongoDB:', user ? 'Yes' : 'No');
+
     if (user) {
+      // Update last login
+      user.lastLogin = new Date();
+      await user.save();
+
       console.log('✅ Login successful for:', user.email);
-      res.json({ success: true, user: { ...user, password: undefined } });
+      res.json({
+        success: true,
+        user: {
+          email: user.email,
+          name: user.name,
+          isAdmin: user.isAdmin,
+          minutesRemaining: user.minutesRemaining,
+          totalMinutesUsed: user.totalMinutesUsed
+        }
+      });
     } else {
       console.log('❌ Login failed for:', email);
       res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
@@ -2125,38 +2142,37 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body);
-    
+
     const { name, email, password, phone } = req.body;
-    
+
     if (!name || !email || !password) {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
     }
-    
-    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
-      console.log('❌ User already exists:', email);
+
+    // Check if user already exists in MongoDB
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      console.log('❌ User already exists in MongoDB:', email);
       return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
-    
-    const newUser = {
-      id: users.length + 1,
+
+    // Create new user in MongoDB
+    const newUser = new User({
       name,
       email: email.toLowerCase(),
       password,
       phone: phone || '',
       isAdmin: false,
-      remainingMinutes: 30, // 30 free minutes
-      totalTranscribed: 0,
-      history: [],
-      joinDate: new Date().toISOString() // Add join date
-    };
-    
-    users.push(newUser);
-    saveUsersData(); // Save after adding new user
-    console.log('✅ User registered successfully:', newUser.email);
-    console.log('📋 Total users now:', users.length);
+      minutesRemaining: 5, // 5 free minutes
+      totalMinutesUsed: 0
+    });
+
+    await newUser.save();
+    console.log('✅ User registered successfully in MongoDB:', newUser.email);
+    console.log('📊 User ID:', newUser._id);
     
     res.json({ success: true, user: { ...newUser, password: undefined } });
   } catch (error) {
