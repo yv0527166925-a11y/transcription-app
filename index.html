@@ -2040,11 +2040,12 @@
                 });
                 formData.append('email', currentUser.email);
                 formData.append('language', language);
+                formData.append('totalMinutes', totalMinutes);
                 if (customInstructions) {
                     formData.append('customInstructions', customInstructions);
                 }
 
-                const response = await fetch(`${API_BASE}/transcribe`, {
+                const response = await fetch(`${API_BASE}/api/transcribe`, {
                     method: 'POST',
                     body: formData
                 });
