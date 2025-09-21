@@ -8,7 +8,4 @@ npm install
 echo "🐍 Installing Python dependencies..."
 pip install -r requirements.txt
 
-echo "🔧 Making sure build.sh is executable..."
-chmod +x build.sh
-
-echo "✅ Build completed successfully for Render deployment"
+echo "✅ Build completed successfully"

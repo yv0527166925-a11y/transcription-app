@@ -5,7 +5,7 @@ async function checkPunctuation() {
   try {
     console.log('🔍 בודק סימני פיסוק בקובץ החדש...');
 
-    const data = fs.readFileSync('בדיקה_תבנית_עובדת.docx');
+    const data = fs.readFileSync('בדיקת_פיסוק_מתוקן.docx');
     const zip = await JSZip.loadAsync(data);
     const docXml = await zip.file('word/document.xml').async('text');
 
