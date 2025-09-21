@@ -11,7 +11,7 @@ async function findOrCreateUser(email) {
             console.log(`👤 Creating new user: ${email}`);
             user = new User({
                 email: email.toLowerCase(),
-                minutesRemaining: 5, // 5 דקות מתנה לכל משתמש חדש
+                minutesRemaining: 5, // 5 דקות חינם לכל משתמש חדש
                 totalMinutesUsed: 0
             });
             await user.save();
@@ -40,12 +40,8 @@ async function checkUserMinutes(email, requiredMinutes) {
             return { hasEnough: false, remaining: 0, user: null };
         }
 
-        console.log(`🔍 User ${email}: has ${user.minutesRemaining} minutes, needs ${requiredMinutes} minutes`);
-
-        const hasEnough = user.minutesRemaining >= requiredMinutes;
-
         return {
-            hasEnough: hasEnough,
+            hasEnough: user.minutesRemaining >= requiredMinutes,
             remaining: user.minutesRemaining,
             user: user
         };

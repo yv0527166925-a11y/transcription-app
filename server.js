@@ -9,14 +9,15 @@ const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 const Imap = require('imap'); // 🔥 NEW: For reading emails
-const { connectDB } = require('./config/database'); // 🔥 NEW: MongoDB connection
-const User = require('./models/User'); // 🔥 NEW: User model
-const {
-  findOrCreateUser,
-  checkUserMinutes,
-  useUserMinutes,
-  addTranscriptionToHistory
-} = require('./utils/userHelpers'); // 🔥 NEW: User helper functions
+// JSON-based user management (MongoDB disabled)
+// const { connectDB } = require('./config/database');
+// const User = require('./models/User');
+// const {
+//   findOrCreateUser,
+//   checkUserMinutes,
+//   useUserMinutes,
+//   addTranscriptionToHistory
+// } = require('./utils/userHelpers');
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -2098,40 +2099,23 @@ app.get('/api/test', (req, res) => {
 });
 
 // Authentication routes
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', (req, res) => {
   try {
     console.log('🔐 Login attempt:', req.body);
-
+    
     const { email, password } = req.body;
-
+    
     if (!email || !password) {
       return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
     }
-
-    // Find user in MongoDB
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      password: password
-    });
-
-    console.log('🔍 User found in MongoDB:', user ? 'Yes' : 'No');
-
+    
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    console.log('🔍 User found:', user ? 'Yes' : 'No');
+    console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
+    
     if (user) {
-      // Update last login
-      user.lastLogin = new Date();
-      await user.save();
-
       console.log('✅ Login successful for:', user.email);
-      res.json({
-        success: true,
-        user: {
-          email: user.email,
-          name: user.name,
-          isAdmin: user.isAdmin,
-          minutesRemaining: user.minutesRemaining,
-          totalMinutesUsed: user.totalMinutesUsed
-        }
-      });
+      res.json({ success: true, user: { ...user, password: undefined } });
     } else {
       console.log('❌ Login failed for:', email);
       res.json({ success: false, error: 'אימייל או סיסמה שגויים' });
@@ -2142,37 +2126,38 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body);
-
+    
     const { name, email, password, phone } = req.body;
-
+    
     if (!name || !email || !password) {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
     }
-
-    // Check if user already exists in MongoDB
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      console.log('❌ User already exists in MongoDB:', email);
+    
+    if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
+      console.log('❌ User already exists:', email);
       return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
-
-    // Create new user in MongoDB
-    const newUser = new User({
+    
+    const newUser = {
+      id: users.length + 1,
       name,
       email: email.toLowerCase(),
       password,
       phone: phone || '',
       isAdmin: false,
-      minutesRemaining: 5, // 5 free minutes
-      totalMinutesUsed: 0
-    });
-
-    await newUser.save();
-    console.log('✅ User registered successfully in MongoDB:', newUser.email);
-    console.log('📊 User ID:', newUser._id);
+      remainingMinutes: 30, // 30 free minutes
+      totalTranscribed: 0,
+      history: [],
+      joinDate: new Date().toISOString() // Add join date
+    };
+    
+    users.push(newUser);
+    saveUsersData(); // Save after adding new user
+    console.log('✅ User registered successfully:', newUser.email);
+    console.log('📋 Total users now:', users.length);
     
     res.json({ success: true, user: { ...newUser, password: undefined } });
   } catch (error) {
@@ -2182,7 +2167,7 @@ app.post('/api/register', async (req, res) => {
 });
 
 // Admin route to add minutes
-app.post('/api/admin/add-minutes', async (req, res) => {
+app.post('/api/admin/add-minutes', (req, res) => {
   try {
     console.log('🔧 Admin add-minutes endpoint called');
     console.log('🔧 Request body:', req.body);
@@ -2197,18 +2182,22 @@ app.post('/api/admin/add-minutes', async (req, res) => {
       });
     }
     
-    // Use MongoDB instead of JSON file
-    const user = await findOrCreateUser(userEmail);
-    console.log('🔍 MongoDB User lookup result: Found');
-    console.log('📧 Email:', user.email);
-    console.log('⏱️ Current balance:', user.minutesRemaining);
-
-    const oldBalance = user.minutesRemaining;
-    user.minutesRemaining += minutes;
-    const newBalance = user.minutesRemaining;
-
-    // Save to MongoDB
-    await user.save();
+    const user = users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    console.log('🔍 User lookup result:', user ? 'Found' : 'Not found');
+    console.log('📋 Available users:', users.map(u => u.email));
+    
+    if (!user) {
+      console.log('❌ User not found for email:', userEmail);
+      return res.status(404).json({ 
+        success: false, 
+        error: `משתמש לא נמצא: ${userEmail}` 
+      });
+    }
+    
+    const oldBalance = user.remainingMinutes;
+    user.remainingMinutes += minutes;
+    const newBalance = user.remainingMinutes;
+    saveUsersData(); // Save after updating balance
 
     console.log(`✅ Added ${minutes} minutes to ${userEmail}: ${oldBalance} → ${newBalance}`);
     
@@ -3314,7 +3303,8 @@ async function sendErrorEmail(senderEmail, errorMessage) {
 const startServer = async () => {
   try {
     // חיבור למסד הנתונים
-    await connectDB();
+    // MongoDB disabled - using JSON files
+    // await connectDB();
 
     // הפעלת השרת
     app.listen(PORT, () => {
@@ -3344,27 +3334,8 @@ const startServer = async () => {
     });
 
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
-    console.log('🚀 Starting server without MongoDB...');
-
-    app.listen(PORT, () => {
-      const ffmpegAvailable = checkFFmpegAvailability();
-
-      console.log(`🚀 Enhanced server running on port ${PORT} (without MongoDB)`);
-      console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
-      console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
-      console.log(`⚠️ MongoDB not connected - user management disabled`);
-      console.log(`📂 Data file: ${DATA_FILE}`);
-      console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
-
-      if (ffmpegAvailable) {
-        console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
-      } else {
-        console.log(`⚠️ FFmpeg not available - using direct transcription only`);
-      }
-
-      console.log(`🎯 Enhanced features: Smart chunking for large files, complete transcription guarantee`);
-    });
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
 };
 
