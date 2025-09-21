@@ -1976,7 +1976,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         const transcriptionData = {
           fileName: transcription.downloadFilename,
           originalName: cleanFilename(transcription.filename),
-          transcriptionText: transcription.text.substring(0, 1000), // Store first 1000 chars
+          transcriptionText: (transcription.text || '').substring(0, 1000), // Store first 1000 chars
           wordDocumentPath: `/api/download/${transcription.downloadFilename}`,
           fileSize: transcription.fileSize || 0,
           processingTime: transcription.processingTime || 0,
