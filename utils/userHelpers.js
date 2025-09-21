@@ -1,25 +1,77 @@
-const User = require('../models/User');
+// JSON-based user management (MongoDB disabled)
+const fs = require('fs');
+const path = require('path');
+
+const USERS_FILE = path.join(__dirname, '..', 'users_data.json');
+
+function loadUsers() {
+    try {
+        if (fs.existsSync(USERS_FILE)) {
+            const data = fs.readFileSync(USERS_FILE, 'utf8');
+            return JSON.parse(data);
+        }
+        return [];
+    } catch (error) {
+        console.error('Error loading users:', error);
+        return [];
+    }
+}
+
+function saveUsers(users) {
+    try {
+        fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf8');
+        return true;
+    } catch (error) {
+        console.error('Error saving users:', error);
+        return false;
+    }
+}
+
+function findUser(email) {
+    const users = loadUsers();
+    return users.find(user => user.email.toLowerCase() === email.toLowerCase());
+}
+
+function updateUser(email, updates) {
+    const users = loadUsers();
+    const userIndex = users.findIndex(user => user.email.toLowerCase() === email.toLowerCase());
+    if (userIndex !== -1) {
+        users[userIndex] = { ...users[userIndex], ...updates };
+        if (saveUsers(users)) {
+            return users[userIndex];
+        }
+    }
+    return null;
+}
 
 /**
  * מוצא או יוצר משתמש חדש
  */
 async function findOrCreateUser(email) {
     try {
-        let user = await User.findOne({ email: email.toLowerCase() });
+        let user = findUser(email);
 
         if (!user) {
             console.log(`👤 Creating new user: ${email}`);
-            user = new User({
+            const users = loadUsers();
+            user = {
+                id: Date.now(),
                 email: email.toLowerCase(),
-                minutesRemaining: 5, // 5 דקות חינם לכל משתמש חדש
-                totalMinutesUsed: 0
-            });
-            await user.save();
+                name: email.toLowerCase(), // Default name
+                password: 'temp123', // Default password
+                isAdmin: false,
+                remainingMinutes: 5, // 5 דקות חינם לכל משתמש חדש
+                totalTranscribed: 0,
+                history: [],
+                joinDate: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+            };
+            users.push(user);
+            saveUsers(users);
             console.log(`✅ New user created with 5 free minutes`);
         } else {
             // עדכן תאריך הכניסה האחרונה
-            user.lastLogin = new Date();
-            await user.save();
+            updateUser(email, { lastLogin: new Date().toISOString() });
         }
 
         return user;
@@ -34,15 +86,19 @@ async function findOrCreateUser(email) {
  */
 async function checkUserMinutes(email, requiredMinutes) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             return { hasEnough: false, remaining: 0, user: null };
         }
 
+        console.log(`🔍 User ${email}: has ${user.remainingMinutes} minutes, needs ${requiredMinutes} minutes`);
+
+        const hasEnough = user.remainingMinutes >= requiredMinutes;
+
         return {
-            hasEnough: user.minutesRemaining >= requiredMinutes,
-            remaining: user.minutesRemaining,
+            hasEnough: hasEnough,
+            remaining: user.remainingMinutes,
             user: user
         };
     } catch (error) {
@@ -56,21 +112,27 @@ async function checkUserMinutes(email, requiredMinutes) {
  */
 async function useUserMinutes(email, minutesUsed) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             throw new Error('User not found');
         }
 
-        if (user.minutesRemaining < minutesUsed) {
+        if (user.remainingMinutes < minutesUsed) {
             throw new Error('Not enough minutes remaining');
         }
 
-        await user.useMinutes(minutesUsed);
+        const newRemainingMinutes = user.remainingMinutes - minutesUsed;
+        const newTotalUsed = user.totalTranscribed + minutesUsed;
 
-        console.log(`⏱️ User ${email} used ${minutesUsed} minutes. Remaining: ${user.minutesRemaining}`);
+        const updatedUser = updateUser(email, {
+            remainingMinutes: newRemainingMinutes,
+            totalTranscribed: newTotalUsed
+        });
 
-        return user;
+        console.log(`⏱️ User ${email} used ${minutesUsed} minutes. Remaining: ${newRemainingMinutes}`);
+
+        return updatedUser;
     } catch (error) {
         console.error('❌ Error using user minutes:', error);
         throw error;
@@ -82,17 +144,18 @@ async function useUserMinutes(email, minutesUsed) {
  */
 async function addUserMinutes(email, minutesToAdd) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             throw new Error('User not found');
         }
 
-        await user.addMinutes(minutesToAdd);
+        const newBalance = user.remainingMinutes + minutesToAdd;
+        const updatedUser = updateUser(email, { remainingMinutes: newBalance });
 
-        console.log(`➕ Added ${minutesToAdd} minutes to user ${email}. Total: ${user.minutesRemaining}`);
+        console.log(`➕ Added ${minutesToAdd} minutes to user ${email}. Total: ${newBalance}`);
 
-        return user;
+        return updatedUser;
     } catch (error) {
         console.error('❌ Error adding user minutes:', error);
         throw error;
@@ -104,7 +167,7 @@ async function addUserMinutes(email, minutesToAdd) {
  */
 async function addTranscriptionToHistory(email, transcriptionData) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             throw new Error('User not found');
@@ -119,14 +182,24 @@ async function addTranscriptionToHistory(email, transcriptionData) {
             processingTime: transcriptionData.processingTime,
             audioLength: transcriptionData.audioLength,
             language: transcriptionData.language || 'hebrew',
-            status: transcriptionData.status || 'completed'
+            status: transcriptionData.status || 'completed',
+            createdAt: new Date().toISOString()
         };
 
-        await user.addTranscription(historyEntry);
+        // Add to beginning of history array
+        const currentHistory = user.history || [];
+        currentHistory.unshift(historyEntry);
+
+        // Keep only last 100 transcriptions
+        if (currentHistory.length > 100) {
+            currentHistory.splice(100);
+        }
+
+        const updatedUser = updateUser(email, { history: currentHistory });
 
         console.log(`📝 Added transcription to history for user ${email}`);
 
-        return user;
+        return updatedUser;
     } catch (error) {
         console.error('❌ Error adding transcription to history:', error);
         throw error;
@@ -138,13 +211,18 @@ async function addTranscriptionToHistory(email, transcriptionData) {
  */
 async function getUserStats(email) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             return null;
         }
 
-        return user.getUsageStats();
+        return {
+            totalMinutesUsed: user.totalTranscribed || 0,
+            minutesRemaining: user.remainingMinutes || 0,
+            totalTranscriptions: (user.history || []).length,
+            lastTranscription: (user.history || [])[0]?.createdAt || null
+        };
     } catch (error) {
         console.error('❌ Error getting user stats:', error);
         throw error;
@@ -156,13 +234,14 @@ async function getUserStats(email) {
  */
 async function getUserHistory(email, limit = 10) {
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const user = findUser(email);
 
         if (!user) {
             return [];
         }
 
-        return user.transcriptionHistory.slice(0, limit);
+        const history = user.history || [];
+        return history.slice(0, limit);
     } catch (error) {
         console.error('❌ Error getting user history:', error);
         throw error;
@@ -177,20 +256,30 @@ async function cleanupOldHistory(daysOld = 90) {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
-        const result = await User.updateMany(
-            {},
-            {
-                $pull: {
-                    transcriptionHistory: {
-                        createdAt: { $lt: cutoffDate }
-                    }
+        const users = loadUsers();
+        let modifiedCount = 0;
+
+        users.forEach(user => {
+            if (user.history && user.history.length > 0) {
+                const originalLength = user.history.length;
+                user.history = user.history.filter(entry => {
+                    const entryDate = new Date(entry.createdAt);
+                    return entryDate >= cutoffDate;
+                });
+
+                if (user.history.length !== originalLength) {
+                    modifiedCount++;
                 }
             }
-        );
+        });
 
-        console.log(`🧹 Cleaned up old transcription history: ${result.modifiedCount} users affected`);
+        if (modifiedCount > 0) {
+            saveUsers(users);
+        }
 
-        return result;
+        console.log(`🧹 Cleaned up old transcription history: ${modifiedCount} users affected`);
+
+        return { modifiedCount };
     } catch (error) {
         console.error('❌ Error cleaning up old history:', error);
         throw error;
