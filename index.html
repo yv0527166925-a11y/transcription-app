@@ -13,18 +13,18 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(to bottom, #ffffff, #f8fafc);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-            color: #6b7280;
         }
 
         .container {
-            background: #ffffff;
-            border-radius: 8px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            max-width: 95%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 800px;
             margin: 0 auto;
         }
 
@@ -34,14 +34,16 @@
         }
 
         .header h1 {
-            color: #1f2937;
+            color: #333;
             font-size: 2.5em;
             margin-bottom: 10px;
-            font-weight: 700;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .header p {
-            color: #6b7280;
+            color: #666;
             font-size: 1.1em;
         }
 
@@ -64,8 +66,8 @@
         }
 
         .nav-tab.active {
-            color: #3b82f6;
-            border-bottom: 3px solid #3b82f6;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
             font-weight: 600;
         }
 
@@ -102,27 +104,27 @@
             transition: border-color 0.3s ease;
         }
 
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
-            border-color: #3b82f6;
+            border-color: #667eea;
         }
 
         .btn {
             width: 100%;
             padding: 15px;
-            background: #3b82f6;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 1.2em;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s ease;
+            transition: transform 0.3s ease;
             margin-bottom: 10px;
         }
 
         .btn:hover {
-            background: #2563eb;
+            transform: translateY(-2px);
         }
 
         .btn:disabled {
@@ -132,133 +134,12 @@
         }
 
         .btn-secondary {
-            background: #f3f4f6;
-            color: #374151;
-        }
-
-        .btn-secondary:hover {
-            background: #e5e7eb;
+            background: #6c757d;
         }
 
         .btn-danger {
             background: #dc3545;
         }
-
-        .btn-clear-all {
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 0.75em;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 1px 4px rgba(255, 107, 107, 0.3);
-            min-width: 60px;
-        }
-
-        .btn-clear-all:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
-            background: linear-gradient(45deg, #ff5252, #e74c3c);
-        }
-
-        .btn-clear-all:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
-        }
-
-        .btn-upload-option {
-            background: #f3f4f6;
-            color: #374151;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            padding: 12px 20px;
-            font-size: 1em;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            min-width: 140px;
-        }
-
-        .btn-upload-option:hover {
-            background: #e5e7eb;
-            border-color: #9ca3af;
-        }
-
-        .btn-upload-option:active {
-            transform: translateY(0);
-        }
-
-        .folder-preview {
-            background: rgba(59, 130, 246, 0.1);
-            padding: 20px;
-            border-radius: 15px;
-            margin: 20px 0;
-            border-left: 4px solid #3b82f6;
-            display: none;
-        }
-
-        .folder-title {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-        }
-
-        .folder-files {
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            padding: 10px;
-            background: white;
-        }
-
-        .folder-file-item {
-            display: flex;
-            align-items: center;
-            padding: 8px;
-            border-bottom: 1px solid #f0f0f0;
-            transition: background 0.2s ease;
-        }
-
-        .folder-file-item:hover {
-            background: rgba(59, 130, 246, 0.05);
-        }
-
-        .folder-file-item:last-child {
-            border-bottom: none;
-        }
-
-        .folder-file-checkbox {
-            margin-left: 10px;
-            margin-right: 10px;
-        }
-
-        .folder-file-info {
-            flex: 1;
-        }
-
-        .folder-file-name {
-            font-weight: 500;
-            color: #333;
-        }
-
-        .folder-file-size {
-            font-size: 0.85em;
-            color: #666;
-        }
-
-        .folder-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            justify-content: center;
-        }
-
 
         .text-center {
             text-align: center;
@@ -267,7 +148,7 @@
         .link-btn {
             background: none;
             border: none;
-            color: #3b82f6;
+            color: #667eea;
             text-decoration: underline;
             cursor: pointer;
             font-size: 1em;
@@ -281,17 +162,17 @@
         }
 
         .stat-card {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(102, 126, 234, 0.1);
             padding: 25px;
             border-radius: 15px;
             text-align: center;
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #667eea;
         }
 
         .stat-number {
             font-size: 2.5em;
             font-weight: bold;
-            color: #3b82f6;
+            color: #667eea;
             margin-bottom: 5px;
         }
 
@@ -301,51 +182,50 @@
         }
 
         .user-info {
-            background: #ffffff;
-            padding: 24px;
-            border-radius: 8px;
+            background: rgba(118, 75, 162, 0.1);
+            padding: 20px;
+            border-radius: 15px;
             margin-bottom: 30px;
-            border-left: 4px solid #3b82f6;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #764ba2;
         }
 
         .user-name {
             font-size: 1.3em;
             font-weight: 600;
-            color: #1f2937;
+            color: #333;
             margin-bottom: 5px;
         }
 
         .user-email {
-            color: #6b7280;
+            color: #666;
         }
 
         .upload-area {
-            border: 2px dashed #d1d5db;
-            border-radius: 8px;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
             padding: 40px 20px;
             text-align: center;
             margin-bottom: 30px;
             transition: all 0.3s ease;
             cursor: pointer;
-            background: #f9fafb;
+            background: rgba(102, 126, 234, 0.05);
         }
 
         .upload-area:hover {
-            border-color: #3b82f6;
-            background: #f0f9ff;
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.1);
             transform: translateY(-2px);
         }
 
         .upload-area.dragover {
-            border-color: #3b82f6;
-            background: #dbeafe;
+            border-color: #764ba2;
+            background: rgba(118, 75, 162, 0.15);
             transform: scale(1.02);
         }
 
         .upload-icon {
             font-size: 3em;
-            color: #3b82f6;
+            color: #667eea;
             margin-bottom: 15px;
         }
 
@@ -365,11 +245,11 @@
         }
 
         .selected-file {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(102, 126, 234, 0.1);
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 20px;
-            border-left: 4px solid #3b82f6;
+            border-left: 4px solid #667eea;
         }
 
         .file-info {
@@ -389,7 +269,7 @@
         }
 
         .file-duration {
-            color: #3b82f6;
+            color: #667eea;
             font-size: 0.9em;
             font-weight: 600;
         }
@@ -417,7 +297,7 @@
 
         .progress-fill {
             height: 100%;
-            background: #3b82f6;
+            background: linear-gradient(45deg, #667eea, #764ba2);
             width: 0%;
             transition: width 0.3s ease;
             border-radius: 10px;
@@ -451,7 +331,7 @@
 
         .spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #3b82f6;
+            border-top: 3px solid #667eea;
             border-radius: 50%;
             width: 30px;
             height: 30px;
@@ -478,13 +358,13 @@
         }
 
         .history-table th {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(102, 126, 234, 0.1);
             font-weight: 600;
             color: #333;
         }
 
         .history-table tr:hover {
-            background: rgba(59, 130, 246, 0.05);
+            background: rgba(102, 126, 234, 0.05);
         }
 
         .status-badge {
@@ -517,7 +397,7 @@
         }
 
         .payment-option {
-            background: rgba(59, 130, 246, 0.1);
+            background: rgba(102, 126, 234, 0.1);
             padding: 20px;
             border-radius: 15px;
             text-align: center;
@@ -527,19 +407,19 @@
         }
 
         .payment-option:hover {
-            border-color: #3b82f6;
+            border-color: #667eea;
             transform: translateY(-2px);
         }
 
         .payment-option.selected {
-            border-color: #3b82f6;
-            background: rgba(59, 130, 246, 0.2);
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
         }
 
         .payment-amount {
             font-size: 2em;
             font-weight: bold;
-            color: #3b82f6;
+            color: #667eea;
             margin-bottom: 5px;
         }
 
@@ -561,69 +441,6 @@
             border-radius: 15px;
             margin-top: 20px;
             border-left: 4px solid #ffc107;
-        }
-
-        .admin-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin: 20px 0;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            margin: 20px 0;
-        }
-
-        .admin-table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .admin-table th {
-            background: #3b82f6;
-            color: white;
-            padding: 12px;
-            text-align: right;
-            font-weight: 600;
-        }
-
-        .admin-table td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            text-align: right;
-        }
-
-        .admin-table tbody tr:hover {
-            background: #f8f9fa;
-        }
-
-        .admin-table .action-btn {
-            padding: 4px 8px;
-            font-size: 0.8em;
-            border-radius: 4px;
-            border: none;
-            cursor: pointer;
-            margin: 0 2px;
-        }
-
-        .admin-table .btn-edit {
-            background: #17a2b8;
-            color: white;
-        }
-
-        .admin-table .btn-delete {
-            background: #dc3545;
-            color: white;
-        }
-
-        .admin-table .btn-success {
-            background: #28a745;
-            color: white;
         }
 
         .admin-title {
@@ -706,11 +523,11 @@
         <div class="header">
             <h1>🎯 תמלול חכם</h1>
             <p>מערכת תמלול מתקדמת עם ניהול דקות אישי</p>
-            <div style="background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 10px; margin-top: 15px; font-size: 0.9em; color: #3b82f6;">
+            <div style="background: rgba(102, 126, 234, 0.1); padding: 10px; border-radius: 10px; margin-top: 15px; font-size: 0.9em; color: #667eea;">
                 <strong>🤖 Powered by Gemini 2.5 Pro</strong> | 📄 תמלול מדויק לקובץ Word מעוצב
             </div>
             
-           <div style="background: #3b82f6; padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center;">
+           <div style="background: linear-gradient(45deg, #667eea, #764ba2); padding: 15px; border-radius: 10px; margin-top: 15px; text-align: center;">
     <p style="margin: 0; font-size: 16px; font-weight: bold; color: white;">
         📞 לתמיכה ורכישת דקות: yv0527166925@gmail.com
     </p>
@@ -740,8 +557,6 @@
                         <button class="link-btn" onclick="switchTab('register')">אין לך חשבון? הירשם כאן</button>
                     </div>
                 </div>
-                <!-- Status for auth messages -->
-                <div class="status" id="authStatus" style="display: none;"></div>
             </div>
 
             <div id="registerTab" class="tab-content">
@@ -769,8 +584,6 @@
                         <button class="link-btn" onclick="switchTab('login')">יש לך חשבון? התחבר כאן</button>
                     </div>
                 </div>
-                <!-- Status for auth messages -->
-                <div class="status" id="registerAuthStatus" style="display: none;"></div>
             </div>
         </div>
 
@@ -798,108 +611,29 @@
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="totalTranscribed">0</div>
-                        <div class="stat-label">דקות מתומללות</div>
+                        <div class="stat-label">דקות מומלות</div>
                     </div>
                 </div>
 
                 <!-- Admin Panel -->
                 <div id="adminPanel" class="admin-panel" style="display: none;">
-                    <!-- Admin Sub-tabs -->
-                    <div class="nav-tabs">
-                        <button class="nav-tab active" onclick="switchAdminTab('overview')">סקירה כללית</button>
-                        <button class="nav-tab" onclick="switchAdminTab('users')">ניהול משתמשים</button>
-                        <button class="nav-tab" onclick="switchAdminTab('transcriptions')">תמלולים</button>
-                        <button class="nav-tab" onclick="switchAdminTab('add-minutes')">הוספת דקות</button>
+                    <div class="admin-title">🔧 פאנל ניהול - הוספת דקות</div>
+                    <div class="admin-controls">
+                        <div>
+                            <div class="form-group">
+                                <label for="adminUserEmail">אימייל לקוח:</label>
+                                <input type="email" id="adminUserEmail" placeholder="הכנס אימייל לקוח (לדוגמה: test@example.com)">
+                            </div>
+                            <div class="form-group">
+                                <label for="adminMinutesToAdd">דקות להוספה:</label>
+                                <input type="number" id="adminMinutesToAdd" min="1" placeholder="מספר דקות">
+                            </div>
+                        </div>
+                        <button class="btn" onclick="addMinutesToUser()">הוסף דקות</button>
                     </div>
-
-                    <!-- Overview Tab -->
-                    <div id="overviewTab" class="tab-content active">
-                        <div class="admin-title">📊 סקירה כללית</div>
-                        <div class="admin-stats">
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalUsers">-</div>
-                                <div class="stat-label">סה"כ משתמשים</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="newUsersToday">-</div>
-                                <div class="stat-label">משתמשים חדשים היום</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalTranscriptions">-</div>
-                                <div class="stat-label">סה"כ תמלולים</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="totalMinutesUsed">-</div>
-                                <div class="stat-label">דקות שנוצלו</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Users Management Tab -->
-                    <div id="usersTab" class="tab-content">
-                        <div class="admin-title">👥 ניהול משתמשים</div>
-                        <div class="table-container">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>שם</th>
-                                        <th>אימייל</th>
-                                        <th>דקות זמינות</th>
-                                        <th>דקות מתומללות</th>
-                                        <th>תאריך הצטרפות</th>
-                                        <th>פעולות</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="usersTableBody">
-                                    <!-- Dynamic content -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Transcriptions Tab -->
-                    <div id="transcriptionsTab" class="tab-content">
-                        <div class="admin-title">📄 תמלולים אחרונים</div>
-                        <div class="table-container">
-                            <table class="admin-table">
-                                <thead>
-                                    <tr>
-                                        <th>תאריך</th>
-                                        <th>משתמש</th>
-                                        <th>שם קובץ</th>
-                                        <th>משך</th>
-                                        <th>שפה</th>
-                                        <th>סטטוס</th>
-                                        <th>הורדה</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="transcriptionsTableBody">
-                                    <!-- Dynamic content -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Add Minutes Tab -->
-                    <div id="addMinutesTab" class="tab-content">
-                        <div class="admin-title">🔧 הוספת דקות</div>
-                        <div class="admin-controls">
-                            <div>
-                                <div class="form-group">
-                                    <label for="adminUserEmail">אימייל לקוח:</label>
-                                    <input type="email" id="adminUserEmail" placeholder="הכנס אימייל לקוח">
-                                </div>
-                                <div class="form-group">
-                                    <label for="adminMinutesToAdd">דקות להוספה:</label>
-                                    <input type="number" id="adminMinutesToAdd" min="1" placeholder="מספר דקות">
-                                </div>
-                            </div>
-                            <button class="btn" onclick="addMinutesToUser()">הוסף דקות</button>
-                        </div>
-
-                        <div style="margin-top: 15px; padding: 10px; background: rgba(255, 193, 7, 0.2); border-radius: 5px; font-size: 0.9em;">
-                            <strong>💡 טיפ:</strong> בחר משתמש מהרשימה למעלה
-                        </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: rgba(255, 193, 7, 0.2); border-radius: 5px; font-size: 0.9em;">
+                        <strong>💡 טיפ:</strong> נסה עם המשתמש הבדיקה: test@example.com
                     </div>
                 </div>
             </div>
@@ -909,97 +643,31 @@
                 <form id="transcriptionForm">
                     <div class="upload-area" id="uploadArea">
                         <div class="upload-icon">📁</div>
-                        <div class="upload-text">לחץ כאן או גרור קבצים (ללא הגבלה)</div>
-                        <div class="upload-subtext">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV</div>
-                        <div style="margin-top: 10px; font-size: 0.8em; color: #3b82f6;">
+                        <div class="upload-text">לחץ כאן או גרור קבצים</div>
+                        <div class="upload-subtext">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV</div>
+                        <div style="margin-top: 10px; font-size: 0.8em; color: #667eea;">
                             ✨ תמלול עם Gemini 2.5 Pro → קובץ Word מסודר ומעוצב
                         </div>
-                        <div style="margin-top: 8px; font-size: 0.85em; color: #28a745; font-weight: 600;">
-                            🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
-                        </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
-                        <input type="file" id="folderInput" class="file-input" webkitdirectory directory multiple accept="audio/*,video/*" style="display: none;">
-                    </div>
-
-                    <!-- Upload options buttons -->
-                    <div style="display: flex; gap: 15px; justify-content: center; margin: 20px 0; flex-wrap: wrap;">
-                        <button type="button" class="btn-upload-option" onclick="selectFiles()">
-                            📄 בחר קבצים
-                        </button>
-                        <button type="button" class="btn-upload-option" onclick="selectFolder()" title="בחר תיקייה עם כל הקבצים שבתוכה">
-                            📂 בחר תיקייה שלמה
-                        </button>
                     </div>
 
                     <div id="selectedFiles"></div>
-
-                    <!-- Folder preview (shown when folder is selected) -->
-                    <div id="folderPreview" class="folder-preview">
-                        <div class="folder-title">📂 קבצים בתיקייה: <span id="folderName"></span></div>
-                        <div class="folder-files" id="folderFiles">
-                            <!-- Files will be populated here -->
-                        </div>
-                        <div class="folder-actions">
-                            <button type="button" class="btn-secondary" onclick="selectAllFolderFiles()">
-                                ✅ בחר הכל
-                            </button>
-                            <button type="button" class="btn-secondary" onclick="deselectAllFolderFiles()">
-                                ❌ בטל הכל
-                            </button>
-                            <button type="button" class="btn" onclick="addSelectedFolderFiles()">
-                                ➕ הוסף קבצים נבחרים
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Clear all button (shown when files are selected) -->
-                    <div id="clearAllContainer" style="display: none; margin: 15px 0; text-align: center;">
-                        <button type="button" class="btn-clear-all" onclick="clearAllFiles()">
-                            🗑️ נקה הכל
-                        </button>
-                    </div>
 
                     <div id="estimatedCost" style="display: none;" class="insufficient-minutes">
                         <strong>אמידת זמן תמלול:</strong> <span id="estimatedMinutes">0</span> דקות<br>
                         <strong>יתרה נוכחית:</strong> <span id="currentBalance">0</span> דקות
                     </div>
 
-                    <!-- Email Upload Info Box -->
-                    <div style="background: rgba(59, 130, 246, 0.1); padding: 20px; border-radius: 15px; margin: 20px 0; border-right: 4px solid #3b82f6; direction: rtl;">
-                        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                            <span style="font-size: 1.5em; margin-left: 10px;">📧</span>
-                            <strong style="color: #3b82f6; font-size: 1.1em;">ניתן לשלוח קבצים לתמלול גם דרך האימייל</strong>
-                        </div>
-                        <div style="color: #555; font-size: 0.95em; line-height: 1.6;">
-                            <div style="margin-bottom: 8px;">
-                                <strong>כתובת:</strong>
-                                <span style="background: rgba(59, 130, 246, 0.2); padding: 3px 8px; border-radius: 5px; font-family: monospace; color: #3b82f6;">yv0527166925@gmail.com</span>
-                            </div>
-                            <div style="margin-bottom: 8px;">
-                                <strong>שורת נושא:</strong>
-                                <span style="background: rgba(59, 130, 246, 0.2); padding: 3px 8px; border-radius: 5px; font-family: monospace; color: #3b82f6;">תמלול</span>
-                            </div>
-                            <div style="font-size: 0.9em; color: #666;">
-                                💡 צרף את קובץ השמע/וידאו למייל ותקבל את התמלול בחזרה כקובץ Word
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="customInstructions">הנחייה אישית (אופציונלי):</label>
-                        <textarea id="customInstructions" placeholder="למשל: השתמש בסגנון פורמלי, הוסף סימני פיסוק מדויקים, התעלם מרעשי רקע, וכו'..." rows="3" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; transition: border-color 0.3s ease; resize: vertical; font-family: inherit;"></textarea>
-                        <small style="color: #666; font-size: 0.85em; margin-top: 5px; display: block;">💡 טיפ: תן הוראות ברורות למודל כדי לקבל תמלול מותאם לצרכים שלך</small>
-                    </div>
-
                     <div class="form-group">
                         <label for="language">שפת התמלול:</label>
                         <select id="language">
                             <option value="he">עברית</option>
-                            <option value="yi">אידיש</option>
                             <option value="en">אנגלית</option>
-                            <option value="fr">צרפתית</option>
+                            <option value="ar">עברית</option>
                             <option value="es">ספרדית</option>
-                            <option value="ru">רוסית</option>
+                            <option value="fr">צרפתית</option>
+                            <option value="de">גרמנית</option>
+                            <option value="auto">זיהוי אוטומטי</option>
                         </select>
                     </div>
 
@@ -1039,10 +707,10 @@
             <div id="paymentTab" class="tab-content">
                 <h3>רכישת דקות תמלול</h3>
                <div class="payment-options">
-    <div class="payment-option" onclick="selectPaymentOption(this, 60, 10)">
+    <div class="payment-option" onclick="selectPaymentOption(this, 60, 6)">
         <div class="payment-amount">60</div>
         <div class="payment-minutes">דקות תמלול</div>
-        <div class="payment-price">₪10</div>
+        <div class="payment-price">₪6</div>
     </div>
 </div>
                 <button class="btn" id="purchaseBtn" disabled onclick="processPurchase()">
@@ -1074,8 +742,6 @@
         let currentUser = null;
         let selectedFiles = [];
         let selectedPayment = null;
-        let currentTranscriptionId = null; // Track current transcription for cancellation
-        let folderFiles = []; // Store folder files for preview
 
         // Debug function
         function updateDebugInfo(message) {
@@ -1111,62 +777,21 @@
         function switchTab(tabName) {
             document.querySelectorAll('#authSection .nav-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('#authSection .tab-content').forEach(content => content.classList.remove('active'));
-
+            
             event.target.classList.add('active');
             document.getElementById(tabName + 'Tab').classList.add('active');
-
-            // Clear auth status when switching tabs
-            const authStatus = document.getElementById('authStatus');
-            const registerAuthStatus = document.getElementById('registerAuthStatus');
-            if (authStatus) {
-                authStatus.style.display = 'none';
-            }
-            if (registerAuthStatus) {
-                registerAuthStatus.style.display = 'none';
-            }
         }
 
         function switchAppTab(tabName) {
             document.querySelectorAll('#appSection .nav-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('#appSection .tab-content').forEach(content => content.classList.remove('active'));
-
+            
             event.target.classList.add('active');
             document.getElementById(tabName + 'Tab').classList.add('active');
 
             if (tabName === 'history') {
                 loadHistory();
-            } else if (tabName === 'admin') {
-                loadAdminData();
             }
-        }
-
-        // 🔧 NEW: Admin tab switching
-        function switchAdminTab(tabName) {
-            document.querySelectorAll('#adminPanel .nav-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('#adminPanel .tab-content').forEach(content => content.classList.remove('active'));
-
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.add('active');
-
-            // Load data based on tab
-            switch(tabName) {
-                case 'overview':
-                    loadAdminOverview();
-                    break;
-                case 'users':
-                    loadAdminUsers();
-                    break;
-                case 'transcriptions':
-                    loadAdminTranscriptions();
-                    break;
-            }
-        }
-
-        // 🔧 NEW: Load admin data when tab is opened
-        function loadAdminData() {
-            loadAdminOverview();
-            loadAdminUsers();
-            loadAdminTranscriptions();
         }
 
         // Authentication functions with better error handling
@@ -1206,16 +831,15 @@
                 
                 if (data.success) {
                     currentUser = data.user;
-                    showAuthStatus('✅ התחברת בהצלחה!', 'success');
                     updateDebugInfo('✅ התחברות הצליחה!');
-                    setTimeout(() => showApp(), 1000); // Small delay to show success message
+                    showApp();
                 } else {
-                    showAuthStatus(data.error || 'שגיאה בהתחברות', 'error');
+                    showStatus(data.error || 'שגיאה בהתחברות', 'error');
                     updateDebugInfo(`❌ התחברות נכשלה: ${data.error}`);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                showStatus(`שגיאה בחיבור: ${error.message}`, 'error');
                 updateDebugInfo(`❌ שגיאה: ${error.message}`);
             }
         });
@@ -1256,16 +880,16 @@
                 
                 if (data.success) {
                     currentUser = data.user;
-                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה! קיבלת 30 דקות חינם', 'success');
                     updateDebugInfo('✅ הרשמה הצליחה!');
-                    setTimeout(() => showApp(), 2000); // Longer delay to read success message
+                    showApp();
+                    showStatus('ההרשמה הושלמה בהצלחה! קיבלת 30 דקות חינם', 'success');
                 } else {
-                    showAuthStatus(data.error || 'שגיאה בהרשמה', 'error');
+                    showStatus(data.error || 'שגיאה בהרשמה', 'error');
                     updateDebugInfo(`❌ הרשמה נכשלה: ${data.error}`);
                 }
             } catch (error) {
                 console.error('Register error:', error);
-                showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                showStatus(`שגיאה בחיבור: ${error.message}`, 'error');
                 updateDebugInfo(`❌ שגיאה: ${error.message}`);
             }
         });
@@ -1378,64 +1002,30 @@
             }
         }
 
-        // Real audio/video duration detection with better error handling
-        function getRealAudioDuration(file) {
+        // Real audio/video duration detection
+        function getAudioDuration(file) {
             return new Promise((resolve) => {
-                console.log(`🎵 קורא משך זמן אמיתי לקובץ: ${file.name}`);
-
-                const url = URL.createObjectURL(file);
-                const mediaElement = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
-
-                let resolved = false;
-
-                const cleanup = () => {
-                    URL.revokeObjectURL(url);
-                    mediaElement.src = '';
-                };
-
-                const resolveWithFallback = () => {
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-
-                        // Fallback to file size estimation only if real duration fails
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        const ext = file.name.toLowerCase().split('.').pop();
-                        let estimatedMinutes;
-
-                        if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) {
-                            estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 3));
-                        } else {
-                            estimatedMinutes = Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                        }
-
-                        console.log(`⚠️ ${file.name} - נכשל בקריאת זמן אמיתי, הערכה: ${estimatedMinutes} דקות`);
-                        resolve(estimatedMinutes);
-                    }
-                };
-
-                // Success: got real duration
-                mediaElement.addEventListener('loadedmetadata', () => {
-                    if (!resolved && !isNaN(mediaElement.duration) && mediaElement.duration > 0) {
-                        resolved = true;
-                        const durationSeconds = mediaElement.duration;
-                        const durationMinutes = Math.ceil(durationSeconds / 60);
-                        cleanup();
-
-                        console.log(`✅ ${file.name} - זמן אמיתי: ${durationSeconds.toFixed(1)}s (${durationMinutes} דקות)`);
-                        resolve(durationMinutes);
-                    }
-                }, { once: true });
-
-                // Error handling
-                mediaElement.addEventListener('error', resolveWithFallback, { once: true });
-
-                // Timeout after 1.5 seconds
-                setTimeout(resolveWithFallback, 1500);
-
-                // Start loading
-                mediaElement.src = url;
-                mediaElement.load();
+                if (file.type.startsWith('audio/') || file.type.startsWith('video/')) {
+                    const url = URL.createObjectURL(file);
+                    const audio = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio');
+                    
+                    audio.addEventListener('loadedmetadata', () => {
+                        const duration = Math.ceil(audio.duration / 60);
+                        URL.revokeObjectURL(url);
+                        resolve(duration);
+                    });
+                    
+                    audio.addEventListener('error', () => {
+                        URL.revokeObjectURL(url);
+                        const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
+                        resolve(Math.max(1, estimatedMinutes));
+                    });
+                    
+                    audio.src = url;
+                } else {
+                    const estimatedMinutes = Math.ceil(file.size / (1024 * 1024 * 2));
+                    resolve(Math.max(1, estimatedMinutes));
+                }
             });
         }
 
@@ -1455,358 +1045,49 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            console.log(`🎯 גרירת קבצים: ${e.dataTransfer.files.length} קבצים`);
-            // Create a copy of files array to avoid reference issues
-            const filesArray = Array.from(e.dataTransfer.files);
-            handleFiles(filesArray, true); // true = add to existing files
+            handleFiles(e.dataTransfer.files);
         });
 
         fileInput.addEventListener('change', (e) => {
-            console.log(`📁 בחירת קבצים דרך File Input: ${e.target.files.length} קבצים`);
-            if (e.target.files.length > 0) {
-                // Create a copy of files array to avoid reference issues
-                const filesArray = Array.from(e.target.files);
-                handleFiles(filesArray, true); // true = add to existing files
-            }
+            handleFiles(e.target.files);
         });
 
-        // Note: Folder input listener is now created dynamically in selectFolder() function
-
-        // Upload option functions
-        function selectFiles() {
-            fileInput.click();
-        }
-
-        function selectFolder() {
-            console.log('📂 פותח דיאלוג בחירת תיקייה');
-
-            // Remove existing input completely
-            const existingInput = document.getElementById('folderInput');
-            if (existingInput) {
-                existingInput.remove();
-            }
-
-            // Create completely new input with folder attributes set from the beginning
-            const newInput = document.createElement('input');
-            newInput.type = 'file';
-            newInput.id = 'folderInput';
-            newInput.className = 'file-input';
-            newInput.style.display = 'none';
-
-            // Set folder-specific attributes BEFORE adding to DOM
-            newInput.webkitdirectory = true;
-            newInput.directory = true;
-            newInput.multiple = true;
-            newInput.accept = 'audio/*,video/*';
-
-            // Add event listener
-            newInput.addEventListener('change', (e) => {
-                console.log(`📂 בחירת תיקייה: ${e.target.files.length} קבצים`);
-                if (e.target.files.length === 0) {
-                    console.log('📂 לא נבחרו קבצים - המשתמש ביטל');
-                    return;
-                }
-                handleFolderSelection(e.target.files);
-            });
-
-            // Add to DOM
-            document.body.appendChild(newInput);
-
-            // Trigger immediately
-            newInput.click();
-            console.log('📂 דיאלוג בחירת תיקייה הופעל');
-        }
-
-        // Handle folder selection and preview
-        async function handleFolderSelection(files) {
-            console.log(`📂 מעבד תיקייה עם ${files.length} קבצים`);
-
-            // Filter valid audio/video files
-            const validFiles = Array.from(files).filter(file =>
-                file.type.startsWith('audio/') ||
+        async function handleFiles(files) {
+            const validFiles = Array.from(files).filter(file => 
+                file.type.startsWith('audio/') || 
                 file.type.startsWith('video/') ||
                 file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
             );
-
-            if (validFiles.length === 0) {
-                showStatus('לא נמצאו קבצי אודיו או וידאו תקינים בתיקייה', 'error');
-                return;
-            }
-
-            // Get folder name from first file
-            const folderPath = files[0].webkitRelativePath;
-            const folderName = folderPath.split('/')[0];
-
-            console.log(`📂 תיקייה: ${folderName}, קבצים תקינים: ${validFiles.length}/${files.length}`);
-
-            // Store files and show preview
-            folderFiles = validFiles;
-            await showFolderPreview(folderName, validFiles);
-        }
-
-        // Show folder preview with file list
-        async function showFolderPreview(folderName, files) {
-            document.getElementById('folderName').textContent = folderName;
-            const folderFilesDiv = document.getElementById('folderFiles');
-            const folderPreview = document.getElementById('folderPreview');
-
-            // Clear previous files
-            folderFilesDiv.innerHTML = '';
-
-            showStatus('<div class="spinner"></div>קורא זמן אמיתי לקבצים בתיקייה...', 'processing');
-
-            // Process each file to get duration
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-
-                try {
-                    const duration = await getRealAudioDuration(file);
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'folder-file-item';
-                    fileItem.innerHTML = `
-                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
-                        <div class="folder-file-info">
-                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
-                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⏱️ ${duration} דקות</div>
-                        </div>
-                    `;
-                    folderFilesDiv.appendChild(fileItem);
-
-                    // Store duration info
-                    files[i].estimatedDuration = duration;
-
-                } catch (error) {
-                    console.error('Error processing file:', file.name, error);
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'folder-file-item';
-                    fileItem.innerHTML = `
-                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
-                        <div class="folder-file-info">
-                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
-                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⚠️ לא ניתן לקרוא זמן</div>
-                        </div>
-                    `;
-                    folderFilesDiv.appendChild(fileItem);
-
-                    // Fallback duration estimate
-                    const fileSizeMB = file.size / (1024 * 1024);
-                    const ext = file.name.toLowerCase().split('.').pop();
-                    files[i].estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
-                        ? Math.max(1, Math.ceil(fileSizeMB / 3))
-                        : Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                }
-            }
-
-            // Show the preview
-            folderPreview.style.display = 'block';
-            showStatus(`✅ נמצאו ${files.length} קבצים בתיקייה "${folderName}"`, 'success');
-
-            setTimeout(() => {
-                const status = document.getElementById('status');
-                if (status) status.style.display = 'none';
-            }, 3000);
-        }
-
-        // Folder management functions
-        function selectAllFolderFiles() {
-            const checkboxes = document.querySelectorAll('.folder-file-checkbox');
-            checkboxes.forEach(checkbox => checkbox.checked = true);
-        }
-
-        function deselectAllFolderFiles() {
-            const checkboxes = document.querySelectorAll('.folder-file-checkbox');
-            checkboxes.forEach(checkbox => checkbox.checked = false);
-        }
-
-        function addSelectedFolderFiles() {
-            const checkboxes = document.querySelectorAll('.folder-file-checkbox:checked');
-            const selectedIndices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.index));
-
-            if (selectedIndices.length === 0) {
-                showStatus('אנא בחר לפחות קובץ אחד', 'error');
-                return;
-            }
-
-            const filesToAdd = selectedIndices.map(index => ({
-                file: folderFiles[index],
-                duration: folderFiles[index].estimatedDuration || 1
-            }));
-
-            console.log(`📂 מוסיף ${filesToAdd.length} קבצים מהתיקייה`);
-
-            // Add files to selectedFiles (avoid duplicates)
-            filesToAdd.forEach(item => {
-                const isDuplicate = selectedFiles.some(selected =>
-                    selected.file.name === item.file.name &&
-                    selected.file.size === item.file.size &&
-                    selected.file.lastModified === item.file.lastModified
-                );
-
-                if (!isDuplicate) {
-                    selectedFiles.push(item);
-                    displayFile(item.file, item.duration);
-                }
-            });
-
-            // Update UI
-            updateSubmitButton();
-            updateCostEstimate();
-
-            // Hide folder preview
-            document.getElementById('folderPreview').style.display = 'none';
-
-            showStatus(`✅ נוספו ${filesToAdd.length} קבצים מהתיקייה לרשימת התמלול`, 'success');
-            setTimeout(() => {
-                const status = document.getElementById('status');
-                if (status) status.style.display = 'none';
-            }, 2000);
-
-            // Reset folder input
-            folderInput.value = '';
-        }
-
-
-        async function handleFiles(files, addToExisting = false) {
-            console.log(`🔄 טיפול בקבצים: ${files.length} קבצים, הוספה לקיימים: ${addToExisting}`);
-            console.log('📁 קבצים שהתקבלו:', Array.from(files).map(f => `${f.name} (${f.size} bytes)`));
-            console.log('📋 קבצים נבחרים כרגע:', selectedFiles.map(item => `${item.file.name} (${item.file.size} bytes)`));
-
-            const validFiles = Array.from(files).filter(file =>
-                file.type.startsWith('audio/') ||
-                file.type.startsWith('video/') ||
-                file.name.toLowerCase().match(/\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/)
-            );
-
-            console.log(`✅ קבצים תקינים: ${validFiles.length}/${files.length}`);
-
+            
             if (validFiles.length === 0) {
                 showStatus('אנא בחר קבצי אודיו או וידאו תקינים', 'error');
                 return;
             }
-
-            // Filter out files that are already selected (prevent duplicates)
-            const newFiles = validFiles.filter(file => {
-                const isDuplicate = selectedFiles.some(selected =>
-                    selected.file.name === file.name &&
-                    selected.file.size === file.size &&
-                    selected.file.lastModified === file.lastModified
-                );
-
-                if (isDuplicate) {
-                    console.log(`🔄 קובץ כפול נמנע: ${file.name}`);
+            
+            showStatus('<div class="spinner"></div>מחשב משך זמן הקבצים...', 'processing');
+            
+            for (const file of validFiles) {
+                try {
+                    const duration = await getAudioDuration(file);
+                    selectedFiles.push({
+                        file: file,
+                        duration: duration
+                    });
+                    await displayFile(file, duration);
+                } catch (error) {
+                    console.error('Error processing file:', file.name, error);
+                    const estimatedDuration = Math.ceil(file.size / (1024 * 1024 * 2));
+                    selectedFiles.push({
+                        file: file,
+                        duration: estimatedDuration
+                    });
+                    await displayFile(file, estimatedDuration);
                 }
-
-                return !isDuplicate;
-            });
-
-            console.log(`🔍 קבצים חדשים לעיבוד: ${newFiles.length}/${validFiles.length}`);
-            console.log('🆕 קבצים חדשים:', newFiles.map(f => f.name));
-
-            if (newFiles.length < validFiles.length) {
-                console.log(`⚠️ ${validFiles.length - newFiles.length} קבצים נמנעו בגלל כפילות`);
             }
-
-            if (newFiles.length === 0 && addToExisting) {
-                showStatus('כל הקבצים שנבחרו כבר קיימים ברשימה', 'error');
-                fileInput.value = ''; // Reset the input
-                setTimeout(() => {
-                    const status = document.getElementById('status');
-                    if (status) status.style.display = 'none';
-                }, 3000);
-                return;
-            }
-
-            // Clear existing files only if not adding to existing
-            if (!addToExisting) {
-                selectedFiles = [];
-                selectedFilesDiv.innerHTML = '';
-            }
-
-            const filesToProcess = addToExisting ? newFiles : validFiles;
-
-            if (filesToProcess.length > 0) {
-                console.log(`📁 מוסיף ${filesToProcess.length} קבצים עם זמן אמיתי`);
-                showStatus('<div class="spinner"></div>קורא זמן אמיתי לקבצים...', 'processing');
-
-                // Process each file to get real duration
-                let processedCount = 0;
-
-                const processFile = async (file) => {
-                    try {
-                        const duration = await getRealAudioDuration(file);
-
-                        selectedFiles.push({
-                            file: file,
-                            duration: duration
-                        });
-
-                        displayFile(file, duration);
-                        processedCount++;
-
-                        console.log(`✅ ${file.name} → ${duration} דקות (זמן אמיתי)`);
-
-                        // Update progress
-                        showStatus(`<div class="spinner"></div>קורא זמן: ${processedCount}/${filesToProcess.length} קבצים...`, 'processing');
-
-                    } catch (error) {
-                        console.error('Error reading duration for:', file.name, error);
-
-                        // Fallback to size estimation
-                        const fileSizeMB = file.size / (1024 * 1024);
-                        const ext = file.name.toLowerCase().split('.').pop();
-                        const estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
-                            ? Math.max(1, Math.ceil(fileSizeMB / 3))
-                            : Math.max(1, Math.ceil(fileSizeMB / 1.2));
-
-                        selectedFiles.push({
-                            file: file,
-                            duration: estimatedDuration
-                        });
-
-                        displayFile(file, estimatedDuration);
-                        processedCount++;
-
-                        console.log(`⚠️ ${file.name} → ${estimatedDuration} דקות (הערכה)`);
-
-                        // Update progress
-                        showStatus(`<div class="spinner"></div>קורא זמן: ${processedCount}/${filesToProcess.length} קבצים...`, 'processing');
-                    }
-                };
-
-                // Process files sequentially
-                for (const file of filesToProcess) {
-                    await processFile(file);
-                }
-
-                // Update UI after all files processed
-                updateSubmitButton();
-                updateCostEstimate();
-
-                // Show completion message (no total duration)
-                if (addToExisting) {
-                    showStatus(`✅ נוספו ${filesToProcess.length} קבצים לרשימה - סה"כ ${selectedFiles.length} קבצים`, 'success');
-                } else {
-                    showStatus(`✅ נבחרו ${filesToProcess.length} קבצים לתמלול`, 'success');
-                }
-
-                setTimeout(() => {
-                    const status = document.getElementById('status');
-                    if (status) status.style.display = 'none';
-                }, 2000);
-            }
-
-            // Final update (only if no files were processed above)
-            if (filesToProcess.length === 0) {
-                updateSubmitButton();
-                updateCostEstimate();
-            }
-
-            // Reset file input after a small delay to ensure processing is complete
-            setTimeout(() => {
-                fileInput.value = '';
-            }, 100);
+            
+            updateSubmitButton();
+            updateCostEstimate();
+            hideStatus();
         }
 
         function displayFile(file, duration) {
@@ -1875,64 +1156,43 @@
 
         function updateSubmitButton() {
             const submitBtn = document.getElementById('submitBtn');
-            const clearAllContainer = document.getElementById('clearAllContainer');
-
-            console.log(`🔘 עדכון כפתורים: ${selectedFiles.length} קבצים נבחרים`);
-
             submitBtn.disabled = selectedFiles.length === 0;
-
-            // Show/hide clear all container
-            if (selectedFiles.length > 0) {
-                clearAllContainer.style.display = 'block';
-                console.log('✅ מציג כפתור נקה הכל');
-            } else {
-                clearAllContainer.style.display = 'none';
-                console.log('❌ מסתיר כפתור נקה הכל');
-            }
-        }
-
-        function clearAllFiles() {
-            selectedFiles = [];
-            selectedFilesDiv.innerHTML = '';
-
-            // Reset file input
-            fileInput.value = '';
-
-            updateSubmitButton();
-            updateCostEstimate();
-
-            showStatus('✅ כל הקבצים נוקו מהרשימה', 'success');
-            setTimeout(() => {
-                const status = document.getElementById('status');
-                if (status) status.style.display = 'none';
-            }, 2000);
         }
 
         function updateCostEstimate() {
-            console.log(`📊 עדכון תצוגה - קבצים נבחרים: ${selectedFiles.length}`);
-
             if (selectedFiles.length === 0) {
                 document.getElementById('estimatedCost').style.display = 'none';
                 return;
             }
 
-            // Log each file's duration for debugging
-            selectedFiles.forEach((item, index) => {
-                console.log(`📄 קובץ ${index + 1}: ${item.file.name} - ${item.duration} דקות`);
-            });
-
+            const totalMinutes = selectedFiles.reduce((sum, item) => sum + item.duration, 0);
+            document.getElementById('estimatedMinutes').textContent = totalMinutes;
+            document.getElementById('currentBalance').textContent = currentUser ? currentUser.remainingMinutes : 0;
+            
             const costDiv = document.getElementById('estimatedCost');
             costDiv.style.display = 'block';
-            costDiv.className = 'status success';
-            costDiv.innerHTML = `
-                <strong>📁 נבחרו ${selectedFiles.length} קבצים לתמלול</strong><br>
-                <strong>יתרה נוכחית:</strong> ${currentUser ? currentUser.remainingMinutes : 0} דקות<br>
-                <small>💡 זמן התמלול האמיתי יחושב במהלך העיבוד ויתרת הדקות תתעדכן בהתאם</small>
-            `;
-
-            // Enable submit button (we'll check balance during transcription)
-            document.getElementById('submitBtn').disabled = false;
-            document.getElementById('submitBtn').textContent = '🚀 התחל תמלול';
+            
+            if (currentUser && totalMinutes > currentUser.remainingMinutes) {
+                costDiv.className = 'insufficient-minutes';
+                costDiv.innerHTML = `
+                    <strong>⚠️ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
+                    <strong>יתרה נוכחית:</strong> ${currentUser.remainingMinutes} דקות<br>
+                    <strong style="color: #d32f2f;">חסרות ${totalMinutes - currentUser.remainingMinutes} דקות!</strong><br>
+                    <small>💡 אנא רכוש דקות נוספות או הסר קבצים</small>
+                `;
+                document.getElementById('submitBtn').disabled = true;
+                document.getElementById('submitBtn').textContent = '⛔ אין מספיק דקות';
+            } else {
+                costDiv.className = 'status success';
+                costDiv.innerHTML = `
+                    <strong>✅ זמן תמלול מחושב:</strong> ${totalMinutes} דקות<br>
+                    <strong>יתרה נוכחית:</strong> ${currentUser ? currentUser.remainingMinutes : 0} דקות<br>
+                    <strong style="color: #2e7d32;">יתרה לאחר תמלול:</strong> ${currentUser ? currentUser.remainingMinutes - totalMinutes : 0} דקות<br>
+                    <small>🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית</small>
+                `;
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = '🚀 התחל תמלול מלא';
+            }
         }
 
         function formatFileSize(bytes) {
@@ -1946,49 +1206,18 @@
 
         function showStatus(message, type) {
             const status = document.getElementById('status');
-            if (status) {
-                status.className = `status ${type}`;
-                status.innerHTML = message;
-                status.style.display = 'block';
-            }
-        }
-
-        function showAuthStatus(message, type) {
-            // Determine which tab is active and show status in the correct place
-            const loginTab = document.getElementById('loginTab');
-            const registerTab = document.getElementById('registerTab');
-
-            let status;
-            if (loginTab && loginTab.classList.contains('active')) {
-                status = document.getElementById('authStatus');
-            } else if (registerTab && registerTab.classList.contains('active')) {
-                status = document.getElementById('registerAuthStatus');
-            } else {
-                // Default to login tab status
-                status = document.getElementById('authStatus');
-            }
-
-            if (status) {
-                status.className = `status ${type}`;
-                status.innerHTML = message;
-                status.style.display = 'block';
-
-                // Auto-hide success messages after 3 seconds
-                if (type === 'success') {
-                    setTimeout(() => {
-                        status.style.display = 'none';
-                    }, 3000);
-                }
-            }
+            status.className = `status ${type}`;
+            status.innerHTML = message;
+            status.style.display = 'block';
         }
 
         function hideStatus() {
             setTimeout(() => {
                 const status = document.getElementById('status');
-                if (status && status.classList.contains('processing')) {
+                if (status.classList.contains('processing')) {
                     status.style.display = 'none';
                 }
-            }, 1000); // Reduced delay for better UX
+            }, 2000);
         }
 
         function updateProgress(percent) {
@@ -2011,18 +1240,16 @@
             }
 
             const language = document.getElementById('language').value;
-            const customInstructions = document.getElementById('customInstructions').value.trim();
             const submitBtn = document.getElementById('submitBtn');
 
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳ מעבד...';
             document.getElementById('progressBar').style.display = 'block';
-
             
             showStatus(`
                 <div class="spinner"></div>
                 <strong>מעבד ${selectedFiles.length} קבצים עם Gemini 2.5 Pro...</strong><br>
-                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 דיוק גבוה: 98% עברית רגילה, 95% הגייה ישיבתית</small><br>
+                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 תמלול מלא ומותאם לעברית</small><br>
                 <small>📧 התוצאות יישלחו למייל ${currentUser.email}</small>
             `, 'processing');
 
@@ -2040,9 +1267,6 @@
                 });
                 formData.append('email', currentUser.email);
                 formData.append('language', language);
-                if (customInstructions) {
-                    formData.append('customInstructions', customInstructions);
-                }
 
                 const response = await fetch(`${API_BASE}/transcribe`, {
                     method: 'POST',
@@ -2051,19 +1275,13 @@
 
                 const data = await response.json();
 
-                // Store transcription ID for potential cancellation
-                if (data.success && data.transcriptionId) {
-                    currentTranscriptionId = data.transcriptionId;
-                }
-
                 clearInterval(progressInterval);
                 updateProgress(100);
 
                 if (data.success) {
-
                     currentUser.remainingMinutes -= data.estimatedMinutes || totalMinutes;
                     currentUser.totalTranscribed += data.estimatedMinutes || totalMinutes;
-
+                    
                     updateDashboard();
                     showStatus(`
                         ✅ <strong>התמלול התחיל בהצלחה!</strong><br>
@@ -2071,15 +1289,13 @@
                         ⏱️ נוצלו ${data.estimatedMinutes || totalMinutes} דקות מהחשבון<br>
                         💰 יתרה נוכחית: <strong>${currentUser.remainingMinutes} דקות</strong><br>
                         🕒 זמן עיבוד משוער: <strong>3-8 דקות</strong><br>
-                        🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
+                        🎯 התמלול מותאם במיוחד לעברית עם הגיה ליטאית ומושגי ארמית
                     `, 'success');
-
+                    
                     selectedFiles = [];
                     selectedFilesDiv.innerHTML = '';
                     updateCostEstimate();
-                    updateSubmitButton(); // Hide clear all button
                     fileInput.value = '';
-                    currentTranscriptionId = null; // Clear transcription tracking
                 } else {
                     throw new Error(data.error || 'שגיאה בעיבוד');
                 }
@@ -2094,10 +1310,8 @@
                     document.getElementById('progressBar').style.display = 'none';
                     updateProgress(0);
                 }, 3000);
-                currentTranscriptionId = null; // Clear transcription tracking
             }
         });
-
 
         // Payment functions
         function selectPaymentOption(element, minutes, price) {
@@ -2162,11 +1376,12 @@
         function getLanguageName(code) {
             const languages = {
                 'he': 'עברית',
-                'yi': 'אידיש',
                 'en': 'אנגלית',
-                'fr': 'צרפתית',
+                'ar': 'עברית',
                 'es': 'ספרדית',
-                'ru': 'רוסית'
+                'fr': 'צרפתית',
+                'de': 'גרמנית',
+                'auto': 'זיהוי אוטומטי'
             };
             return languages[code] || code;
         }
@@ -2181,168 +1396,7 @@
         }
 
         function downloadFile(url) {
-            try {
-                showStatus('⬇️ מתחיל הורדה...', 'processing');
-
-                // Create a temporary anchor element for download
-                const link = document.createElement('a');
-                link.href = url;
-                link.style.display = 'none';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                setTimeout(() => {
-                    showStatus('✅ ההורדה החלה בהצלחה!', 'success');
-                    setTimeout(() => {
-                        const status = document.getElementById('status');
-                        if (status) status.style.display = 'none';
-                    }, 3000);
-                }, 500);
-
-            } catch (error) {
-                console.error('Download error:', error);
-                showStatus('❌ שגיאה בהורדת הקובץ', 'error');
-            }
-        }
-
-        // 🔧 NEW: Admin functions
-        async function loadAdminOverview() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/overview`);
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('totalUsers').textContent = data.totalUsers || 0;
-                    document.getElementById('newUsersToday').textContent = data.newUsersToday || 0;
-                    document.getElementById('totalTranscriptions').textContent = data.totalTranscriptions || 0;
-                    document.getElementById('totalMinutesUsed').textContent = data.totalMinutesUsed || 0;
-                }
-            } catch (error) {
-                console.error('Error loading admin overview:', error);
-            }
-        }
-
-        async function loadAdminUsers() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/users`);
-                const data = await response.json();
-
-                if (data.success) {
-                    const tbody = document.getElementById('usersTableBody');
-                    tbody.innerHTML = '';
-
-                    data.users.forEach(user => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${user.name}</td>
-                            <td>${user.email}</td>
-                            <td>${user.remainingMinutes}</td>
-                            <td>${user.totalTranscribed}</td>
-                            <td>${user.joinDate || 'לא זמין'}</td>
-                            <td>
-                                <button class="action-btn btn-success" onclick="addMinutesToUser('${user.email}', '${user.name}')">➕ הוסף דקות</button>
-                                <button class="action-btn btn-edit" onclick="editUser('${user.email}')">✏️ ערוך</button>
-                                ${!user.isAdmin ? `<button class="action-btn btn-delete" onclick="deleteUser('${user.email}')">🗑️ מחק</button>` : ''}
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading admin users:', error);
-            }
-        }
-
-        async function addMinutesToUser(userEmail, userName) {
-            const minutes = prompt(`כמה דקות להוסיף למשתמש ${userName}?`, '60');
-
-            if (minutes === null || minutes === '') {
-                return; // User cancelled
-            }
-
-            const minutesToAdd = parseInt(minutes);
-            if (isNaN(minutesToAdd) || minutesToAdd <= 0) {
-                alert('אנא הזן מספר דקות תקין');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/admin/add-minutes`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        adminEmail: currentUser.email,
-                        userEmail: userEmail,
-                        minutes: minutesToAdd
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    alert(`✅ נוספו ${minutesToAdd} דקות למשתמש ${userName}`);
-                    loadAdminUsers(); // Refresh the table
-                } else {
-                    alert(`❌ שגיאה: ${data.error}`);
-                }
-            } catch (error) {
-                console.error('Error adding minutes:', error);
-                alert('❌ שגיאה בהוספת דקות');
-            }
-        }
-
-        // Placeholder for editUser function
-        function editUser(userEmail) {
-            alert('🚧 פונקציית עריכה בפיתוח');
-        }
-
-        async function loadAdminTranscriptions() {
-            try {
-                const response = await fetch(`${API_BASE}/admin/transcriptions`);
-                const data = await response.json();
-
-                if (data.success) {
-                    const tbody = document.getElementById('transcriptionsTableBody');
-                    tbody.innerHTML = '';
-
-                    data.transcriptions.forEach(transcription => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td>${transcription.date}</td>
-                            <td>${transcription.userEmail}</td>
-                            <td>${transcription.fileName}</td>
-                            <td>${transcription.duration} דקות</td>
-                            <td>${getLanguageName(transcription.language)}</td>
-                            <td><span class="status-badge status-${transcription.status}">${getStatusName(transcription.status)}</span></td>
-                            <td>
-                                ${transcription.downloadUrl ?
-                                  `<button class="action-btn btn-edit" onclick="downloadFile('${transcription.downloadUrl}')">📥 הורד</button>` :
-                                  '-'
-                                }
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading admin transcriptions:', error);
-            }
-        }
-
-        function editUser(email) {
-            // Fill the add minutes form with user email
-            document.getElementById('adminUserEmail').value = email;
-            switchAdminTab('add-minutes');
-        }
-
-        function deleteUser(email) {
-            if (confirm(`האם אתה בטוח שברצונך למחוק את המשתמש ${email}?`)) {
-                // TODO: Implement user deletion
-                showStatus('פונקציה זו תתווסף בקרוב', 'info');
-            }
+            showStatus('⬇️ ההורדה תתחיל תוך רגע...', 'success');
         }
 
         // Initialize app
