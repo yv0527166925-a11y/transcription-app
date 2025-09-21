@@ -293,6 +293,57 @@ async function findOrCreateUser(email) {
   }
 }
 
+// Helper function to use user minutes (JSON version)
+async function useUserMinutes(email, minutes) {
+  try {
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      throw new Error(`User not found: ${email}`);
+    }
+
+    if (user.remainingMinutes < minutes) {
+      throw new Error(`Insufficient minutes. User has ${user.remainingMinutes}, needs ${minutes}`);
+    }
+
+    user.remainingMinutes -= minutes;
+    user.totalTranscribed += minutes;
+    saveUsersData();
+
+    console.log(`✅ Used ${minutes} minutes for ${email}. Remaining: ${user.remainingMinutes}`);
+    return user;
+
+  } catch (error) {
+    console.error('❌ Error in useUserMinutes:', error);
+    throw error;
+  }
+}
+
+// Helper function to add transcription to history (JSON version)
+async function addTranscriptionToHistory(email, transcriptionData) {
+  try {
+    const user = users.find(u => u.email === email);
+    if (!user) {
+      console.error(`❌ User not found for history: ${email}`);
+      return;
+    }
+
+    if (!user.transcriptionHistory) {
+      user.transcriptionHistory = [];
+    }
+
+    user.transcriptionHistory.push({
+      ...transcriptionData,
+      timestamp: new Date().toISOString()
+    });
+
+    saveUsersData();
+    console.log(`📝 Added transcription to history for ${email}`);
+
+  } catch (error) {
+    console.error('❌ Error in addTranscriptionToHistory:', error);
+  }
+}
+
 // 🔥 NEW: FFmpeg and chunking functions
 let ffmpegAvailabilityCache = null; // Cache the result
 
