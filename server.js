@@ -260,6 +260,39 @@ setInterval(() => {
   saveUsersData();
 }, 5 * 60 * 1000);
 
+// Helper function to find or create user (JSON version)
+async function findOrCreateUser(email) {
+  try {
+    // Find existing user
+    let user = users.find(u => u.email === email);
+
+    if (user) {
+      console.log(`👤 Found existing user: ${email} with ${user.remainingMinutes} minutes`);
+      return user;
+    }
+
+    // Create new user if not found
+    const newUser = {
+      email: email,
+      remainingMinutes: 30, // Default 30 minutes for new users
+      totalTranscribed: 0,
+      registrationDate: new Date().toISOString(),
+      isAdmin: false,
+      transcriptionHistory: []
+    };
+
+    users.push(newUser);
+    saveUsersData();
+
+    console.log(`✅ Created new user: ${email} with 30 minutes`);
+    return newUser;
+
+  } catch (error) {
+    console.error('❌ Error in findOrCreateUser:', error);
+    return null;
+  }
+}
+
 // 🔥 NEW: FFmpeg and chunking functions
 let ffmpegAvailabilityCache = null; // Cache the result
 
