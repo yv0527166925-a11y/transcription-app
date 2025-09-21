@@ -21,6 +21,18 @@ const userSchema = new mongoose.Schema({
         trim: true,
         index: { unique: true }
     },
+    password: {
+        type: String,
+        required: true
+    },
+    name: {
+        type: String,
+        required: true
+    },
+    isAdmin: {
+        type: Boolean,
+        default: false
+    },
     minutesRemaining: {
         type: Number,
         default: 0,
