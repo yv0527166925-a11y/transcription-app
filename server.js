@@ -416,6 +416,7 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
 }
 
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions) {
+  const startTime = Date.now();
   try {
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.5-pro",
@@ -459,7 +460,6 @@ ${contextPrompt}
 ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו עם התמלול:`;
 
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
-    const startTime = Date.now();
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
     // Add timeout wrapper - 5 minutes per chunk
