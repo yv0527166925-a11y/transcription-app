@@ -8,17 +8,25 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "check-ffmpeg": "ffmpeg -version",
-    "setup": "npm install && npm run check-ffmpeg"
+    "setup": "npm install && npm run check-ffmpeg",
+    "postinstall": "pip install -r requirements.txt || echo 'Python dependencies not installed, using HTML fallback'",
+    "docker:build": "docker build -t transcription-app .",
+    "docker:run": "docker run -p 3000:3000 transcription-app",
+    "docker:dev": "docker-compose up --build",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up --build"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "multer": "^1.4.5-lts.1",
+    "@anthropic-ai/claude-code": "^1.0.113",
     "@google/generative-ai": "^0.19.0",
-    "nodemailer": "^6.9.7",
-    "docx": "^8.5.0",
     "cors": "^2.8.5",
+    "docx": "^8.5.0",
     "dotenv": "^16.3.1",
-    "jszip": "^3.10.1"
+    "express": "^4.18.2",
+    "html-to-docx": "^1.8.0",
+    "jszip": "^3.10.1",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.7",
+    "node-mailjet": "^6.0.5"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -49,4 +57,3 @@
   },
   "homepage": "https://github.com/yourusername/transcription-app#readme"
 }
-
