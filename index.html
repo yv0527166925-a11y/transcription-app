@@ -1539,69 +1539,140 @@
 
             console.log(`📂 תיקייה: ${folderName}, קבצים תקינים: ${validFiles.length}/${files.length}`);
 
+            // Check for large folders and limit processing
+            const MAX_FILES = 200; // Maximum files to process at once
+            let filesToProcess = validFiles;
+            let showingLimitedFiles = false;
+
+            if (validFiles.length > MAX_FILES) {
+                showingLimitedFiles = true;
+                filesToProcess = validFiles.slice(0, MAX_FILES);
+
+                showStatus(`⚠️ תיקייה גדולה: ${validFiles.length} קבצים. מציג ${MAX_FILES} הראשונים לביצועים טובים יותר`, 'processing');
+
+                // Show warning in console
+                console.log(`⚠️ תיקייה גדולה: ${validFiles.length} קבצים, מעבד רק ${MAX_FILES} ראשונים`);
+            }
+
             // Store files and show preview
-            folderFiles = validFiles;
-            await showFolderPreview(folderName, validFiles);
+            folderFiles = filesToProcess;
+            await showFolderPreview(folderName, filesToProcess, showingLimitedFiles, validFiles.length);
         }
 
         // Show folder preview with file list
-        async function showFolderPreview(folderName, files) {
-            document.getElementById('folderName').textContent = folderName;
+        async function showFolderPreview(folderName, files, showingLimitedFiles = false, totalFiles = 0) {
+            const folderTitle = showingLimitedFiles
+                ? `${folderName} (מציג ${files.length} מתוך ${totalFiles} קבצים)`
+                : folderName;
+
+            document.getElementById('folderName').textContent = folderTitle;
             const folderFilesDiv = document.getElementById('folderFiles');
             const folderPreview = document.getElementById('folderPreview');
 
             // Clear previous files
             folderFilesDiv.innerHTML = '';
 
-            showStatus('<div class="spinner"></div>קורא זמן אמיתי לקבצים בתיקייה...', 'processing');
-
-            // Process each file to get duration
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-
-                try {
-                    const duration = await getRealAudioDuration(file);
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'folder-file-item';
-                    fileItem.innerHTML = `
-                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
-                        <div class="folder-file-info">
-                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
-                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⏱️ ${duration} דקות</div>
-                        </div>
-                    `;
-                    folderFilesDiv.appendChild(fileItem);
-
-                    // Store duration info
-                    files[i].estimatedDuration = duration;
-
-                } catch (error) {
-                    console.error('Error processing file:', file.name, error);
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'folder-file-item';
-                    fileItem.innerHTML = `
-                        <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
-                        <div class="folder-file-info">
-                            <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
-                            <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⚠️ לא ניתן לקרוא זמן</div>
-                        </div>
-                    `;
-                    folderFilesDiv.appendChild(fileItem);
-
-                    // Fallback duration estimate
-                    const fileSizeMB = file.size / (1024 * 1024);
-                    const ext = file.name.toLowerCase().split('.').pop();
-                    files[i].estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
-                        ? Math.max(1, Math.ceil(fileSizeMB / 3))
-                        : Math.max(1, Math.ceil(fileSizeMB / 1.2));
-                }
+            // Add warning message for limited files
+            if (showingLimitedFiles) {
+                const warningDiv = document.createElement('div');
+                warningDiv.style.cssText = 'background: rgba(255, 152, 0, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; border-right: 3px solid #ff9800; text-align: center; color: #e65100; font-weight: 600;';
+                warningDiv.innerHTML = `⚠️ תיקייה גדולה: מציג ${files.length} קבצים ראשונים מתוך ${totalFiles} לביצועים מיטביים`;
+                folderFilesDiv.appendChild(warningDiv);
             }
+
+            // Create progress div
+            const progressDiv = document.createElement('div');
+            progressDiv.style.cssText = 'background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center;';
+            progressDiv.innerHTML = '<div class="spinner"></div>מעבד קבצים... <span id="folderProgress">0/${files.length}</span>';
+            folderFilesDiv.appendChild(progressDiv);
+
+            // Process files in parallel batches
+            const BATCH_SIZE = 10; // Process 10 files simultaneously
+            let processedCount = 0;
+
+            const updateProgress = () => {
+                const progressSpan = document.getElementById('folderProgress');
+                if (progressSpan) {
+                    progressSpan.textContent = `${processedCount}/${files.length}`;
+                }
+            };
+
+            const processFileBatch = async (batch, startIndex) => {
+                const promises = batch.map(async (file, batchIndex) => {
+                    const i = startIndex + batchIndex;
+                    try {
+                        const duration = await getRealAudioDuration(file);
+
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'folder-file-item';
+                        fileItem.innerHTML = `
+                            <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
+                            <div class="folder-file-info">
+                                <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
+                                <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⏱️ ${duration} דקות</div>
+                            </div>
+                        `;
+
+                        // Store duration info
+                        file.estimatedDuration = duration;
+
+                        processedCount++;
+                        updateProgress();
+
+                        return fileItem;
+
+                    } catch (error) {
+                        console.error('Error processing file:', file.name, error);
+
+                        const fileItem = document.createElement('div');
+                        fileItem.className = 'folder-file-item';
+                        fileItem.innerHTML = `
+                            <input type="checkbox" class="folder-file-checkbox" checked data-index="${i}">
+                            <div class="folder-file-info">
+                                <div class="folder-file-name">${getFileTypeIcon(file.type, file.name)} ${file.name}</div>
+                                <div class="folder-file-size">📏 ${formatFileSize(file.size)} • ⚠️ לא ניתן לקרוא זמן</div>
+                            </div>
+                        `;
+
+                        // Fallback duration estimate
+                        const fileSizeMB = file.size / (1024 * 1024);
+                        const ext = file.name.toLowerCase().split('.').pop();
+                        file.estimatedDuration = ['mp4', 'mov', 'avi', 'mkv'].includes(ext)
+                            ? Math.max(1, Math.ceil(fileSizeMB / 3))
+                            : Math.max(1, Math.ceil(fileSizeMB / 1.2));
+
+                        processedCount++;
+                        updateProgress();
+
+                        return fileItem;
+                    }
+                });
+
+                const fileItems = await Promise.all(promises);
+
+                // Add items to DOM in order
+                fileItems.forEach(item => {
+                    folderFilesDiv.appendChild(item);
+                });
+            };
+
+            // Process all files in batches
+            for (let i = 0; i < files.length; i += BATCH_SIZE) {
+                const batch = files.slice(i, i + BATCH_SIZE);
+                await processFileBatch(batch, i);
+            }
+
+            // Remove progress div
+            progressDiv.remove();
 
             // Show the preview
             folderPreview.style.display = 'block';
-            showStatus(`✅ נמצאו ${files.length} קבצים בתיקייה "${folderName}"`, 'success');
+
+            const statusMessage = showingLimitedFiles
+                ? `✅ מעובד ${files.length} קבצים מתוך ${totalFiles} בתיקייה "${folderName}"`
+                : `✅ נמצאו ${files.length} קבצים בתיקייה "${folderName}"`;
+
+            showStatus(statusMessage, 'success');
 
             setTimeout(() => {
                 const status = document.getElementById('status');
