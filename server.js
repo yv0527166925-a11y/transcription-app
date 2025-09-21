@@ -12,12 +12,12 @@ const Imap = require('imap'); // 🔥 NEW: For reading emails
 // JSON-based user management (MongoDB disabled)
 // const { connectDB } = require('./config/database');
 // const User = require('./models/User');
-// const {
-//   findOrCreateUser,
-//   checkUserMinutes,
-//   useUserMinutes,
-//   addTranscriptionToHistory
-// } = require('./utils/userHelpers');
+const {
+  findOrCreateUser,
+  checkUserMinutes,
+  useUserMinutes,
+  addTranscriptionToHistory
+} = require('./utils/userHelpers');
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
