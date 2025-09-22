@@ -2185,13 +2185,17 @@
         function loadHistory() {
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            
-            if (!currentUser || !currentUser.history || currentUser.history.length === 0) {
+
+            // Check both transcriptionHistory and history for backward compatibility
+            const userHistory = currentUser?.transcriptionHistory || currentUser?.history || [];
+
+            if (!currentUser || userHistory.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">אין היסטוריה עדיין</td></tr>';
                 return;
             }
-            
-            currentUser.history.reverse().forEach(item => {
+
+            // Create a copy and reverse it to show newest first
+            [...userHistory].reverse().forEach(item => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${item.date}</td>

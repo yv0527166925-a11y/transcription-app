@@ -143,6 +143,7 @@ const defaultUsers = [
     remainingMinutes: 1000,
     totalTranscribed: 0,
     history: [],
+    transcriptionHistory: [],
     joinDate: new Date().toISOString()
   }
 ];
@@ -327,14 +328,22 @@ async function addTranscriptionToHistory(email, transcriptionData) {
       return;
     }
 
+    // Initialize both history arrays if they don't exist
     if (!user.transcriptionHistory) {
       user.transcriptionHistory = [];
     }
+    if (!user.history) {
+      user.history = [];
+    }
 
-    user.transcriptionHistory.push({
+    const historyEntry = {
       ...transcriptionData,
       timestamp: new Date().toISOString()
-    });
+    };
+
+    // Add to both arrays for backward compatibility
+    user.transcriptionHistory.push(historyEntry);
+    user.history.push(historyEntry);
 
     saveUsersData();
     console.log(`📝 Added transcription to history for ${email}`);
@@ -2226,6 +2235,7 @@ app.post('/api/register', (req, res) => {
       remainingMinutes: 30, // 30 free minutes
       totalTranscribed: 0,
       history: [],
+      transcriptionHistory: [],
       joinDate: new Date().toISOString() // Add join date
     };
     
@@ -2504,13 +2514,57 @@ app.get('/api/admin/users', (req, res) => {
   }
 });
 
+// Get specific user's transcription history (for admin)
+app.get('/api/users/:email/history', (req, res) => {
+  try {
+    const { email } = req.params;
+    const { limit = 20 } = req.query;
+
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'משתמש לא נמצא'
+      });
+    }
+
+    // Check both transcriptionHistory and history for backward compatibility
+    const userHistory = user.transcriptionHistory || user.history || [];
+
+    // Sort by timestamp (newest first) and limit results
+    const sortedHistory = userHistory
+      .sort((a, b) => {
+        if (a.timestamp && b.timestamp) {
+          return b.timestamp - a.timestamp;
+        }
+        return 0;
+      })
+      .slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      history: sortedHistory
+    });
+
+  } catch (error) {
+    console.error('Error fetching user history:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בטעינת היסטוריה'
+    });
+  }
+});
+
 app.get('/api/admin/transcriptions', (req, res) => {
   try {
     const allTranscriptions = [];
 
     users.forEach(user => {
-      if (user.history && user.history.length > 0) {
-        user.history.forEach(entry => {
+      // Check both transcriptionHistory and history for backward compatibility
+      const userHistory = user.transcriptionHistory || user.history || [];
+      if (userHistory.length > 0) {
+        userHistory.forEach(entry => {
           allTranscriptions.push({
             ...entry,
             userEmail: user.email,
