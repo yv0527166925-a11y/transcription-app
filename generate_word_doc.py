@@ -631,7 +631,7 @@ def main():
         print(f"Arguments: {sys.argv}", file=sys.stderr)
 
         if len(sys.argv) != 2:
-            print("Usage: python generate_word_doc.py '<json_data>'")
+            print("Usage: python generate_word_doc.py '<json_file_path>'")
             sys.exit(1)
 
         # בדיקת python-docx - לא בהכרח נדרשת כי יש לנו HTML fallback
@@ -643,9 +643,18 @@ def main():
             print(f"python-docx import error: {str(e)}", file=sys.stderr)
             print("Will use HTML fallback instead", file=sys.stderr)
 
-        # קבלת הנתונים מ-Node.js
-        json_data = sys.argv[1]
-        print(f"Received JSON data length: {len(json_data)}", file=sys.stderr)
+        # קריאת הנתונים מקובץ JSON
+        json_file_path = sys.argv[1]
+        print(f"Reading JSON data from file: {json_file_path}", file=sys.stderr)
+
+        try:
+            with open(json_file_path, 'r', encoding='utf-8') as f:
+                json_data = f.read()
+            print(f"Loaded JSON data length: {len(json_data)}", file=sys.stderr)
+        except Exception as e:
+            print(f"ERROR: Failed to read JSON file: {str(e)}", file=sys.stderr)
+            print(json.dumps({"success": False, "error": f"Failed to read JSON file: {str(e)}"}))
+            sys.exit(1)
 
         data = json.loads(json_data)
         print(f"Parsed data keys: {list(data.keys())}", file=sys.stderr)

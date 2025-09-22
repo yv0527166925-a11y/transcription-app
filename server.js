@@ -1622,9 +1622,19 @@ async function createWordDocumentPython(transcription, filename, duration) {
       output_path: outputPath
     });
 
-    // קריאה לסקריפט Python
+    // יצירת קובץ זמני עבור הנתונים
+    const tempDataPath = path.join(__dirname, `temp_data_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.json`);
+
+    try {
+      fs.writeFileSync(tempDataPath, pythonData, 'utf8');
+    } catch (error) {
+      console.error('❌ Failed to write temp data file:', error);
+      throw new Error('Failed to prepare data for Python script');
+    }
+
+    // קריאה לסקריפט Python עם נתיב לקובץ הנתונים
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', ['generate_word_doc.py', pythonData], {
+      const pythonProcess = spawn('python', ['generate_word_doc.py', tempDataPath], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -1652,11 +1662,13 @@ async function createWordDocumentPython(transcription, filename, duration) {
               if (result.success && fs.existsSync(outputPath)) {
                 console.log(`✅ Python script completed successfully: ${outputPath}`);
                 const buffer = fs.readFileSync(outputPath);
-                // ניקוי קובץ זמני
+                // ניקוי קבצים זמניים
                 fs.unlinkSync(outputPath);
+                try { fs.unlinkSync(tempDataPath); } catch (e) {}
                 resolve(buffer);
               } else {
                 console.error('❌ Python script failed:', result.error || 'Unknown error');
+                try { fs.unlinkSync(tempDataPath); } catch (e) {}
                 reject(new Error(result.error || 'Python script failed'));
               }
             } else {
@@ -1664,26 +1676,31 @@ async function createWordDocumentPython(transcription, filename, duration) {
               if (fs.existsSync(outputPath)) {
                 const buffer = fs.readFileSync(outputPath);
                 fs.unlinkSync(outputPath);
+                try { fs.unlinkSync(tempDataPath); } catch (e) {}
                 resolve(buffer);
               } else {
+                try { fs.unlinkSync(tempDataPath); } catch (e) {}
                 reject(new Error('Output file not created'));
               }
             }
           } catch (parseError) {
             console.error('❌ Error parsing Python output:', parseError);
             console.log('Raw output:', output);
+            try { fs.unlinkSync(tempDataPath); } catch (e) {}
             reject(parseError);
           }
         } else {
           console.error(`❌ Python script exited with code ${code}`);
           console.error('Error output:', errorOutput);
           console.log('Standard output:', output);
+          try { fs.unlinkSync(tempDataPath); } catch (e) {}
           reject(new Error(`Python script failed with code ${code}: ${errorOutput}`));
         }
       });
 
       pythonProcess.on('error', (error) => {
         console.error('❌ Error spawning Python process:', error);
+        try { fs.unlinkSync(tempDataPath); } catch (e) {}
         reject(error);
       });
     });
