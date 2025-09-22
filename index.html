@@ -2197,15 +2197,22 @@
             // Create a copy and reverse it to show newest first
             [...userHistory].reverse().forEach(item => {
                 const row = document.createElement('tr');
+
+                // Handle missing data gracefully
+                const displayDate = item.date || new Date(item.timestamp).toLocaleDateString('he-IL') || 'לא זמין';
+                const displayFileName = item.fileName || item.originalName || 'קובץ לא ידוע';
+                const displayDuration = item.duration || Math.ceil((item.audioLength || 0) / 60) || '0';
+                const downloadUrl = item.downloadUrl || item.wordDocumentPath || '';
+
                 row.innerHTML = `
-                    <td>${item.date}</td>
-                    <td>${item.fileName}</td>
-                    <td>${item.duration} דקות</td>
+                    <td>${displayDate}</td>
+                    <td>${displayFileName}</td>
+                    <td>${displayDuration} דקות</td>
                     <td>${getLanguageName(item.language)}</td>
                     <td><span class="status-badge status-${item.status}">${getStatusName(item.status)}</span></td>
                     <td>
-                        ${item.status === 'completed' ? 
-                          `<button class="btn-secondary" onclick="downloadFile('${item.downloadUrl}')">📥 הורדה</button>` : 
+                        ${item.status === 'completed' && downloadUrl ?
+                          `<button class="btn-secondary" onclick="downloadFile('${downloadUrl}')">📥 הורדה</button>` :
                           '⏳ בעיבוד'
                         }
                     </td>
@@ -2237,12 +2244,19 @@
 
         function downloadFile(url) {
             try {
+                // Validate URL before attempting download
+                if (!url || url === 'undefined' || url === 'null') {
+                    showStatus('❌ קישור ההורדה לא זמין', 'error');
+                    return;
+                }
+
                 showStatus('⬇️ מתחיל הורדה...', 'processing');
 
                 // Create a temporary anchor element for download
                 const link = document.createElement('a');
                 link.href = url;
                 link.style.display = 'none';
+                link.download = ''; // Force download
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);

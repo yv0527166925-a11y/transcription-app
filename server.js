@@ -156,6 +156,44 @@ function loadUsersData() {
       console.log('📂 Data file exists, loading...');
       const data = fs.readFileSync(DATA_FILE, 'utf8');
       const loadedUsers = JSON.parse(data);
+
+      // Fix missing fields in existing users
+      loadedUsers.forEach(user => {
+        // Ensure both history arrays exist
+        if (!user.history) user.history = [];
+        if (!user.transcriptionHistory) user.transcriptionHistory = [];
+
+        // Fix history entries that might have missing fields
+        if (user.history) {
+          user.history.forEach(entry => {
+            if (!entry.date && entry.timestamp) {
+              entry.date = new Date(entry.timestamp).toLocaleDateString('he-IL');
+            }
+            if (!entry.downloadUrl && entry.wordDocumentPath) {
+              entry.downloadUrl = entry.wordDocumentPath;
+            }
+            if (!entry.fileName && entry.originalName) {
+              entry.fileName = entry.originalName;
+            }
+          });
+        }
+
+        // Fix transcriptionHistory entries as well
+        if (user.transcriptionHistory) {
+          user.transcriptionHistory.forEach(entry => {
+            if (!entry.date && entry.timestamp) {
+              entry.date = new Date(entry.timestamp).toLocaleDateString('he-IL');
+            }
+            if (!entry.downloadUrl && entry.wordDocumentPath) {
+              entry.downloadUrl = entry.wordDocumentPath;
+            }
+            if (!entry.fileName && entry.originalName) {
+              entry.fileName = entry.originalName;
+            }
+          });
+        }
+      });
+
       console.log(`✅ Successfully loaded ${loadedUsers.length} users from file`);
       return loadedUsers;
     } else {
@@ -1982,16 +2020,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
       // 🔧 NEW: Add each transcription to MongoDB history
       for (const transcription of transcriptions) {
+        const durationMinutes = Math.ceil(estimatedMinutes / transcriptions.length);
         const transcriptionData = {
-          fileName: transcription.downloadFilename,
+          fileName: cleanFilename(transcription.filename),
           originalName: cleanFilename(transcription.filename),
           transcriptionText: (transcription.text || '').substring(0, 1000), // Store first 1000 chars
+          downloadUrl: `/api/download/${transcription.downloadFilename}`,
           wordDocumentPath: `/api/download/${transcription.downloadFilename}`,
           fileSize: transcription.fileSize || 0,
           processingTime: transcription.processingTime || 0,
-          audioLength: Math.ceil(estimatedMinutes / transcriptions.length * 60), // Convert to seconds
+          duration: durationMinutes, // Store in minutes for display
+          audioLength: durationMinutes * 60, // Store in seconds for compatibility
           language: language,
-          status: 'completed'
+          status: 'completed',
+          date: new Date().toLocaleDateString('he-IL')
         };
 
         await addTranscriptionToHistory(userEmail, transcriptionData);
@@ -2001,15 +2043,18 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       // 🔧 NEW: Add failed transcriptions to MongoDB history
       for (const failed of failedTranscriptions) {
         const failedData = {
-          fileName: failed.filename,
+          fileName: cleanFilename(failed.filename),
           originalName: cleanFilename(failed.filename),
           transcriptionText: '',
+          downloadUrl: null,
           wordDocumentPath: null,
           fileSize: failed.fileSize || 0,
           processingTime: 0,
+          duration: 0,
           audioLength: 0,
           language: language,
-          status: 'failed'
+          status: 'failed',
+          date: new Date().toLocaleDateString('he-IL')
         };
 
         await addTranscriptionToHistory(userEmail, failedData);
