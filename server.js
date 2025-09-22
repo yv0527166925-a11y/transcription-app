@@ -8,7 +8,7 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
-const Imap = require('imap'); // 🔥 NEW: For reading emails
+// const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,19 +29,19 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 60000 // 60 seconds
 });
 
-// IMAP configuration for reading emails
-const imapConfig = {
-  user: process.env.EMAIL_USER,
-  password: process.env.EMAIL_PASS,
-  host: 'imap.gmail.com',
-  port: 993,
-  tls: true,
-  tlsOptions: {
-    rejectUnauthorized: false
-  },
-  connTimeout: 15000, // 15 seconds connection timeout
-  authTimeout: 10000  // 10 seconds authentication timeout
-};
+// IMAP configuration disabled - email transcription service not in use
+// const imapConfig = {
+//   user: process.env.EMAIL_USER,
+//   password: process.env.EMAIL_PASS,
+//   host: 'imap.gmail.com',
+//   port: 993,
+//   tls: true,
+//   tlsOptions: {
+//     rejectUnauthorized: false
+//   },
+//   connTimeout: 15000,
+//   authTimeout: 10000
+// };
 
 // Middleware
 app.use(cors());
@@ -2726,22 +2726,22 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// 🔥 EMAIL TRANSCRIPTION SYSTEM
-let processedEmails = new Set(); // Track processed emails to avoid duplicates
+// EMAIL TRANSCRIPTION SYSTEM DISABLED
+// let processedEmails = new Set(); // Disabled - not tracking emails anymore
 
-// Check for transcription emails every 10 minutes
+// Email monitoring disabled - not using email transcription service
 function startEmailMonitoring() {
-  console.log('📧 Starting email monitoring for transcription requests (every 10 minutes)...');
-
-  // Check immediately
-  checkForTranscriptionEmails();
-
-  // Then check every 2 minutes for better responsiveness
-  setInterval(checkForTranscriptionEmails, 120000);
+  console.log('📧 Email monitoring disabled per user request - not checking for transcription emails');
+  // Function disabled - no longer checking emails for audio/video files
 }
 
-// Check for new transcription emails
+// Email checking disabled - not using email transcription service
 async function checkForTranscriptionEmails() {
+  // Function disabled - no longer checking emails for audio/video files
+  console.log('📧 Email checking skipped - email transcription service disabled');
+  return;
+  // Disabled code below:
+  /*
   try {
     const imap = new Imap(imapConfig);
 
@@ -2787,10 +2787,14 @@ async function checkForTranscriptionEmails() {
   } catch (error) {
     console.error('📧 Email monitoring error:', error);
   }
+  */
 }
 
 // Process found emails
+// Email processing disabled - not using email transcription service
 function processEmails(imap, uids) {
+  // Function disabled - no longer processing emails for audio/video files
+  return;
   const fetch = imap.fetch(uids, {
     bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT'],
     struct: true
@@ -2864,7 +2868,10 @@ function processEmails(imap, uids) {
 }
 
 // Download attachments immediately while IMAP connection is active
+// Email attachment download disabled - not using email transcription service
 async function downloadAttachmentsInPlace(emailData, imap, seqno) {
+  // Function disabled - no longer downloading attachments from emails
+  return;
   const tempDir = path.join(__dirname, 'temp_email_attachments');
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -3036,7 +3043,10 @@ function decodeEmailSubject(subject) {
 }
 
 // Handle transcription email with all validation
+// Email transcription handling disabled - not using email transcription service
 async function handleTranscriptionEmail(emailData, imap, seqno) {
+  // Function disabled - no longer handling transcription emails
+  return;
   try {
     const from = emailData.headers.from;
     const rawSubject = emailData.headers.subject || '';
@@ -3494,9 +3504,9 @@ app.listen(PORT, () => {
   // Start history cleanup scheduler
   scheduleHistoryCleanup();
 
-  // Start email monitoring for transcription requests
+  // Email monitoring disabled per user request
   console.log('🕒 History cleanup scheduled for every day at midnight');
-  startEmailMonitoring();
+  console.log('📧 Email monitoring disabled - not using email transcription service');
 });
 
 
