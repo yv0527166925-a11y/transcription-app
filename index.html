@@ -967,8 +967,7 @@
 
                     <div class="form-group">
                         <label for="customInstructions">הנחייה אישית (אופציונלי):</label>
-                        <textarea id="customInstructions" placeholder="למשל: השתמש בסגנון פורמלי, הוסף סימני פיסוק מדויקים, התעלם מרעשי רקע, וכו'..." rows="3" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; transition: border-color 0.3s ease; resize: vertical; font-family: inherit;"></textarea>
-                        <small style="color: #666; font-size: 0.85em; margin-top: 5px; display: block;">💡 טיפ: תן הוראות ברורות למודל כדי לקבל תמלול מותאם לצרכים שלך</small>
+                        <textarea id="customInstructions" placeholder="" rows="3" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; transition: border-color 0.3s ease; resize: vertical; font-family: inherit;"></textarea>
                     </div>
 
                     <div class="form-group">
@@ -1236,7 +1235,7 @@
                 
                 if (data.success) {
                     currentUser = data.user;
-                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה! קיבלת 30 דקות חינם', 'success');
+                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה! קיבלת 10 דקות חינם', 'success');
                     updateDebugInfo('✅ הרשמה הצליחה!');
                     setTimeout(() => showApp(), 2000); // Longer delay to read success message
                 } else {
