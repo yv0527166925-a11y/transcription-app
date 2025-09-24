@@ -2303,7 +2303,7 @@ print(f"Python version: {sys.version}")
 app.get('/api/download/:filename', (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, 'downloads', filename);
+    const filePath = path.join(PERSISTENT_PATH, 'transcriptions', filename);
 
     console.log(`📥 Download request for: ${filename}`);
 
@@ -2772,7 +2772,7 @@ function cleanupOldHistory() {
         if (entry.timestamp <= thirtyDaysAgo && entry.downloadUrl) {
           try {
             const filename = entry.downloadUrl.split('/').pop();
-            const filePath = path.join(__dirname, 'downloads', filename);
+            const filePath = path.join(PERSISTENT_PATH, 'transcriptions', filename);
             if (fs.existsSync(filePath)) {
               fs.unlinkSync(filePath);
               totalFilesDeleted++;
