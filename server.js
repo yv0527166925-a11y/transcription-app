@@ -360,7 +360,7 @@ async function findOrCreateUser(email) {
     // Create new user if not found
     const newUser = {
       email: email,
-      remainingMinutes: 30, // Default 30 minutes for new users
+      remainingMinutes: 10, // Default 10 minutes for new users
       totalTranscribed: 0,
       registrationDate: new Date().toISOString(),
       isAdmin: false,
@@ -370,7 +370,7 @@ async function findOrCreateUser(email) {
     users.push(newUser);
     saveUsersData();
 
-    console.log(`✅ Created new user: ${email} with 30 minutes`);
+    console.log(`✅ Created new user: ${email} with 10 minutes`);
     return newUser;
 
   } catch (error) {
@@ -1899,9 +1899,6 @@ const attachments = transcriptions.map(trans => {
         <div dir="rtl" style="font-family: Arial, sans-serif; line-height: 1.8; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px 10px 0 0; text-align: center;">
             <h1 style="margin: 0; font-size: 26px;">🎯 התמלול המלא הושלם בהצלחה!</h1>
-            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">
-              עם טכנולוגיית חלוקה למקטעים מתקדמת
-            </p>
           </div>
 
           <div style="background: #f8f9ff; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -1909,7 +1906,7 @@ const attachments = transcriptions.map(trans => {
 
             <p style="font-size: 16px; margin-bottom: 25px;">
               התמלול המלא והמפורט שלך הושלם!
-              מצורפים קבצי Word מעוצבים עם תמלול שלם מההתחלה עד הסוף:
+              מצורפים קבצי Word עם תמלול שלם מההתחלה עד הסוף:
             </p>
 
             <div style="background: white; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #4caf50;">
@@ -1921,18 +1918,6 @@ const attachments = transcriptions.map(trans => {
 
             ${failureSection}
 
-            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
-              <h3 style="color: #1565c0; margin-bottom: 15px; font-size: 18px;">🔥 שיפורים בגרסה המשופרת:</h3>
-              <ul style="margin: 0; font-size: 15px; line-height: 1.8; color: #1565c0;">
-                <li>🎯 <strong>תמלול מלא 100%</strong> - מההתחלה עד הסוף הגמור</li>
-                <li>🔪 <strong>חלוקה חכמה למקטעים</strong> - לקבצים גדולים (>25MB)</li>
-                <li>🔗 <strong>איחוד אוטומטי</strong> - עם זיהוי חפיפות מתקדם</li>
-                <li>🛡️ <strong>גיבוי אוטומטי</strong> - אם חלוקה נכשלת</li>
-                <li>⚡ <strong>תמיכה בקבצים ענקיים</strong> - עד 500MB</li>
-                <li>🎓 <strong>דיוק גבוה בעברית</strong> - 98% דיוק בעברית רגילה, 95% דיוק בהגייה ישיבתית</li>
-                <li>💬 <strong>זיהוי דוברים וציטוטים</strong> - במירכאות נכונות</li>
-              </ul>
-            </div>
 
            <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
@@ -1953,7 +1938,7 @@ const attachments = transcriptions.map(trans => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: userEmail,
-      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מעוצבים מצורפים`,
+      subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מצורפים`,
       html: htmlContent,
       attachments: attachments
     };
@@ -2390,7 +2375,7 @@ app.post('/api/register', (req, res) => {
       password,
       phone: phone || '',
       isAdmin: false,
-      remainingMinutes: 30, // 30 free minutes
+      remainingMinutes: 10, // 10 free minutes
       totalTranscribed: 0,
       history: [],
       transcriptionHistory: [],
