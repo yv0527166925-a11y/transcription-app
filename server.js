@@ -126,11 +126,37 @@ const upload = multer({
   }
 });
 
-// Data persistence
-const DATA_FILE = path.join(__dirname, 'users_data.json');
+// Data persistence - Persistent Disk Configuration
+const PERSISTENT_PATH = process.env.NODE_ENV === 'production' ? '/mnt/data' : __dirname;
+const DATA_FILE = path.join(PERSISTENT_PATH, 'users_data.json');
+const TRANSCRIPTIONS_DIR = path.join(PERSISTENT_PATH, 'transcriptions');
+const BACKUPS_DIR = path.join(PERSISTENT_PATH, 'backups');
+
+console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`🔧 Persistent storage path: ${PERSISTENT_PATH}`);
 console.log(`🔧 Data file path: ${DATA_FILE}`);
 console.log(`🔧 Current working directory: ${process.cwd()}`);
 console.log(`🔧 __dirname: ${__dirname}`);
+
+// Create directories if they don't exist
+function ensurePersistentDirectories() {
+  try {
+    if (!fs.existsSync(PERSISTENT_PATH)) {
+      fs.mkdirSync(PERSISTENT_PATH, { recursive: true });
+      console.log(`✅ Created persistent directory: ${PERSISTENT_PATH}`);
+    }
+    if (!fs.existsSync(TRANSCRIPTIONS_DIR)) {
+      fs.mkdirSync(TRANSCRIPTIONS_DIR, { recursive: true });
+      console.log(`✅ Created transcriptions directory: ${TRANSCRIPTIONS_DIR}`);
+    }
+    if (!fs.existsSync(BACKUPS_DIR)) {
+      fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+      console.log(`✅ Created backups directory: ${BACKUPS_DIR}`);
+    }
+  } catch (error) {
+    console.error('❌ Error creating persistent directories:', error);
+  }
+}
 
 // Default users data
 const defaultUsers = [
@@ -150,6 +176,9 @@ const defaultUsers = [
 
 // Load users data from file or use defaults
 function loadUsersData() {
+  // Ensure persistent directories exist first
+  ensurePersistentDirectories();
+
   try {
     console.log(`📂 Checking for data file at: ${DATA_FILE}`);
     if (fs.existsSync(DATA_FILE)) {
@@ -216,6 +245,24 @@ function saveUsersData() {
     fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2), 'utf8');
     console.log(`✅ Successfully saved ${users.length} users to file`);
 
+    // Create daily backup
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const backupFile = path.join(BACKUPS_DIR, `backup_${today}.json`);
+
+      if (!fs.existsSync(backupFile)) {
+        const backupData = {
+          date: new Date().toISOString(),
+          users: users,
+          totalUsers: users.length
+        };
+        fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2), 'utf8');
+        console.log(`✅ Daily backup created: ${backupFile}`);
+      }
+    } catch (backupError) {
+      console.error('❌ Error creating backup:', backupError);
+    }
+
     // Verify file was created
     if (fs.existsSync(DATA_FILE)) {
       const stats = fs.statSync(DATA_FILE);
@@ -233,11 +280,11 @@ function saveUsersData() {
 // Load users on startup
 let users = loadUsersData();
 
-// Ensure downloads directory exists
-const downloadsDir = path.join(__dirname, 'downloads');
+// Ensure downloads directory exists (use persistent storage)
+const downloadsDir = path.join(PERSISTENT_PATH, 'transcriptions');
 if (!fs.existsSync(downloadsDir)) {
   fs.mkdirSync(downloadsDir, { recursive: true });
-  console.log('📁 Created downloads directory');
+  console.log('📁 Created transcriptions directory in persistent storage');
 }
 
 // Initialize data file from template if it doesn't exist
@@ -2014,8 +2061,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
         const wordDoc = await createWordDocumentPython(transcription, file.filename, fileDurationMinutes);
 
-        // 🔧 NEW: Save document to downloads folder
-        const downloadsDir = path.join(__dirname, 'downloads');
+        // 🔧 NEW: Save document to persistent transcriptions folder
         if (!fs.existsSync(downloadsDir)) {
           fs.mkdirSync(downloadsDir, { recursive: true });
         }
@@ -3550,7 +3596,8 @@ app.listen(PORT, () => {
   console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
   console.log(`📂 Data file: ${DATA_FILE}`);
-  console.log(`📁 Downloads folder: ${path.join(__dirname, 'downloads')}`);
+  console.log(`📁 Transcriptions folder: ${downloadsDir}`);
+  console.log(`💾 Backups folder: ${BACKUPS_DIR}`);
 
   if (ffmpegAvailable) {
     console.log(`✅ FFmpeg is available - enhanced chunking enabled`);
