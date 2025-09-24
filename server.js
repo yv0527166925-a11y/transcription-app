@@ -1963,8 +1963,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     for (const file of files) {
       console.log(`🎵 Processing file: ${file.filename}`);
       console.log(`📊 File size: ${(fs.statSync(file.path).size / (1024 * 1024)).toFixed(1)} MB`);
-      
+
       try {
+        // Get actual duration for this specific file
+        let fileDuration = 0;
+        try {
+          fileDuration = await getAudioDuration(file.path);
+        } catch (durationError) {
+          console.warn(`⚠️ Could not get duration for ${file.filename}, using file size estimate`);
+          // Fallback to file size estimation
+          fileDuration = (file.size / (1024 * 1024 * 2)) * 60;
+        }
+        const fileDurationMinutes = Math.ceil(fileDuration / 60);
+        console.log(`⏱️ File duration: ${fileDurationMinutes} minutes`);
+
         // Use the enhanced transcription method that handles large files with chunking
         const transcription = await realGeminiTranscription(file.path, file.filename, language, customInstructions);
 
@@ -1985,8 +1997,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         if (transcription.includes('%PDF') && transcription.includes('/Type/Catalog')) {
           throw new Error('התמלול נראה כמו קובץ PDF או נתונים בינאריים במקום טקסט');
         }
-        
-        const wordDoc = await createWordDocumentPython(transcription, file.filename, estimatedMinutes);
+
+        const wordDoc = await createWordDocumentPython(transcription, file.filename, fileDurationMinutes);
 
         // 🔧 NEW: Save document to downloads folder
         const downloadsDir = path.join(__dirname, 'downloads');
@@ -2004,7 +2016,9 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           transcription,
           wordDoc,
           savedPath: docPath,
-          downloadFilename: docFilename
+          downloadFilename: docFilename,
+          duration: fileDurationMinutes, // Store actual duration for this file
+          fileSize: fs.statSync(file.path).size
         });
         
         console.log(`✅ Successfully processed: ${cleanFilename(file.filename)}`);
@@ -2012,9 +2026,22 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         
       } catch (fileError) {
         console.error(`❌ Failed to process ${file.filename}:`, fileError);
+
+        // Try to get duration even for failed files for history purposes
+        let failedFileDuration = 0;
+        try {
+          failedFileDuration = await getAudioDuration(file.path);
+        } catch (durationError) {
+          // Fallback to file size estimation
+          failedFileDuration = (file.size / (1024 * 1024 * 2)) * 60;
+        }
+        const failedFileDurationMinutes = Math.ceil(failedFileDuration / 60);
+
         failedTranscriptions.push({
           filename: file.filename,
-          error: fileError.message
+          error: fileError.message,
+          duration: failedFileDurationMinutes,
+          fileSize: fs.statSync(file.path).size
         });
       } finally {
         // Clean up file
@@ -2037,16 +2064,17 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
       // 🔧 NEW: Add each transcription to MongoDB history
       for (const transcription of transcriptions) {
-        const durationMinutes = Math.ceil(estimatedMinutes / transcriptions.length);
+        // Use the actual duration calculated for this specific file
+        const durationMinutes = transcription.duration || Math.ceil(estimatedMinutes / transcriptions.length);
         const transcriptionData = {
           fileName: cleanFilename(transcription.filename),
           originalName: cleanFilename(transcription.filename),
-          transcriptionText: (transcription.text || '').substring(0, 1000), // Store first 1000 chars
+          transcriptionText: (transcription.transcription || '').substring(0, 1000), // Store first 1000 chars
           downloadUrl: `/api/download/${transcription.downloadFilename}`,
           wordDocumentPath: `/api/download/${transcription.downloadFilename}`,
           fileSize: transcription.fileSize || 0,
           processingTime: transcription.processingTime || 0,
-          duration: durationMinutes, // Store in minutes for display
+          duration: durationMinutes, // Store actual duration for this file
           audioLength: durationMinutes * 60, // Store in seconds for compatibility
           language: language,
           status: 'completed',
@@ -2067,8 +2095,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           wordDocumentPath: null,
           fileSize: failed.fileSize || 0,
           processingTime: 0,
-          duration: 0,
-          audioLength: 0,
+          duration: failed.duration || 0, // Use actual duration if available
+          audioLength: (failed.duration || 0) * 60,
           language: language,
           status: 'failed',
           date: new Date().toLocaleDateString('he-IL')
