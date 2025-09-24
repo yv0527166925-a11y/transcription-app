@@ -1052,22 +1052,35 @@ async function realGeminiTranscription(filePath, filename, language, customInstr
     const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
     const duration = await getAudioDuration(filePath);
     const durationMinutes = duration / 60;
+
+    return await realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration);
+  } catch (error) {
+    console.error('🔥 Transcription error:', error);
+    throw error;
+  }
+}
+
+// Enhanced version that accepts pre-calculated duration to avoid multiple getAudioDuration calls
+async function realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration) {
+  try {
+    const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
+    const durationMinutes = duration / 60;
     
     console.log(`🎵 Processing: ${cleanFilename(filename)}`);
     console.log(`📊 File size: ${fileSizeMB.toFixed(1)} MB, Duration: ${durationMinutes.toFixed(1)} minutes`);
-    
+
     // Decide transcription strategy
     const ffmpegAvailable = checkFFmpegAvailability();
     const shouldChunk = ffmpegAvailable && (fileSizeMB > 25 || durationMinutes > 15);
-    
+
     if (!shouldChunk) {
       console.log(`📝 Using direct transcription (small file or FFmpeg unavailable)`);
       return await directGeminiTranscription(filePath, filename, language, customInstructions);
     }
-    
+
     console.log(`🔪 Using chunked transcription (large file detected)`);
     return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions);
-    
+
   } catch (error) {
     console.error('🔥 Transcription error:', error);
     throw error;
@@ -1978,7 +1991,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         console.log(`⏱️ File duration: ${fileDurationMinutes} minutes`);
 
         // Use the enhanced transcription method that handles large files with chunking
-        const transcription = await realGeminiTranscription(file.path, file.filename, language, customInstructions);
+        // Pass the duration we already calculated to avoid duplicate getAudioDuration calls
+        const transcription = await realGeminiTranscriptionWithDuration(file.path, file.filename, language, customInstructions, fileDuration);
 
         console.log(`🔍 Transcription validation:`);
         console.log(`   Type: ${typeof transcription}`);
