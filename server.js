@@ -1302,10 +1302,26 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       console.log(`📊 Progress: ${i + 1}/${chunksData.chunks.length} chunks processed (${Math.round((i + 1) / chunksData.chunks.length * 100)}%)`);
     }
     
+    // Check for failed chunks in the transcription
+    const failedChunks = transcriptions.filter(chunk =>
+      chunk.includes('[שגיאה בתמלול קטע') ||
+      chunk.includes('נכשל אחרי')
+    );
+
     // Merge all transcriptions
     const finalTranscription = mergeTranscriptionChunks(transcriptions);
-    
-    console.log(`🎉 Chunked transcription completed: ${finalTranscription.length} characters from ${transcriptions.length} chunks`);
+
+    if (failedChunks.length > 0) {
+      console.warn(`⚠️ Transcription completed with ${failedChunks.length} failed chunks out of ${transcriptions.length}`);
+      // Add warning to the beginning of transcription
+      const warningText = `⚠️ הערה: תמלול זה הושלם עם ${failedChunks.length} קטעים שנכשלו מתוך ${transcriptions.length} קטעים כולל. הקטעים הכושלים מסומנים בטקסט.\n\n`;
+      const finalWithWarning = warningText + finalTranscription;
+
+      console.log(`🎉 Chunked transcription completed with warnings: ${finalWithWarning.length} characters from ${transcriptions.length} chunks`);
+      return finalWithWarning;
+    }
+
+    console.log(`🎉 Chunked transcription completed successfully: ${finalTranscription.length} characters from ${transcriptions.length} chunks`);
     return finalTranscription;
     
   } catch (error) {
@@ -1876,17 +1892,30 @@ const attachments = transcriptions.map(trans => {
     const successList = transcriptions.map(t => {
       const cleanName = cleanFilename(t.filename);
       const wordCount = t.transcription.split(/\s+/).length;
-      return `<li>📄 <strong>${cleanName}</strong> <small>(${wordCount} מילים)</small></li>`;
+
+      // Check if this transcription has failed chunks
+      const hasFailedChunks = t.transcription.includes('[שגיאה בתמלול קטע') || t.transcription.includes('נכשל אחרי');
+      const warningIcon = hasFailedChunks ? ' ⚠️' : '';
+      const warningText = hasFailedChunks ? ' <small style="color: #856404;">(תמלול חלקי - ראה הערות בקובץ)</small>' : '';
+
+      return `<li>📄 <strong>${cleanName}</strong>${warningIcon} <small>(${wordCount} מילים)</small>${warningText}</li>`;
     }).join('');
 
+    // Check for partial transcriptions with failed chunks
+    const partialTranscriptions = transcriptions.filter(t =>
+      t.transcription.includes('[שגיאה בתמלול קטע') || t.transcription.includes('נכשל אחרי')
+    );
+
     let failureSection = '';
+
+    // Section for completely failed files
     if (failedTranscriptions.length > 0) {
       const failureList = failedTranscriptions.map(f => {
         const cleanName = cleanFilename(f.filename);
         return `<li>❌ <strong>${cleanName}</strong></li>`;
       }).join('');
-      
-      failureSection = `
+
+      failureSection += `
         <div style="background: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #ffc107;">
           <h3 style="color: #856404; margin-bottom: 15px; font-size: 18px;">⚠️ קבצים שלא הצליחו:</h3>
           <ul style="margin: 10px 0; font-size: 15px; color: #856404;">
@@ -1894,6 +1923,27 @@ const attachments = transcriptions.map(trans => {
           </ul>
           <p style="font-size: 14px; margin-top: 15px;">
             <strong>💡 טיפ:</strong> נסה להעלות קבצים אלה שוב או צור קשר לתמיכה.
+          </p>
+        </div>
+      `;
+    }
+
+    // Section for partially failed transcriptions
+    if (partialTranscriptions.length > 0) {
+      const partialList = partialTranscriptions.map(t => {
+        const cleanName = cleanFilename(t.filename);
+        return `<li>⚠️ <strong>${cleanName}</strong> - תמלול חלקי</li>`;
+      }).join('');
+
+      failureSection += `
+        <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #0d6efd;">
+          <h3 style="color: #084298; margin-bottom: 15px; font-size: 18px;">ℹ️ תמלולים עם קטעים שנכשלו:</h3>
+          <ul style="margin: 10px 0; font-size: 15px; color: #084298;">
+            ${partialList}
+          </ul>
+          <p style="font-size: 14px; margin-top: 15px; color: #084298;">
+            <strong>💡 הסבר:</strong> קבצים אלה תומללו בהצלחה, אך חלקים מסוימים לא הצליחו (מסומנים בקובץ Word).
+            הדבר יכול לקרות בגלל רעש, שקט ממושך, או איכות אודיו נמוכה באזורים מסוימים.
           </p>
         </div>
       `;
