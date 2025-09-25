@@ -661,7 +661,12 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
       .replace(/\r\n/g, '\n')
       .replace(/^\s*תמלול[:\s]*/i, '') // Remove "תמלול:" prefix
       .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
+      .replace(/\d{1,2}:\d{2}/g, '') // Remove timestamps like 12:34 or 1:23
+      .replace(/\d{1,2}:\d{2}:\d{2}/g, '') // Remove timestamps like 1:23:45
+      .replace(/^\s*\d{1,2}:\d{2}\s*/gm, '') // Remove timestamps at start of lines
+      .replace(/\s+\d{1,2}:\d{2}\s+/g, ' ') // Remove timestamps between words
       .replace(/\n{3,}/g, '\n\n')
+      .replace(/\s{2,}/g, ' ') // Clean extra spaces
       .trim();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
