@@ -631,7 +631,7 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    // Add timeout wrapper - 5 minutes per chunk
+    // Add timeout wrapper - 4 minutes for 4-minute chunks
     const transcriptionPromise = model.generateContent([
       {
         inlineData: {
@@ -643,7 +643,7 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
     ]);
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Transcription timeout after 5 minutes')), 5 * 60 * 1000)
+      setTimeout(() => reject(new Error('Transcription timeout after 4 minutes')), 4 * 60 * 1000)
     );
 
     const result = await Promise.race([transcriptionPromise, timeoutPromise]);
@@ -1237,7 +1237,10 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     const chunkDuration = durationMinutes > 60 ? 6 : 8; // minutes per chunk
     
     // Split audio into chunks
-    chunksData = await splitAudioIntoChunks(filePath, chunkDuration);
+    // Reduced chunk duration for better success rate and faster processing
+    const optimizedChunkDuration = 4; // Changed from 8 to 4 minutes
+    chunksData = await splitAudioIntoChunks(filePath, optimizedChunkDuration);
+    console.log(`📦 Using optimized chunk duration: ${optimizedChunkDuration} minutes (was 8 minutes)`);
     
     if (chunksData.chunks.length === 0) {
       throw new Error('No chunks were created');
@@ -1258,8 +1261,10 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
         try {
           if (retryCount > 0) {
             console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
-            // Longer delay between retries
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            // Exponential backoff: 5s, 15s, 30s
+            const backoffDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 30000);
+            console.log(`⏳ Waiting ${backoffDelay/1000}s before retry...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
 
           chunkTranscription = await transcribeAudioChunk(
