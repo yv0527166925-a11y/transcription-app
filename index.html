@@ -1235,7 +1235,7 @@
                 
                 if (data.success) {
                     currentUser = data.user;
-                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה! קיבלת 10 דקות חינם', 'success');
+                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה!', 'success');
                     updateDebugInfo('✅ הרשמה הצליחה!');
                     setTimeout(() => showApp(), 2000); // Longer delay to read success message
                 } else {

@@ -360,7 +360,7 @@ async function findOrCreateUser(email) {
     // Create new user if not found
     const newUser = {
       email: email,
-      remainingMinutes: 10, // Default 10 minutes for new users
+      remainingMinutes: 0, // No free minutes for new users
       totalTranscribed: 0,
       registrationDate: new Date().toISOString(),
       isAdmin: false,
@@ -370,7 +370,7 @@ async function findOrCreateUser(email) {
     users.push(newUser);
     saveUsersData();
 
-    console.log(`✅ Created new user: ${email} with 10 minutes`);
+    console.log(`✅ Created new user: ${email} with 0 minutes`);
     return newUser;
 
   } catch (error) {
@@ -2430,7 +2430,7 @@ app.post('/api/register', (req, res) => {
       password,
       phone: phone || '',
       isAdmin: false,
-      remainingMinutes: 10, // 10 free minutes
+      remainingMinutes: 0, // No free minutes
       totalTranscribed: 0,
       history: [],
       transcriptionHistory: [],

@@ -11,11 +11,11 @@ async function findOrCreateUser(email) {
             console.log(`👤 Creating new user: ${email}`);
             user = new User({
                 email: email.toLowerCase(),
-                minutesRemaining: 5, // 5 דקות חינם לכל משתמש חדש
+                minutesRemaining: 0, // אין דקות חינם למשתמש חדש
                 totalMinutesUsed: 0
             });
             await user.save();
-            console.log(`✅ New user created with 5 free minutes`);
+            console.log(`✅ New user created`);
         } else {
             // עדכן תאריך הכניסה האחרונה
             user.lastLogin = new Date();
