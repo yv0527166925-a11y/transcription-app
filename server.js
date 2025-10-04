@@ -2028,6 +2028,21 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     return;
   }
 
+  // Double-check user has enough minutes BEFORE starting anything
+  if (user.remainingMinutes < estimatedMinutes) {
+    console.error(`❌ CRITICAL: Insufficient minutes in async processing! User has ${user.remainingMinutes}, needs ${estimatedMinutes}`);
+    // Clean up uploaded files
+    files.forEach(file => {
+      try {
+        fs.unlinkSync(file.path);
+        console.log(`🗑️ Deleted file due to insufficient minutes: ${file.path}`);
+      } catch (e) {
+        console.warn(`Could not delete file ${file.path}:`, e.message);
+      }
+    });
+    return;
+  }
+
   // Register transcription for cancellation tracking
   activeTranscriptions.set(transcriptionId, {
     userEmail,
@@ -2057,7 +2072,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   try {
     // Deduct minutes immediately to prevent abuse (before actual processing)
     await useUserMinutes(userEmail, estimatedMinutes);
-    console.log(`💰 Minutes deducted upfront. User balance: ${user.minutesRemaining} minutes`);
+    console.log(`💰 Minutes deducted upfront. User balance: ${user.remainingMinutes} minutes`);
 
     // Minutes already saved to MongoDB by useUserMinutes function
 
@@ -2215,7 +2230,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
-      console.log(`💰 Updated balance: ${user.minutesRemaining} minutes remaining`);
+      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
     } else {
@@ -2224,6 +2239,21 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     
   } catch (error) {
     console.error('Async transcription batch error:', error);
+
+    // If error is due to insufficient minutes, clean up files and don't deduct
+    if (error.message && error.message.includes('Insufficient minutes')) {
+      console.error(`❌ Minutes deduction failed - cleaning up files`);
+      files.forEach(file => {
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+            console.log(`🗑️ Deleted file after minutes error: ${file.path}`);
+          }
+        } catch (e) {
+          console.warn(`Could not delete file ${file.path}:`, e.message);
+        }
+      });
+    }
   } finally {
     // Clean up transcription tracking
     activeTranscriptions.delete(transcriptionId);
@@ -2527,7 +2557,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     const user = await findOrCreateUser(email);
     console.log('🔍 User lookup for transcription: Found');
     console.log('📧 Email:', email);
-    console.log('⏱️ User minutes remaining:', user.minutesRemaining);
+    console.log('⏱️ User minutes remaining:', user.remainingMinutes);
 
    // Calculate total estimated minutes ACCURATELY
     let totalDurationSeconds = 0;
@@ -2546,9 +2576,9 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
     // Convert total seconds to minutes and round up
     const accurateMinutes = Math.ceil(totalDurationSeconds / 60);
 
-    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.minutesRemaining}`);
+    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.remainingMinutes}`);
 
-    if (accurateMinutes > user.minutesRemaining) {
+    if (accurateMinutes > user.remainingMinutes) {
         console.log('❌ Insufficient minutes, deleting uploaded files.');
         // Clean up files immediately if not enough minutes
         for (const file of req.files) {
@@ -2560,7 +2590,7 @@ app.post('/api/transcribe', upload.array('files'), async (req, res) => {
         }
         return res.status(400).json({
             success: false,
-            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.minutesRemaining}`
+            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.remainingMinutes}`
         });
     }
 
