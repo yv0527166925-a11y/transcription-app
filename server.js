@@ -2146,7 +2146,14 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         
         console.log(`✅ Successfully processed: ${cleanFilename(file.filename)}`);
         console.log(`📊 Final transcription: ${transcription.length} characters, ${transcription.split(/\s+/).length} words`);
-        
+
+        // Add delay between files to prevent API rate limiting and allow system recovery
+        const currentFileIndex = files.indexOf(file);
+        if (currentFileIndex < files.length - 1) {
+          console.log(`⏳ Waiting 15 seconds before processing next file to avoid rate limiting and ensure stability...`);
+          await new Promise(resolve => setTimeout(resolve, 15000));
+        }
+
       } catch (fileError) {
         console.error(`❌ Failed to process ${file.filename}:`, fileError);
 
