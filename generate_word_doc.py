@@ -28,7 +28,19 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         import shutil
         from zipfile import ZipFile
 
-        # בדיקה אם קיימת תבנית עובדת
+        # בדיקה אם השפה היא RTL - רק אז נשתמש בתבנית
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        is_rtl = language in rtl_languages
+
+        print(f"🔍 Language check: '{language}' -> RTL={is_rtl}", file=sys.stderr)
+
+        # אם זו לא שפת RTL, אל תשתמש בתבנית - צור מסמך חדש
+        if not is_rtl:
+            print(f"📝 Creating LTR document without template for language: {language}", file=sys.stderr)
+            return create_basic_hebrew_document(transcription, title, output_path, language)
+
+        # בדיקה אם קיימת תבנית עובדת (רק לשפות RTL)
+        print(f"📝 Creating RTL document with template for language: {language}", file=sys.stderr)
         possible_templates = [
             'חזר מהשרת תקין 2.docx',
             'דוגמה_Word_מושלמת.docx',
@@ -72,9 +84,11 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
 
         # קביעת כיוון טקסט לפי שפה
         # תמיכה בשמות מלאים וקודים קצרים
+        print(f"🔍 DEBUG: Received language = '{language}'", file=sys.stderr)
         rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
         is_rtl = language in rtl_languages
         alignment = 'right' if is_rtl else 'left'
+        print(f"🔍 DEBUG: is_rtl = {is_rtl}, alignment = '{alignment}'", file=sys.stderr)
 
         # כותרת
         title_paragraph = f'''
@@ -203,9 +217,9 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         print(f"Error creating Word document: {str(e)}")
         return False
 
-def create_basic_hebrew_document(transcription, title, output_path):
+def create_basic_hebrew_document(transcription, title, output_path, language='Hebrew'):
     """
-    יצירת מסמך בסיסי אם אין תבנית - עם הגדרות RTL משופרות
+    יצירת מסמך בסיסי אם אין תבנית - עם הגדרות RTL או LTR לפי השפה
     """
     try:
         # Import docx here too
@@ -215,7 +229,11 @@ def create_basic_hebrew_document(transcription, title, output_path):
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
 
-        print("Creating basic Hebrew document with RTL settings", file=sys.stderr)
+        # בדיקה אם השפה RTL או LTR
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        is_rtl = language in rtl_languages
+
+        print(f"📝 Creating basic document: language={language}, RTL={is_rtl}", file=sys.stderr)
         doc = Document()
 
         # הגדרת השפה העיקרית של המסמך לעברית
@@ -228,16 +246,20 @@ def create_basic_hebrew_document(transcription, title, output_path):
         return create_html_fallback(transcription, title, output_path)
 
     try:
-        # כותרת עם הגדרות RTL מחוזקות
+        # כותרת עם הגדרות RTL או LTR
         title_paragraph = doc.add_paragraph()
         title_run = title_paragraph.add_run(title)
         title_run.font.name = 'David'
         title_run.font.size = Pt(18)
         title_run.bold = True
-        title_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-        # הוספת הגדרות RTL לכותרת
-        set_rtl_paragraph(title_paragraph)
+        # יישור לפי שפה
+        if is_rtl:
+            title_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            # הוספת הגדרות RTL לכותרת
+            set_rtl_paragraph(title_paragraph)
+        else:
+            title_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
         # שורה ריקה
         doc.add_paragraph()
@@ -260,10 +282,14 @@ def create_basic_hebrew_document(transcription, title, output_path):
             run = paragraph.add_run(combined_text)
             run.font.name = 'David'
             run.font.size = Pt(14)
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-            # הוספת הגדרות RTL לכל פסקה
-            set_rtl_paragraph(paragraph)
+            # יישור לפי שפה
+            if is_rtl:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                # הוספת הגדרות RTL לכל פסקה
+                set_rtl_paragraph(paragraph)
+            else:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
             print(f"Added paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
 
