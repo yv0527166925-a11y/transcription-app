@@ -71,7 +71,9 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         new_paragraphs = []
 
         # קביעת כיוון טקסט לפי שפה
-        is_rtl = language in ['Hebrew', 'Yiddish', 'Arabic']
+        # תמיכה בשמות מלאים וקודים קצרים
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        is_rtl = language in rtl_languages
         alignment = 'right' if is_rtl else 'left'
 
         # כותרת
