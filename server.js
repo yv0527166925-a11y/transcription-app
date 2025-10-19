@@ -8,6 +8,7 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
+const { detectAndFixRepetitions } = require('./repetition-detector'); // 🚨 NEW: Anti-repetition system
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
 const app = express();
@@ -663,6 +664,8 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
       .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
       .replace(/\n{3,}/g, '\n\n')
       .trim();
+n    // 🚨 CRITICAL: Detect and fix infinite repetitions
+    transcription = detectAndFixRepetitions(transcription, chunkIndex);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
