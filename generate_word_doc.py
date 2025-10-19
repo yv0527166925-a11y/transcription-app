@@ -266,32 +266,82 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
 
         # עיבוד התוכן
         clean_text = transcription.replace('\r\n', '\n').replace('\n\n\n', '\n\n').strip()
-        clean_text = fix_hebrew_punctuation(clean_text)
-        sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
 
-        print(f"Creating {len(sections)} content paragraphs", file=sys.stderr)
+        # הרץ fix_hebrew_punctuation רק על טקסט RTL
+        if is_rtl:
+            clean_text = fix_hebrew_punctuation(clean_text)
 
-        for i, section in enumerate(sections):
-            lines = [line.strip() for line in section.split('\n') if line.strip()]
-            combined_text = ' '.join(lines).strip()
+        # חלוקה חכמה לפסקאות - שונה בין RTL ל-LTR
+        if is_rtl:
+            # RTL: חלוקה פשוטה לפי \n\n (כמו שהיה)
+            sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
 
-            if combined_text and not combined_text[-1] in '.!?:':
-                combined_text += '.'
+            print(f"Creating {len(sections)} RTL paragraphs", file=sys.stderr)
 
-            paragraph = doc.add_paragraph()
-            run = paragraph.add_run(combined_text)
-            run.font.name = 'David'
-            run.font.size = Pt(14)
+            for i, section in enumerate(sections):
+                lines = [line.strip() for line in section.split('\n') if line.strip()]
+                combined_text = ' '.join(lines).strip()
 
-            # יישור לפי שפה
-            if is_rtl:
+                if combined_text and not combined_text[-1] in '.!?:':
+                    combined_text += '.'
+
+                paragraph = doc.add_paragraph()
+                run = paragraph.add_run(combined_text)
+                run.font.name = 'David'
+                run.font.size = Pt(14)
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                # הוספת הגדרות RTL לכל פסקה
                 set_rtl_paragraph(paragraph)
-            else:
+
+                print(f"Added RTL paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
+        else:
+            # LTR: חלוקה חכמה לפי מילים ואורך
+            import re
+
+            # נקה ירידות שורה ורווחים מיותרים
+            all_text = re.sub(r'\n+', ' ', clean_text)
+            all_text = re.sub(r'\s{2,}', ' ', all_text)
+
+            # חלק לפסקאות
+            words = all_text.split()
+            current_para = ""
+            word_count = 0
+            para_num = 0
+
+            print(f"Creating LTR paragraphs with smart splitting ({len(words)} words total)", file=sys.stderr)
+
+            for word in words:
+                current_para += word + " "
+                word_count += 1
+
+                # יצירת פסקה חדשה אם:
+                # 1. יש 20-30 מילים או 250+ תווים
+                # 2. המשפט מסתיים
+                if (word_count >= 20 or len(current_para) > 250) and word.endswith(('.', '!', '?', ':')):
+                    para_text = current_para.strip()
+                    if para_text:
+                        paragraph = doc.add_paragraph()
+                        run = paragraph.add_run(para_text)
+                        run.font.name = 'David'
+                        run.font.size = Pt(14)
+                        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                        para_num += 1
+                        print(f"Added LTR paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
+
+                    current_para = ""
+                    word_count = 0
+
+            # פסקה אחרונה
+            if current_para.strip():
+                para_text = current_para.strip()
+                paragraph = doc.add_paragraph()
+                run = paragraph.add_run(para_text)
+                run.font.name = 'David'
+                run.font.size = Pt(14)
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-            print(f"Added paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
+                para_num += 1
+                print(f"Added final LTR paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
 
         doc.save(output_path)
         print(f"Basic document saved successfully: {output_path}", file=sys.stderr)
