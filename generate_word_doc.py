@@ -7,7 +7,7 @@ import json
 # Don't import docx at module level - do it only when needed
 # This prevents immediate failure if docx is not installed
 
-def create_hebrew_word_document(transcription, title, output_path):
+def create_hebrew_word_document(transcription, title, output_path, language='Hebrew'):
     """
     יוצר מסמך Word בשיטה של החלפת תבנית עובדת
     """
@@ -70,11 +70,15 @@ def create_hebrew_word_document(transcription, title, output_path):
         # יצירת תוכן חדש במבנה הקיים
         new_paragraphs = []
 
+        # קביעת כיוון טקסט לפי שפה
+        is_rtl = language in ['Hebrew', 'Yiddish', 'Arabic']
+        alignment = 'right' if is_rtl else 'left'
+
         # כותרת
         title_paragraph = f'''
 <w:p w14:paraId="6A1F55DC" w14:textId="77777777">
   <w:pPr>
-    <w:jc w:val="right"/>
+    <w:jc w:val="{alignment}"/>
     <w:spacing w:after="400"/>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
@@ -127,7 +131,7 @@ def create_hebrew_word_document(transcription, title, output_path):
                         content_paragraph = f'''
 <w:p>
   <w:pPr>
-    <w:jc w:val="right"/>
+    <w:jc w:val="{alignment}"/>
     <w:spacing w:after="240"/>
   </w:pPr>
   <w:r>
@@ -148,7 +152,7 @@ def create_hebrew_word_document(transcription, title, output_path):
             content_paragraph = f'''
 <w:p>
   <w:pPr>
-    <w:jc w:val="right"/>
+    <w:jc w:val="{alignment}"/>
     <w:spacing w:after="240"/>
   </w:pPr>
   <w:r>
@@ -662,6 +666,7 @@ def main():
         transcription = data.get('transcription', '')
         title = data.get('title', 'תמלול')
         output_path = data.get('output_path', 'output.docx')
+        language = data.get('language', 'Hebrew')  # ברירת מחדל: עברית
 
         print(f"Creating document: {title} -> {output_path}", file=sys.stderr)
         print(f"Transcription type: {type(transcription)}", file=sys.stderr)
@@ -682,7 +687,7 @@ def main():
             sys.exit(1)
 
         # יצירת המסמך
-        success = create_hebrew_word_document(transcription, title, output_path)
+        success = create_hebrew_word_document(transcription, title, output_path, language)
 
         if success:
             print(json.dumps({"success": True, "file_path": output_path}))
