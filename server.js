@@ -608,7 +608,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
     
-    const prompt = `תמלל את קטע האודיו הזה לעברית תקנית.
+    const prompt = `${language === 'Hebrew' ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
 ${contextPrompt}
 
@@ -1189,7 +1189,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 5. המשך לתמלל עד שהאודיו נגמר לחלוטין
 6. אל תכתוב "המשך התמלול..." או "סיום התמלול" - רק התוכן המלא
 
-🎯 תמלל לעברית תקנית:
+🎯 ${language === 'Hebrew' ? 'תמלל לעברית תקנית:' : `Transcribe in ${language || 'the original language'}. Do NOT translate:`}
 - מושגים דתיים מדויקים
 - ציטוטים במירכאות: "כמו שכתוב", "אמרו חכמים", "תניא"
 - פסקאות של 2-4 משפטים עם שורה ריקה
@@ -1686,10 +1686,10 @@ async function createWordDocument(transcription, filename, duration) {
 }
 
 // NEW: Python-based Word document creation
-async function createWordDocumentPython(transcription, filename, duration) {
+async function createWordDocumentPython(transcription, filename, duration, language = 'Hebrew') {
   try {
     const cleanName = cleanFilename(filename);
-    console.log(`🐍 Creating Word document using Python for: ${cleanName}`);
+    console.log(`🐍 Creating Word document using Python for: ${cleanName} (Language: ${language})`);
 
     const { spawn } = require('child_process');
     const path = require('path');
@@ -1708,7 +1708,8 @@ async function createWordDocumentPython(transcription, filename, duration) {
     const pythonData = JSON.stringify({
       transcription: transcription,
       title: cleanName,
-      output_path: outputPath
+      output_path: outputPath,
+      language: language || 'Hebrew'
     });
 
     // יצירת קובץ זמני עבור הנתונים
@@ -2122,7 +2123,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           throw new Error('התמלול נראה כמו קובץ PDF או נתונים בינאריים במקום טקסט');
         }
 
-        const wordDoc = await createWordDocumentPython(transcription, file.filename, fileDurationMinutes);
+        const wordDoc = await createWordDocumentPython(transcription, file.filename, fileDurationMinutes, language);
 
         // 🔧 NEW: Save document to persistent transcriptions folder
         if (!fs.existsSync(downloadsDir)) {
