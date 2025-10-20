@@ -2142,19 +2142,40 @@
 
                     const realProgressCheck = setInterval(async () => {
                         try {
+                            // Skip if no valid transcription ID
+                            if (!currentTranscriptionId || currentTranscriptionId === 'null') {
+                                console.log('⏸️ No valid transcription ID, stopping progress check');
+                                clearInterval(realProgressCheck);
+                                return;
+                            }
+
+                            console.log(`🔍 Checking progress for transcription: ${currentTranscriptionId}`);
                             const progressResponse = await fetch(`${API_BASE}/transcription-progress/${currentTranscriptionId}`);
+                            console.log(`📡 Progress response status: ${progressResponse.status}`);
+
                             if (progressResponse.ok) {
                                 const progressData = await progressResponse.json();
+                                console.log(`📊 Progress data received:`, progressData);
+
                                 if (progressData.success && progressData.progress) {
+                                    console.log(`📈 Updating progress to: ${progressData.progress.percentage}% - ${progressData.progress.stage}`);
                                     updateProgress(progressData.progress.percentage);
+
                                     if (progressData.progress.percentage >= 100) {
+                                        console.log(`✅ Progress completed, stopping checks`);
                                         clearInterval(realProgressCheck);
                                     }
+                                } else {
+                                    console.log(`⚠️ No progress data in response`);
                                 }
+                            } else {
+                                console.log(`❌ Progress response not ok: ${progressResponse.status}`);
                             }
                         } catch (e) {
+                            console.log(`❌ Progress check error:`, e);
                             // If progress check fails, restart fake progress
                             if (!progressInterval) {
+                                console.log(`🔄 Falling back to fake progress`);
                                 progressInterval = setInterval(() => {
                                     progress += Math.random() * 2;
                                     if (progress > 85) progress = 85;
