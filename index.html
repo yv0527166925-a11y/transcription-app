@@ -2137,7 +2137,9 @@
                 if (data.success && data.transcriptionId) {
                     currentTranscriptionId = data.transcriptionId;
 
-                    // Start checking real progress from server
+                    // Stop fake progress and start real progress checking
+                    clearInterval(progressInterval);
+
                     const realProgressCheck = setInterval(async () => {
                         try {
                             const progressResponse = await fetch(`${API_BASE}/transcription-progress/${currentTranscriptionId}`);
@@ -2151,13 +2153,17 @@
                                 }
                             }
                         } catch (e) {
-                            // If progress check fails, keep using the fake progress
+                            // If progress check fails, restart fake progress
+                            if (!progressInterval) {
+                                progressInterval = setInterval(() => {
+                                    progress += Math.random() * 2;
+                                    if (progress > 85) progress = 85;
+                                    updateProgress(progress);
+                                }, 3000);
+                            }
                         }
                     }, 3000);
                 }
-
-                clearInterval(progressInterval);
-                updateProgress(100);
 
                 if (data.success) {
 
