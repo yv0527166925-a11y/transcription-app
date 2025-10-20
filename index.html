@@ -917,6 +917,9 @@
                         <div style="margin-top: 8px; font-size: 0.85em; color: #28a745; font-weight: 600;">
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #6b7280; background-color: #f3f4f6; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                            📏 <strong>מגבלות:</strong> עד 500MB לקובץ בודד • ללא הגבלה על מספר קבצים
+                        </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
                         <input type="file" id="folderInput" class="file-input" webkitdirectory directory multiple accept="audio/*,video/*" style="display: none;">
                     </div>
@@ -1735,6 +1738,22 @@
                 return;
             }
 
+            // Check for files that exceed the size limit (500MB)
+            const maxFileSize = 500 * 1024 * 1024; // 500MB in bytes
+            const oversizedFiles = validFiles.filter(file => file.size > maxFileSize);
+
+            if (oversizedFiles.length > 0) {
+                const oversizedNames = oversizedFiles.map(file =>
+                    `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`
+                ).join('<br>');
+
+                showStatus(
+                    `❌ <strong>קבצים גדולים מדי!</strong><br>המגבלה היא 500MB לקובץ<br><br>קבצים שחורגים:<br>${oversizedNames}`,
+                    'error'
+                );
+                return;
+            }
+
             // Filter out files that are already selected (prevent duplicates)
             const newFiles = validFiles.filter(file => {
                 const isDuplicate = selectedFiles.some(selected =>
@@ -2097,6 +2116,20 @@
                     method: 'POST',
                     body: formData
                 });
+
+                // Handle specific HTTP error codes before trying to parse JSON
+                if (!response.ok) {
+                    if (response.status === 413) {
+                        // File too large - try to get the detailed error message
+                        try {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'הקובץ גדול מדי! המגבלה היא 500MB');
+                        } catch {
+                            throw new Error('הקובץ גדול מדי! המגבלה היא 500MB. אנא בחר קובץ קטן יותר.');
+                        }
+                    }
+                    throw new Error(`שגיאה בשרת (${response.status})`);
+                }
 
                 const data = await response.json();
 

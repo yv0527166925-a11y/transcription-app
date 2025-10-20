@@ -2542,8 +2542,41 @@ app.post('/api/admin/add-minutes', (req, res) => {
   }
 });
 
+// Multer error handling middleware
+function handleMulterError(err, req, res, next) {
+  if (err) {
+    console.error('📤 Multer error:', err);
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        success: false,
+        error: `הקובץ גדול מדי! המגבלה היא 500MB. הקובץ שלך: ${Math.round(err.field?.size / (1024 * 1024) || 0)}MB`,
+        errorCode: 'FILE_TOO_LARGE',
+        maxSize: '500MB'
+      });
+    }
+
+
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        error: 'סוג קובץ לא נתמך',
+        errorCode: 'UNSUPPORTED_FILE_TYPE'
+      });
+    }
+
+    // General multer error
+    return res.status(400).json({
+      success: false,
+      error: 'שגיאה בהעלאת הקובץ: ' + (err.message || 'שגיאה לא ידועה'),
+      errorCode: 'UPLOAD_ERROR'
+    });
+  }
+  next();
+}
+
 // Enhanced transcription route
-app.post('/api/transcribe', upload.array('files'), async (req, res) => {
+app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req, res) => {
   try {
     console.log('🎯 Enhanced transcription request received');
     console.log('📁 Files uploaded:', req.files?.length || 0);
