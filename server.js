@@ -587,10 +587,10 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions) {
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0,
         maxOutputTokens: 32768
       }
     });
@@ -609,6 +609,9 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
     }
     
     const prompt = `${language === 'Hebrew' ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+
+🚨 חשוב: אם מילה חוזרת על עצמה, רשום אותה מקסימום 5 פעמים ברציפות.
+אל תחזור על אותה מילה או ביטוי יותר מ-5 פעמים ברצף.
 
 ${contextPrompt}
 
@@ -1137,10 +1140,10 @@ async function realGeminiTranscriptionWithDuration(filePath, filename, language,
 // Direct transcription (original method)
 async function directGeminiTranscription(filePath, filename, language, customInstructions) {
   try {
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
       generationConfig: {
-        temperature: 0.1,
+        temperature: 0,
         maxOutputTokens: 65536
       }
     });
@@ -1157,6 +1160,9 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     else if (ext === '.mov') mimeType = 'video/quicktime';
 
     const prompt = `🚨 חובה מוחלטת: תמלל את כל הקובץ האודיו הזה מהתחלה עד הסוף הגמור!
+
+🚨 חשוב: אם מילה חוזרת על עצמה, רשום אותה מקסימום 5 פעמים ברציפות.
+אל תחזור על אותה מילה או ביטוי יותר מ-5 פעמים ברצף.
 
 קובץ: ${cleanFilename(filename)}
 גודל: ${fileSizeMB.toFixed(1)} MB
