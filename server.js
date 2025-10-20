@@ -2019,6 +2019,17 @@ const attachments = transcriptions.map(trans => {
 // Global transcription tracking for cancellation
 let activeTranscriptions = new Map(); // Map of transcriptionId -> { userEmail, files, cancelled: boolean }
 
+// Helper function to update transcription progress
+function updateTranscriptionProgress(transcriptionId, progress, stage, currentFile = '') {
+  const transcriptionData = activeTranscriptions.get(transcriptionId);
+  if (transcriptionData) {
+    transcriptionData.progress = progress;
+    transcriptionData.stage = stage;
+    transcriptionData.currentFile = currentFile;
+    console.log(`📊 Progress ${transcriptionId}: ${progress}% - ${stage}`);
+  }
+}
+
 async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes, transcriptionId, customInstructions = '') {
   console.log(`🎯 Starting enhanced async transcription with chunking for ${files.length} files`);
   console.log(`📧 Processing for user: ${userEmail} (ID: ${transcriptionId})`);
@@ -2044,12 +2055,18 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     return;
   }
 
-  // Register transcription for cancellation tracking
+  // Register transcription for cancellation tracking with progress info
   activeTranscriptions.set(transcriptionId, {
     userEmail,
     files: files.map(f => f.path), // Store file paths for cleanup
     cancelled: false,
-    startTime: new Date()
+    startTime: new Date(),
+    progress: 0,
+    stage: 'מתחיל תהליך התמלול...',
+    currentFile: '',
+    filesProcessed: 0,
+    totalFiles: files.length,
+    isCompleted: false
   });
 
   console.log(`📝 Registered transcription ${transcriptionId} for cancellation tracking`);
@@ -2081,10 +2098,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     // Minutes have been deducted, transcription is considered "started"
     activeTranscriptions.get(transcriptionId).minutesDeducted = true;
 
+    updateTranscriptionProgress(transcriptionId, 10, 'מתכונן לעיבוד הקבצים...');
     const transcriptions = [];
     const failedTranscriptions = [];
-    
-    for (const file of files) {
+
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const file = files[fileIndex];
+
+      // Update progress for current file
+      const fileProgress = 20 + ((fileIndex / files.length) * 60); // 20-80% range
+      updateTranscriptionProgress(transcriptionId, Math.round(fileProgress), `מעבד קובץ ${fileIndex + 1} מתוך ${files.length}...`, file.filename);
+
+      // Update files processed counter
+      activeTranscriptions.get(transcriptionId).filesProcessed = fileIndex;
+
       console.log(`🎵 Processing file: ${file.filename}`);
       console.log(`📊 File size: ${(fs.statSync(file.path).size / (1024 * 1024)).toFixed(1)} MB`);
 
@@ -2122,6 +2149,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         if (transcription.includes('%PDF') && transcription.includes('/Type/Catalog')) {
           throw new Error('התמלול נראה כמו קובץ PDF או נתונים בינאריים במקום טקסט');
         }
+
+        // Update progress for Word document creation
+        const wordProgress = 80 + ((fileIndex + 1) / files.length) * 5; // 80-85% range
+        updateTranscriptionProgress(transcriptionId, Math.round(wordProgress), `יוצר מסמך Word עבור ${file.filename}...`);
 
         const wordDoc = await createWordDocumentPython(transcription, file.filename, fileDurationMinutes, language);
 
@@ -2187,6 +2218,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     
     // Send email with results
     if (transcriptions.length > 0) {
+      updateTranscriptionProgress(transcriptionId, 95, 'שולח תוצאות באימייל...');
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
 
@@ -2236,6 +2268,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         await addTranscriptionToHistory(userEmail, failedData);
         console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
       }
+
+      // Mark transcription as completed with 100% progress
+      updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
+      activeTranscriptions.get(transcriptionId).isCompleted = true;
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
@@ -2728,6 +2764,41 @@ app.post('/api/cancel-transcription', (req, res) => {
     res.status(500).json({
       success: false,
       error: 'שגיאה בביטול התמלול'
+    });
+  }
+});
+
+// 🆕 Get transcription progress endpoint
+app.get('/api/transcription-progress/:transcriptionId', (req, res) => {
+  try {
+    const { transcriptionId } = req.params;
+    const transcriptionData = activeTranscriptions.get(transcriptionId);
+
+    if (!transcriptionData) {
+      return res.status(404).json({
+        success: false,
+        error: 'התמלול לא נמצא או הסתיים'
+      });
+    }
+
+    // Return current progress information
+    res.json({
+      success: true,
+      progress: {
+        percentage: transcriptionData.progress || 0,
+        stage: transcriptionData.stage || 'מתחיל...',
+        currentFile: transcriptionData.currentFile || '',
+        filesProcessed: transcriptionData.filesProcessed || 0,
+        totalFiles: transcriptionData.totalFiles || 0,
+        isCompleted: transcriptionData.isCompleted || false
+      }
+    });
+
+  } catch (error) {
+    console.error('Progress check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בבדיקת התקדמות התמלול'
     });
   }
 });

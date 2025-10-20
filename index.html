@@ -2136,6 +2136,24 @@
                 // Store transcription ID for potential cancellation
                 if (data.success && data.transcriptionId) {
                     currentTranscriptionId = data.transcriptionId;
+
+                    // Start checking real progress from server
+                    const realProgressCheck = setInterval(async () => {
+                        try {
+                            const progressResponse = await fetch(`${API_BASE}/transcription-progress/${currentTranscriptionId}`);
+                            if (progressResponse.ok) {
+                                const progressData = await progressResponse.json();
+                                if (progressData.success && progressData.progress) {
+                                    updateProgress(progressData.progress.percentage);
+                                    if (progressData.progress.percentage >= 100) {
+                                        clearInterval(realProgressCheck);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // If progress check fails, keep using the fake progress
+                        }
+                    }, 3000);
                 }
 
                 clearInterval(progressInterval);
