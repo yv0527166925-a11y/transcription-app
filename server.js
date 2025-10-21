@@ -1308,8 +1308,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           // Delay between chunks to avoid rate limiting
           if (i < chunksData.chunks.length - 1) {
-            console.log(`⏳ Waiting 15 seconds before processing next chunk for API stability...`);
-            await new Promise(resolve => setTimeout(resolve, 15000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
 
         } catch (chunkError) {
@@ -2210,8 +2209,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         // Add delay between files to prevent API rate limiting and allow system recovery
         const currentFileIndex = files.indexOf(file);
         if (currentFileIndex < files.length - 1) {
-          console.log(`⏳ Waiting 15 seconds before processing next file to avoid rate limiting and ensure stability...`);
-          await new Promise(resolve => setTimeout(resolve, 15000));
+          console.log(`⏳ Waiting 1 minute before processing next file to avoid rate limiting and ensure stability...`);
+          await new Promise(resolve => setTimeout(resolve, 60000));
         }
 
       } catch (fileError) {
