@@ -2209,8 +2209,13 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         // Add delay between files to prevent API rate limiting and allow system recovery
         const currentFileIndex = files.indexOf(file);
         if (currentFileIndex < files.length - 1) {
-          console.log(`⏳ Waiting 1 minute before processing next file to avoid rate limiting and ensure stability...`);
-          await new Promise(resolve => setTimeout(resolve, 60000));
+          // Dynamic delay based on total number of files
+          const totalFiles = files.length;
+          const delaySeconds = totalFiles <= 3 ? 15 : 120; // 15 seconds for ≤3 files, 2 minutes for 4+ files
+          const delayMs = delaySeconds * 1000;
+
+          console.log(`⏳ Waiting ${delaySeconds} seconds before processing next file (${totalFiles} total files)...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
       } catch (fileError) {
