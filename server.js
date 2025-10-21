@@ -10,6 +10,21 @@ const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
+
+// פונקציה להסרת חזרות של ביטויים/משפטים שחוזרים 5+ פעמים
+function removeExtremeRepetitions(text) {
+  if (!text) return text;
+
+  // הסר חזרות של ביטויים (2-15 מילים) שחוזרים 5+ פעמים
+  let cleaned = text;
+
+  for (let wordCount = 2; wordCount <= 15; wordCount++) {
+    const pattern = new RegExp(`((?:\\S+\\s+){${wordCount-1}}\\S+)(?:\\s+\\1){4,}`, 'gi');
+    cleaned = cleaned.replace(pattern, '$1');
+  }
+
+  return cleaned;
+}
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -654,6 +669,9 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
     const response = await result.response;
     let transcription = response.text();
 
+    // 🔥 NEW: הסר חזרות קיצוניות מהמודל
+    transcription = removeExtremeRepetitions(transcription);
+
     // Validate transcription
     if (!transcription || transcription.trim().length < 10) {
       throw new Error(`Invalid transcription: too short (${transcription ? transcription.length : 0} characters)`);
@@ -1217,7 +1235,10 @@ ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${cust
 
     const response = await result.response;
     let transcription = response.text();
-    
+
+    // 🔥 NEW: הסר חזרות קיצוניות מהמודל
+    transcription = removeExtremeRepetitions(transcription);
+
     // Enhanced text cleaning
     transcription = transcription
       .replace(/\r\n/g, '\n')
@@ -1287,7 +1308,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           // Delay between chunks to avoid rate limiting
           if (i < chunksData.chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            console.log(`⏳ Waiting 15 seconds before processing next chunk for API stability...`);
+            await new Promise(resolve => setTimeout(resolve, 15000));
           }
 
         } catch (chunkError) {
