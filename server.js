@@ -786,6 +786,8 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   // שלב 2: חלוקה חכמה לפסקאות בגמיני
   console.log(`🔍 Checking smart division conditions: language="${language}", length=${merged.length}`);
   if ((language === 'Hebrew' || language === 'he') && merged.length > 500) {
+    console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
     console.log(`🎯 Starting smart paragraph division with Gemini...`);
     merged = await smartParagraphDivision(merged);
   } else {
@@ -1269,6 +1271,8 @@ ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${cust
     // שלב 2: חלוקה חכמה לפסקאות בגמיני
     console.log(`🔍 Checking smart division conditions: language="${language}", length=${transcription.length}`);
     if ((language === 'Hebrew' || language === 'he') && transcription.length > 500) {
+      console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
       console.log(`🎯 Starting smart paragraph division with Gemini...`);
       transcription = await smartParagraphDivision(transcription);
     } else {
