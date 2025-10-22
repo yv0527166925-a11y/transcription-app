@@ -116,55 +116,15 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         # שורה ריקה
         new_paragraphs.append('<w:p></w:p>')
 
-        # פסקאות תוכן - Python מעבד הכל כאן
+        # פסקאות תוכן - שומר על פסקאות גמיני!
         import re
-        all_text = ' '.join(sections)
-        # תיקון ירידות שורה באמצע משפט
-        all_text = re.sub(r'\n+', ' ', all_text)  # החלף ירידות שורה ברווח
-        all_text = re.sub(r'\s{2,}', ' ', all_text)  # רווחים כפולים לרווח יחיד
-        all_text = fix_hebrew_punctuation(all_text)  # Python עושה את כל העיבוד העברי
 
-        # חלוקה לפסקאות - שומרים על שלמות המירכאות
+        # עיבוד עברי בלבד - לא נוגע בחלוקת פסקאות
+        for section in sections:
+            # רק תיקון עברי - לא חלוקה לפסקאות!
+            processed_text = fix_hebrew_punctuation(section)
 
-        # חלוקה בזהירות למשפטים, אבל לא אם יש מירכאה פתוחה
-        words = all_text.split()
-        current_para = ""
-        word_count = 0
-
-        for word in words:
-            current_para += word + " "
-            word_count += 1
-
-            # יצירת פסקה חדשה רק אם:
-            # 1. יש מספיק מילים (קוצר עוד יותר ל-20)
-            # 2. אין מירכאה פתוחה (זוגי של מירכאות)
-            # 3. המשפט מסתיים
-            if (word_count >= 20 or len(current_para) > 250) and word.endswith(('.', '!', '?', ':')):
-                quote_count = current_para.count('"')
-                if quote_count % 2 == 0:  # זוגי מירכאות = לא באמצע ציטוט
-                    para_text = current_para.strip()
-                    if para_text:
-                        content_paragraph = f'''
-<w:p>
-  <w:pPr>
-    <w:jc w:val="{alignment}"/>
-    <w:spacing w:after="240"/>
-  </w:pPr>
-  <w:r>
-    <w:rPr>
-      <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-      <w:sz w:val="28"/>
-    </w:rPr>
-    <w:t>{escape_xml(para_text)}</w:t>
-  </w:r>
-</w:p>'''
-                        new_paragraphs.append(content_paragraph)
-                    current_para = ""
-                    word_count = 0
-
-        # פסקה אחרונה
-        if current_para.strip():
-            para_text = current_para.strip()
+            # יצירת פסקה כפי שגמיני חילק
             content_paragraph = f'''
 <w:p>
   <w:pPr>
@@ -176,7 +136,7 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="28"/>
     </w:rPr>
-    <w:t>{escape_xml(para_text)}</w:t>
+    <w:t>{escape_xml(processed_text)}</w:t>
   </w:r>
 </w:p>'''
             new_paragraphs.append(content_paragraph)
@@ -271,77 +231,35 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
         if is_rtl:
             clean_text = fix_hebrew_punctuation(clean_text)
 
-        # חלוקה חכמה לפסקאות - שונה בין RTL ל-LTR
-        if is_rtl:
-            # RTL: חלוקה פשוטה לפי \n\n (כמו שהיה)
-            sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
+        # שומר על פסקאות גמיני - לא מחלק מחדש!
+        sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
 
-            print(f"Creating {len(sections)} RTL paragraphs", file=sys.stderr)
+        print(f"Creating {len(sections)} paragraphs from Gemini (language={language}, RTL={is_rtl})", file=sys.stderr)
 
-            for i, section in enumerate(sections):
-                lines = [line.strip() for line in section.split('\n') if line.strip()]
-                combined_text = ' '.join(lines).strip()
+        for i, section in enumerate(sections):
+            lines = [line.strip() for line in section.split('\n') if line.strip()]
+            combined_text = ' '.join(lines).strip()
 
-                if combined_text and not combined_text[-1] in '.!?:':
-                    combined_text += '.'
+            # רק תיקון עברי - לא חלוקה לפסקאות!
+            if is_rtl:
+                combined_text = fix_hebrew_punctuation(combined_text)
 
-                paragraph = doc.add_paragraph()
-                run = paragraph.add_run(combined_text)
-                run.font.name = 'David'
-                run.font.size = Pt(14)
+            # בדיקה אם צריך נקודה בסוף
+            if combined_text and not combined_text[-1] in '.!?:':
+                combined_text += '.'
+
+            paragraph = doc.add_paragraph()
+            run = paragraph.add_run(combined_text)
+            run.font.name = 'David'
+            run.font.size = Pt(14)
+
+            if is_rtl:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 set_rtl_paragraph(paragraph)
-
-                print(f"Added RTL paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
-        else:
-            # LTR: חלוקה חכמה לפי מילים ואורך
-            import re
-
-            # נקה ירידות שורה ורווחים מיותרים
-            all_text = re.sub(r'\n+', ' ', clean_text)
-            all_text = re.sub(r'\s{2,}', ' ', all_text)
-
-            # חלק לפסקאות
-            words = all_text.split()
-            current_para = ""
-            word_count = 0
-            para_num = 0
-
-            print(f"Creating LTR paragraphs with smart splitting ({len(words)} words total)", file=sys.stderr)
-
-            for word in words:
-                current_para += word + " "
-                word_count += 1
-
-                # יצירת פסקה חדשה אם:
-                # 1. יש 20-30 מילים או 250+ תווים
-                # 2. המשפט מסתיים
-                if (word_count >= 20 or len(current_para) > 250) and word.endswith(('.', '!', '?', ':')):
-                    para_text = current_para.strip()
-                    if para_text:
-                        paragraph = doc.add_paragraph()
-                        run = paragraph.add_run(para_text)
-                        run.font.name = 'David'
-                        run.font.size = Pt(14)
-                        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-                        para_num += 1
-                        print(f"Added LTR paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
-
-                    current_para = ""
-                    word_count = 0
-
-            # פסקה אחרונה
-            if current_para.strip():
-                para_text = current_para.strip()
-                paragraph = doc.add_paragraph()
-                run = paragraph.add_run(para_text)
-                run.font.name = 'David'
-                run.font.size = Pt(14)
+            else:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-                para_num += 1
-                print(f"Added final LTR paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
+            print(f"Added paragraph {i+1} ({language}): {combined_text[:50]}...", file=sys.stderr)
 
         doc.save(output_path)
         print(f"Basic document saved successfully: {output_path}", file=sys.stderr)
