@@ -805,7 +805,7 @@ async function smartParagraphDivision(text) {
       model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 65536
+        maxOutputTokens: 500000
       }
     });
 
