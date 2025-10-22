@@ -631,7 +631,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
     
-    const prompt = `${language === 'Hebrew' ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
 🔥🔥🔥 הוראה ראשונה וקריטית ביותר:
 חלק את התמלול לפסקאות עם שורה ריקה כפולה (\\n\\n) בין כל פסקה!
@@ -785,11 +785,11 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
 
   // שלב 2: חלוקה חכמה לפסקאות בגמיני
   console.log(`🔍 Checking smart division conditions: language="${language}", length=${merged.length}`);
-  if (language === 'Hebrew' && merged.length > 500) {
+  if ((language === 'Hebrew' || language === 'he') && merged.length > 500) {
     console.log(`🎯 Starting smart paragraph division with Gemini...`);
     merged = await smartParagraphDivision(merged);
   } else {
-    console.log(`❌ Smart division skipped - language: "${language}" === "Hebrew"? ${language === 'Hebrew'}, length > 500? ${merged.length > 500}`);
+    console.log(`❌ Smart division skipped - language: "${language}" (Hebrew/he)? ${(language === 'Hebrew' || language === 'he')}, length > 500? ${merged.length > 500}`);
   }
 
   // Python will handle all text processing - no Node.js processing needed
@@ -1173,7 +1173,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 5. המשך לתמלל עד שהאודיו נגמר לחלוטין
 6. אל תכתוב "המשך התמלול..." או "סיום התמלול" - רק התוכן המלא
 
-🎯 ${language === 'Hebrew' ? 'תמלל לעברית תקנית:' : `Transcribe in ${language || 'the original language'}. Do NOT translate:`}
+🎯 ${(language === 'Hebrew' || language === 'he') ? 'תמלל לעברית תקנית:' : `Transcribe in ${language || 'the original language'}. Do NOT translate:`}
 
 📝 הוראות חלוקה לפסקאות - חובה מוחלטת:
 
@@ -1235,11 +1235,11 @@ ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${cust
 
     // שלב 2: חלוקה חכמה לפסקאות בגמיני
     console.log(`🔍 Checking smart division conditions: language="${language}", length=${transcription.length}`);
-    if (language === 'Hebrew' && transcription.length > 500) {
+    if ((language === 'Hebrew' || language === 'he') && transcription.length > 500) {
       console.log(`🎯 Starting smart paragraph division with Gemini...`);
       transcription = await smartParagraphDivision(transcription);
     } else {
-      console.log(`❌ Smart division skipped - language: "${language}" === "Hebrew"? ${language === 'Hebrew'}, length > 500? ${transcription.length > 500}`);
+      console.log(`❌ Smart division skipped - language: "${language}" (Hebrew/he)? ${(language === 'Hebrew' || language === 'he')}, length > 500? ${transcription.length > 500}`);
     }
 
     return transcription;
