@@ -647,10 +647,18 @@ ${contextPrompt}
 4. סיים ישירות עם התוכן - אל תוסיף סיכום
 5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
 
-📝 הנחיות עיצוב:
-- חלק לפסקאות של 2-3 משפטים
-- ציטוטים במירכאות: "שנאמר", "כדאיתא"
-- שמור על רציפות טבעית
+📝 הוראות חלוקה לפסקאות - חובה לבצע:
+- חלק את הטקסט לפסקאות טבעיות של 2-3 משפטים לפי שינוי נושא או רעיון
+- כל פסקה לא תעלה על 7-8 שורות גם אם הנושא נמשך
+- הפרד בין פסקאות עם שורה ריקה אחת בלבד (\n\n)
+- אם יש מעבר ברעיון (גם בלי הפסקה ארוכה), פתח פסקה חדשה
+- אם הדובר ממשיך באותו רעיון עם ניסוח שונה, אל תפתח פסקה חדשה
+- זהה שינויים בדוברים וצור פסקה חדשה
+- השתמש בסימני פיסוק תקניים לפי המשמעות
+- הסר מילות מילוי ("אה", "אממ") אם אינן תורמות להבנה
+- ציטוטים במירכאות
+- השתמש ברווחים תקניים בעברית, בלי סימני רווח מיותרים בתחילת שורה
+- החזר טקסט מוכן לשימוש ללא עיבוד נוסף - כמו תמלול מוכן למסמך Word
 
 ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו עם התמלול:`;
 
@@ -768,9 +776,9 @@ function mergeTranscriptionChunks(chunks) {
   return merged;
 }
 
-// Helper function to break long paragraphs into shorter ones - ENHANCED VERSION
-function applyParagraphBreaking(text) {
-  console.log(`🔧 Starting enhanced paragraph breaking...`);
+// Helper function for Hebrew text fixes only (paragraphs handled by Gemini)
+function applyHebrewTextFixes(text) {
+  console.log(`🔧 Starting Hebrew text fixes...`);
 
   // שלב 1: תיקון אגרסיבי וחזק לכל בעיות העברית
   console.log('🔧 Starting SUPER AGGRESSIVE Hebrew fixing...');
@@ -928,141 +936,10 @@ function applyParagraphBreaking(text) {
     .replace(/^\s+|\s+$/gm, '')
     .trim();
 
-  console.log(`✅ Punctuation fixing completed`);
+  console.log(`✅ Hebrew text fixes completed`);
 
-  // שלב 2: זיהוי משפטים מלאים עם הגיון מתקדם וטיפול בציטוטים
-  const sentences = [];
-  let currentSentence = '';
-  let insideQuotation = false;
-  let quotationDepth = 0;
-  const words = text.split(/\s+/);
-
-  console.log(`📝 Processing ${words.length} words into complete sentences with quotation handling...`);
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const nextWord = i < words.length - 1 ? words[i + 1] : '';
-    const prevWord = i > 0 ? words[i - 1] : '';
-
-    currentSentence += word + ' ';
-
-    // זיהוי גרשיים פתיחה וסגירה
-    const hasOpenQuote = word.includes('"') && word.match(/^[^"]*"[^"]*$/);
-    const hasCloseQuote = word.includes('"') && word.match(/[^"]*"[^"]*$/);
-
-    // ספירת גרשיים בתוך המילה
-    const quoteCount = (word.match(/"/g) || []).length;
-
-    if (quoteCount > 0) {
-      quotationDepth += quoteCount % 2 === 1 ? (insideQuotation ? -1 : 1) : 0;
-      insideQuotation = quotationDepth > 0;
-    }
-
-    // זיהוי סוף משפט אמיתי עם בדיקות מתקדמות
-    const endsWithPunctuation = word.match(/[.!?]$/);
-
-    if (endsWithPunctuation && !insideQuotation) {
-      // בדיקות שזה לא קיצור או מספר
-      const isCommonAbbreviation = word.match(/^(רש"י|חז"ל|החיד"א|הגר"א|רמב"ם|רמב"ן|משנ"ב|שו"ע|שו"ת|מהר"ל|ר"ת|תוס'|ע"ש|ע"פ|כו'|וכו'|שם|דף|עמ'|פס'|סי'|ח"א|ח"ב|ח"ג|ח"ד|ח"ה)\.?$/);
-      const isNumber = word.match(/^\d+\.$/);
-      const isInitials = word.match(/^[א-ת]"[א-ת]\.$/);
-
-      // זיהוי שהמילה הבאה מתחילה משפט חדש
-      const nextStartsNewSentence = nextWord && (
-        nextWord.match(/^[א-ת]/i) ||  // מילה עברית
-        nextWord.match(/^[A-Z]/) ||   // מילה באנגלית עם אות גדולה
-        nextWord.match(/^"[א-ת]/)     // ציטוט חדש
-      );
-
-      // תנאי סיום משפט - רק אם לא בתוך ציטוט
-      if (!isCommonAbbreviation && !isNumber && !isInitials && nextStartsNewSentence) {
-        sentences.push(currentSentence.trim());
-        currentSentence = '';
-        insideQuotation = false;
-        quotationDepth = 0;
-      }
-    }
-
-    // אם אנחנו בתוך ציטוט ורואים גרשיים סוגרים, המשך לבדוק סוף משפט
-    if (insideQuotation && word.includes('"') && word.match(/[.!?]"$/)) {
-      insideQuotation = false;
-      quotationDepth = 0;
-
-      // בדוק אם זה סוף משפט אמיתי אחרי סגירת הציטוט
-      if (nextWord && nextWord.match(/^[א-ת]/i)) {
-        sentences.push(currentSentence.trim());
-        currentSentence = '';
-      }
-    }
-  }
-
-  // הוסף משפט אחרון
-  if (currentSentence.trim()) {
-    sentences.push(currentSentence.trim());
-  }
-
-  console.log(`✅ Created ${sentences.length} complete sentences`);
-
-  // שלב 3: חלוקה חכמה לפסקאות על פי תוכן
-  const paragraphs = [];
-  let currentParagraph = '';
-  let sentenceCount = 0;
-
-  for (let i = 0; i < sentences.length; i++) {
-    const sentence = sentences[i];
-    const nextSentence = i < sentences.length - 1 ? sentences[i + 1] : '';
-
-    currentParagraph += sentence + ' ';
-    sentenceCount++;
-
-    // זיהוי תחילת נושא/רעיון חדש
-    const startsNewTopic = nextSentence && nextSentence.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|לדוגמה|בפרט|מכאן|שהסיבה|והשאלה|בפרשת|כיוון|היינו|נמצא|הוכחה|וכן|ועוד|בנוסף|למשל|לדוגמה)/);
-
-    // זיהוי סוף רעיון מלא
-    const endsIdea = sentence.match(/\b(הקדוש ברוך הוא|חז"ל|רש"י|רמב"ם|התורה|הגמרא|המשנה|התלמוד|המדרש)\b.*[.!?]\s*$/) ||
-                    sentence.match(/\b(לכן|אם כן|ומכאן|לסיכום|בסופו של דבר|זהו|זו|לסיום|בסוף|לבסוף)\b.*[.!?]\s*$/);
-
-    // זיהוי מעבר בין דוברים
-    const speakerChange = nextSentence && (
-      nextSentence.match(/^(הרב|המורה|השואל|המשיב|המלמד|התלמיד)/i) ||
-      nextSentence.match(/^[א-ת]+\s+(אמר|אומר|שאל|ענה|הוסיף|המשיך)/i)
-    );
-
-    // זיהוי דיאלוג רצוף - אל תפצל באמצע דיאלוג
-    const currentHasQuote = sentence.includes('"');
-    const nextHasQuote = nextSentence && nextSentence.includes('"');
-    const inMiddleOfDialogue = currentHasQuote && nextHasQuote;
-
-    // זיהוי שאלה ותשובה רצופה
-    const currentEndsWithQuestion = sentence.match(/[?]"?\s*$/);
-    const nextStartsWithAnswer = nextSentence && nextSentence.match(/^"?(כן|לא|אמר|אומר|ענה)/);
-    const questionAnswerPair = currentEndsWithQuestion && nextStartsWithAnswer;
-
-    // תנאים לפיצול פסקה
-    const wordCount = currentParagraph.split(' ').length;
-    const shouldBreak =
-      sentenceCount >= 6 ||                               // מקסימום 6 משפטים (הוגדל)
-      (sentenceCount >= 3 && startsNewTopic && !inMiddleOfDialogue) ||    // 3 משפטים + נושא חדש (אם לא דיאלוג)
-      (sentenceCount >= 3 && endsIdea && !inMiddleOfDialogue) ||          // 3 משפטים + סוף רעיון (אם לא דיאלוג)
-      (sentenceCount >= 3 && speakerChange && !questionAnswerPair) ||     // 3 משפטים + החלפת דובר (אם לא שאלה-תשובה)
-      wordCount >= 80;                                    // מקסימום 80 מילים (הוגדל)
-
-    if (shouldBreak && currentParagraph.trim()) {
-      paragraphs.push(currentParagraph.trim());
-      currentParagraph = '';
-      sentenceCount = 0;
-    }
-  }
-
-  // הוסף את הפסקה האחרונה
-  if (currentParagraph.trim()) {
-    paragraphs.push(currentParagraph.trim());
-  }
-
-  console.log(`📝 Enhanced paragraph breaking completed: ${paragraphs.length} logical paragraphs created`);
-  console.log(`📊 Average paragraph length: ${Math.round(text.length / paragraphs.length)} characters`);
-
-  return paragraphs.join('\n\n');
+  // החזר את הטקסט המתוקן ללא עיבוד פסקאות (ג'מיני כבר עשה את זה)
+  return text;
 }
 
 // Helper function to clean filename for display
@@ -1223,9 +1100,20 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 6. אל תכתוב "המשך התמלול..." או "סיום התמלול" - רק התוכן המלא
 
 🎯 ${language === 'Hebrew' ? 'תמלל לעברית תקנית:' : `Transcribe in ${language || 'the original language'}. Do NOT translate:`}
+
+📝 הוראות חלוקה לפסקאות - חובה לבצע:
+- חלק את הטקסט לפסקאות טבעיות של 2-3 משפטים לפי שינוי נושא או רעיון
+- כל פסקה לא תעלה על 7-8 שורות גם אם הנושא נמשך
+- הפרד בין פסקאות עם שורה ריקה אחת בלבד (\n\n)
+- אם יש מעבר ברעיון (גם בלי הפסקה ארוכה), פתח פסקה חדשה
+- אם הדובר ממשיך באותו רעיון עם ניסוח שונה, אל תפתח פסקה חדשה
+- זהה שינויים בדוברים וצור פסקה חדשה
+- השתמש בסימני פיסוק תקניים לפי המשמעות
+- הסר מילות מילוי ("אה", "אממ") אם אינן תורמות להבנה
+- ציטוטים במירכאות
+- השתמש ברווחים תקניים בעברית, בלי סימני רווח מיותרים בתחילת שורה
 - מושגים דתיים מדויקים
-- ציטוטים במירכאות: "כמו שכתוב", "אמרו חכמים", "תניא"
-- פסקאות של 2-4 משפטים עם שורה ריקה
+- החזר טקסט מוכן לשימוש ללא עיבוד נוסף - כמו תמלול מוכן למסמך Word
 🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
 
 ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו ותמלל הכל ללא חריגות:`;
@@ -1385,6 +1273,59 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
 
 
+// 🔥 NEW: פונקציה לשיפור איכות הטקסט עם ג'מיני (ללא שינוי מבנה פסקאות)
+async function improveTranscriptionQuality(transcription, language = 'Hebrew') {
+  try {
+    console.log('🔧 Starting text quality improvement with Gemini...');
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 32768
+      }
+    });
+
+    const improvementPrompt = `אתה עורך טקסט מקצועי. תקבל טקסט מתומלל ותשפר אותו **מבלי לשנות את מבנה הפסקאות**.
+
+🎯 **משימות שיפור:**
+1. **תקן שגיאות כתיב ודקדוק** - הקפד על עברית תקנית
+2. **שפר סימני פיסוק** - פסיקים, נקודות, סימני שאלה במקומות הנכונים
+3. **תקן מילות מפתח שגויות** - שמות, מונחים מקצועיים
+4. **הסר חזרות מיותרות** - מילים שחוזרות ללא הצדקה
+5. **שמור על המבנה המדויק** - אל תוסיף או תסיר שורות ריקות
+
+🚨 **חוקים קריטיים:**
+- אל תשנה את מבנה הפסקאות הקיים
+- אל תוסיף תוכן חדש
+- אל תקצר משמעותית
+- שמור על הסגנון המקורי של הדובר
+- התחל ישירות עם הטקסט המשופר
+
+**הטקסט לשיפור:**
+${transcription}`;
+
+    const result = await model.generateContent(improvementPrompt);
+    const response = await result.response;
+    let improvedText = response.text();
+
+    // נקה מקדמות מיותרות
+    improvedText = improvedText
+      .replace(/^\s*טקסט משופר[:\s]*/i, '')
+      .replace(/^\s*הנה הטקסט המשופר[:\s]*/i, '')
+      .replace(/^\s*תוצאה[:\s]*/i, '')
+      .trim();
+
+    console.log(`✅ Text quality improvement completed: ${transcription.length} -> ${improvedText.length} characters`);
+    return improvedText;
+
+  } catch (error) {
+    console.error('❌ Error in text quality improvement:', error.message);
+    console.log('⚠️ Returning original transcription due to improvement error');
+    return transcription;
+  }
+}
+
 // 🔥 NEW: פונקציה לעיבוד טקסט לתבנית
 function processTranscriptionForTemplate(transcription) {
   const paragraphs = transcription
@@ -1467,49 +1408,11 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/\n{3,}/g, '\n\n') // שמור על מעברי פסקאות קיימים
       .trim();
 
-    // 3. חלוקה חכמה לפסקאות לפי תוכן ומבנה לוגי
-    function createSmartParagraphs(text) {
-      const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
-      const paragraphs = [];
-      let currentParagraph = '';
-
-      for (let i = 0; i < sentences.length; i++) {
-        const sentence = sentences[i].trim();
-        currentParagraph += sentence + ' ';
-
-        const nextSentence = i < sentences.length - 1 ? sentences[i + 1].trim() : '';
-
-        // חלוקה חכמה לפסקאות לפי כללים כלליים
-        const currentWords = currentParagraph.trim().split(/\s+/);
-        const shouldEndParagraph =
-          // סיום פסקה במשפט אחרון
-          i === sentences.length - 1 ||
-
-          // פסקה ארוכה מדי (מעל 150 מילים)
-          currentWords.length >= 150 ||
-
-
-          // זיהוי שאלות בודדות שיכולות לסגור פסקה
-          (sentence.endsWith('?') && currentWords.length > 20) ||
-
-          // זיהוי ציטוטים שמסתיימים בפסקה
-          (sentence.endsWith('".') && currentWords.length > 15);
-
-        if (shouldEndParagraph && currentParagraph.trim().length > 0) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = '';
-        }
-      }
-
-      // הוסף את מה שנשאר
-      if (currentParagraph.trim().length > 0) {
-        paragraphs.push(currentParagraph.trim());
-      }
-
-      return paragraphs.filter(p => p.length > 0);
-    }
-
-    const shortParagraphs = createSmartParagraphs(cleanedTranscription);
+    // 3. פיצול לפסקאות לפי מה שהחזיר ג'מיני (ללא עיבוד נוסף)
+    const shortParagraphs = cleanedTranscription
+      .split(/\n\n+/) // פיצול לפי שורות ריקות כפולות
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
 
     // יצירת XML לכל פסקה קצרה
     const paragraphElements = shortParagraphs.map(paragraph => `
