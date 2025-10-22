@@ -29,7 +29,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+let genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // ספירת קבצים לאיפוס genAI כל 3 קבצים
 let processedFilesCount = 0;
@@ -633,7 +633,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
 
 ${contextPrompt}
 
-קובץ: ${cleanFilename(filename)} (חלק ${chunkIndex + 1}/${totalChunks})
+קובץ אודיו (חלק ${chunkIndex + 1}/${totalChunks})
 
 🚨 הוראות קריטיות:
 1. תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט
@@ -1462,8 +1462,49 @@ async function createWordDocument(transcription, filename, duration) {
       .replace(/\n{3,}/g, '\n\n') // שמור על מעברי פסקאות קיימים
       .trim();
 
-    // 3. פיצול לפסקאות כפי שה-AI יצר (ללא עיבוד יתר!)
-    const shortParagraphs = cleanedTranscription.split(/\n\s*\n/);
+    // 3. חלוקה חכמה לפסקאות לפי תוכן ומבנה לוגי
+    function createSmartParagraphs(text) {
+      const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+      const paragraphs = [];
+      let currentParagraph = '';
+
+      for (let i = 0; i < sentences.length; i++) {
+        const sentence = sentences[i].trim();
+        currentParagraph += sentence + ' ';
+
+        const nextSentence = i < sentences.length - 1 ? sentences[i + 1].trim() : '';
+
+        // חלוקה חכמה לפסקאות לפי כללים כלליים
+        const currentWords = currentParagraph.trim().split(/\s+/);
+        const shouldEndParagraph =
+          // סיום פסקה במשפט אחרון
+          i === sentences.length - 1 ||
+
+          // פסקה ארוכה מדי (מעל 150 מילים)
+          currentWords.length >= 150 ||
+
+
+          // זיהוי שאלות בודדות שיכולות לסגור פסקה
+          (sentence.endsWith('?') && currentWords.length > 20) ||
+
+          // זיהוי ציטוטים שמסתיימים בפסקה
+          (sentence.endsWith('".') && currentWords.length > 15);
+
+        if (shouldEndParagraph && currentParagraph.trim().length > 0) {
+          paragraphs.push(currentParagraph.trim());
+          currentParagraph = '';
+        }
+      }
+
+      // הוסף את מה שנשאר
+      if (currentParagraph.trim().length > 0) {
+        paragraphs.push(currentParagraph.trim());
+      }
+
+      return paragraphs.filter(p => p.length > 0);
+    }
+
+    const shortParagraphs = createSmartParagraphs(cleanedTranscription);
 
     // יצירת XML לכל פסקה קצרה
     const paragraphElements = shortParagraphs.map(paragraph => `
