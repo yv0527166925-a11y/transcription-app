@@ -31,6 +31,9 @@ const PORT = process.env.PORT || 3000;
 // Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// ספירת קבצים לאיפוס genAI כל 3 קבצים
+let processedFilesCount = 0;
+
 
 // Email transporter with timeout settings
 const transporter = nodemailer.createTransport({
@@ -625,8 +628,8 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
     
     const prompt = `${language === 'Hebrew' ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
-🚨 חשוב: אם מילה חוזרת על עצמה, רשום אותה מקסימום 5 פעמים ברציפות.
-אל תחזור על אותה מילה או ביטוי יותר מ-5 פעמים ברצף.
+🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
+אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
 
 ${contextPrompt}
 
@@ -1179,8 +1182,9 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
     const prompt = `🚨 חובה מוחלטת: תמלל את כל הקובץ האודיו הזה מהתחלה עד הסוף הגמור!
 
-🚨 חשוב: אם מילה חוזרת על עצמה, רשום אותה מקסימום 5 פעמים ברציפות.
-אל תחזור על אותה מילה או ביטוי יותר מ-5 פעמים ברצף.
+🔥🔥🔥 הוראה קריטית חדשה: זהה והסר קטעים של חזרות פגומות וחסרות פשר (לדוגמה: "זה היה נו- זה היה נושא אחר, e, זה היה"). אם נתקלת בקטע כזה, השמט אותו לחלוטין והמשך את התמלול מהנקודה התקינה הבאה.
+
+🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 
 קובץ: ${cleanFilename(filename)}
 גודל: ${fileSizeMB.toFixed(1)} MB
@@ -1452,191 +1456,14 @@ async function createWordDocument(transcription, filename, duration) {
     const zip = await JSZip.loadAsync(templateData);
     const docXml = await zip.file('word/document.xml').async('text');
 
-    // עיבוד התמלול עם תיקון פיסוק מתקדם
-    let cleanedText = transcription
-      .replace(/\r\n/g, '\n')
-      .replace(/\n{3,}/g, '\n\n')
-      // תיקונים טכניים מינימליים בלבד (לא עריכה ספרותית)
-
-      // 1. רווחים נכונים אחרי סימני פיסוק
-      .replace(/\.([א-ת])/g, '. $1')            // משפט.משפט → משפט. משפט
-      .replace(/!([א-ת])/g, '! $1')             // משפט!משפט → משפט! משפט
-      .replace(/\?([א-ת])/g, '? $1')            // משפט?משפט → משפט? משפט
-      .replace(/,([א-ת])/g, ', $1')             // מילה,מילה → מילה, מילה
-      .replace(/:([א-ת])/g, ': $1')             // מילה:מילה → מילה: מילה
-
-      // 2. תיקון גרשיים וציטוטים מתקדם
-      .replace(/"/g, '"')                       // " → "
-      .replace(/"/g, '"')                       // " → "
-
-      // תיקון מילים צמודות לגרשיים
-      .replace(/([א-ת])\"([א-ת][^"]*?)\"([א-ת])/g, '$1 "$2" $3')  // מילה"ציטוט"מילה → מילה "ציטוט" מילה
-      .replace(/([א-ת])\"([^"]*?)\"([א-ת])/g, '$1 "$2" $3')       // מילה"ציטוט"מילה → מילה "ציטוט" מילה
-      .replace(/([א-ת])\"([^"]*?)$/g, '$1 "$2"')                   // מילה"ציטוט בסוף שורה → מילה "ציטוט"
-      .replace(/^([^"]*?)\"([א-ת])/g, '"$1" $2')                   // ציטוט"מילה בתחילת שורה → "ציטוט" מילה
-
-      // תיקון גרשיים לא מזווגים
-      .replace(/([א-ת])\"\s*\n/g, '$1."\n')                       // מילה" בסוף שורה → מילה." (סגירת ציטוט חסר)
-      .replace(/\n\s*([^"]*?)([.!?])\s*\n/g, '\n"$1$2"\n')       // טקסט בשורה נפרדת → "טקסט" (ציטוט פתוח לא נסגר)
-
-      // רווחים נכונים סביב גרשיים
-      .replace(/([א-ת])\"([א-ת])/g, '$1 "$2')                     // מילה"מילה → מילה "מילה
-      .replace(/\"([א-ת])/g, '"$1')                               // "מילה → "מילה
-      .replace(/([א-ת])\"/g, '$1"')                               // מילה" → מילה"
-      .replace(/\"\s{2,}/g, '" ')                                 // גרשיים + רווחים מרובים
-      .replace(/\s{2,}\"/g, ' "')                                 // רווחים מרובים + גרשיים
-
-      // 3. תיקון מילים דבוקות שגיאות תמלול נפוצות
-      .replace(/([א-ת]+)תון/g, '$1תעון')        // שמע תון → שמעון
-      .replace(/קצרטונת/g, 'קצרה')             // קצרטונת → קצרה
-      .replace(/([א-ת])תראו([א-ת])/g, '$1 תראו $2')  // מילהתראומילה → מילה תראו מילה
-
-      // 4. זיהוי מעברי נושא ויצירת הפסקות (אבל עדיין כל משפט בשורה נפרדת)
-      .replace(/([.!?])\s*(אבל|אז|עכשיו|בואו|הנה|אגב|דרך אגב|בקשר|יש לי|אני רוצה|בעצם|למעשה|כמו כן|נוסף על כך|חוץ מזה|יותר מזה)/g, '$1\n\n$2')
-      .replace(/([.!?])\s*(סיפור|פעם אחת|היה מעשה|אני זוכר|פעם|בזמן|לפני|בעבר|פעם ראיתי|ידוע|מסופר|נאמר)/g, '$1\n\n$2')
-      .replace(/([.!?])\s*(השאלה|הנקודה|הדבר|העניין|הבעיה|הפתרון|המסר|הלקח|התשובה|המטרה|הכוונה)/g, '$1\n\n$2')
-      .replace(/([.!?])\s*(בנוסף|כמו כן|באופן דומה|לעומת זאת|מצד אחד|מצד שני|לכן|אם כך|בכל מקרה)/g, '$1\n\n$2')
-      .replace(/([.!?])\s*(עכשיו אני|בואו נראה|בואו נדבר|אני אומר|הגעתי למסקנה|מה שאני|הדבר החשוב)/g, '$1\n\n$2')
-
-      // 5. ניקוי רווחים כפולים
-      .replace(/\s{2,}/g, ' ')                  // רווחים כפולים
+    // 2. נקה את התמלול מהערות מיותרות (כמו רעשי רקע)
+    const cleanedTranscription = transcription
+      .replace(/\[מוזיקה\]|\[רעש רקע\]|\[צלילים\]|\[רעש\]|\[קולות\]|\[הפסקה\]|\[שקט\]|\[.*?ברור.*?\]/gi, '')
+      .replace(/\n{3,}/g, '\n\n') // שמור על מעברי פסקאות קיימים
       .trim();
 
-    // 6. חלוקה לשורות - כל משפט בשורה נפרדת (ללא פסקאות ארוכות)
-    const allSentences = cleanedText
-      // ראשית, נפצל לפי הפסקות כפולות (מעברי נושא)
-      .split(/\n\s*\n/)
-      .map(section => section.trim())
-      .filter(section => section.length > 0)
-      .flatMap(section => {
-        // כל קטע נפצל למשפטים נפרדים
-        return section
-          .split(/([.!?]\s+)/)
-          .reduce((acc, part, index, array) => {
-            if (index % 2 === 0) {
-              const sentence = part.trim();
-              const punctuation = array[index + 1] || '';
-              if (sentence && sentence.length > 3) {
-                acc.push(sentence + punctuation.trim());
-              }
-            }
-            return acc;
-          }, []);
-      });
-
-    // הפיכת כל משפט למקטע נפרד (ללא פסקאות ארוכות)
-    const sections = allSentences;
-
-    // יצירת כותרת גדולה ומודגשת - עותק מדויק מהקובץ שעבד
-    const titleParagraph = `
-      <w:p w14:paraId="6A1F55DC" w14:textId="77777777" w:rsidR="0056303E" w:rsidRPr="0056303E" w:rsidRDefault="0056303E" w:rsidP="0056303E">
-        <w:pPr>
-          <w:spacing w:after="400"/>
-          <w:rPr>
-            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-            <w:sz w:val="32"/>
-            <w:b/>
-          </w:rPr>
-        </w:pPr>
-        <w:r w:rsidRPr="0056303E">
-          <w:rPr>
-            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
-            <w:sz w:val="32"/>
-            <w:b/>
-          </w:rPr>
-          <w:t>${escapeXml(cleanName)}</w:t>
-        </w:r>
-      </w:p>`;
-
-
-    // חלוקה לפסקאות קצרות בהתבסס על מילים ונושאים
-    function createShortParagraphs(text) {
-      // תיקון פיסוק בסיסי
-      text = text
-        .replace(/([א-ת]),([א-ת])/g, '$1, $2')    // פסיק עם רווח
-        .replace(/([א-ת])\.([א-ת])/g, '$1. $2')   // נקודה עם רווח
-        .replace(/([א-ת])!([א-ת])/g, '$1! $2')    // קריאה עם רווח
-        .replace(/([א-ת])\?([א-ת])/g, '$1? $2')   // שאלה עם רווח
-        .replace(/([א-ת]):([א-ת])/g, '$1: $2')    // נקודתיים עם רווח
-        .replace(/([א-ת]);([א-ת])/g, '$1; $2')    // נקודה-פסיק עם רווח
-        .replace(/([א-ת])"([א-ת])/g, '$1" $2')    // גרשיים עם רווח
-        .replace(/\s{2,}/g, ' ')                   // ניקוי רווחים כפולים
-        .trim();
-
-      // חלק למשפטים על פי מילים ומספר תווים
-      const words = text.split(/\s+/);
-      const paragraphs = [];
-      let currentParagraph = '';
-      let wordCount = 0;
-
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        currentParagraph += word + ' ';
-        wordCount++;
-
-        // בדיקת נקודת סיום טבעית
-        const endsWithPunctuation = word.match(/[.!?]$/);
-        const nextWord = i < words.length - 1 ? words[i + 1] : '';
-
-        // מילות מפתח שמסמנות תחילת נושא חדש - הרחבתי את הרשימה
-        const isNewTopicStart = nextWord.match(/^(אומר|כותב|שואל|מביא|אז|כך|למה|איך|מה|ועכשיו|והנה|אבל|אמנם|ולכן|לכן|בנוסף|כמו|דהיינו|הרי|אדרבה|רצתה|היות|תירוץ|הוכחה|ומכאן|שהסיבה|והשאלה|בפרשת|בגלל|כיוון)$/);
-
-        // ביטויים שמסמנים סוף רעיון
-        const endsIdea = word.match(/^(בכור|הארון|קהת|גרשון|התורה|חכם|קודם)\.$/) ||
-                        currentParagraph.match(/\bחז\"ל\b.*\.$/) ||
-                        currentParagraph.match(/\bתלמיד חכם\b.*\.$/) ||
-                        currentParagraph.match(/\bכלי יקר\b.*\.$/) ||
-                        currentParagraph.match(/\bהקדוש ברוך הוא\b.*\.$/);
-
-        // תנאי פיצול מחמירים יותר - הורדתי את המקסימום ל-50 מילים
-        const shouldBreak =
-          wordCount >= 50 || // מקסימום 50 מילים לפסקה (הורדתי מ-100)
-          (endsWithPunctuation && wordCount >= 25) || // פסקה של 25+ מילים עם נקודה
-          (endsWithPunctuation && isNewTopicStart && wordCount >= 15) || // נושא חדש אחרי 15+ מילים
-          (endsIdea && wordCount >= 20) || // סוף רעיון מוגדר
-          (endsWithPunctuation && wordCount >= 30 && nextWord.match(/^[א-ת]/)); // כל משפט של 30+ מילים
-
-        if (shouldBreak) {
-          paragraphs.push(currentParagraph.trim());
-          currentParagraph = '';
-          wordCount = 0;
-        }
-      }
-
-      // הוסף את הפסקה האחרונה אם יש
-      if (currentParagraph.trim().length > 0) {
-        paragraphs.push(currentParagraph.trim());
-      }
-
-      return paragraphs;
-    }
-
-    // צור פסקאות קצרות מכל הטקסט
-    let fullText = sections.join(' ').trim();
-
-    // נקה סוגריים מרובעים של רעש רקע ומוזיקה
-    fullText = fullText
-      .replace(/\[מוזיקה\]/gi, '')
-      .replace(/\[רעש רקע\]/gi, '')
-      .replace(/\[צלילים\]/gi, '')
-      .replace(/\[רעש\]/gi, '')
-      .replace(/\[קולות\]/gi, '')
-      .replace(/\[מוזיקת רקע\]/gi, '')
-      .replace(/\[הפסקה\]/gi, '')
-      .replace(/\[שקט\]/gi, '')
-      .replace(/\[בלתי ברור\]/gi, '')
-      .replace(/\[לא ברור\]/gi, '')
-      .replace(/\[אי-ברור\]/gi, '')
-      .replace(/\[\?\?\?\]/gi, '')
-      .replace(/\[MUSIC\]/gi, '')
-      .replace(/\[BACKGROUND\]/gi, '')
-      .replace(/\[NOISE\]/gi, '')
-      .replace(/\[SOUNDS\]/gi, '')
-      .replace(/\[UNCLEAR\]/gi, '')
-      .replace(/\s{2,}/g, ' ')  // נקה רווחים כפולים שנוצרו
-      .trim();
-
-    const shortParagraphs = createShortParagraphs(fullText);
+    // 3. פיצול לפסקאות כפי שה-AI יצר (ללא עיבוד יתר!)
+    const shortParagraphs = cleanedTranscription.split(/\n\s*\n/);
 
     // יצירת XML לכל פסקה קצרה
     const paragraphElements = shortParagraphs.map(paragraph => `
@@ -1664,13 +1491,16 @@ async function createWordDocument(transcription, filename, duration) {
 
     const newParagraphs = [titleParagraph, ...paragraphElements];
 
-    // החלפת התוכן בתבנית
-    let newDocXml = docXml
-      .replace(/REPLACETITLE/g, '')
-      .replace(/REPLACECONTENT/g, '');
-
-    // הוספת הפסקאות החדשות לפני סוגר ה-body
-    newDocXml = newDocXml.replace('</w:body>', newParagraphs.join('') + '</w:body>');
+    // החלפת התוכן בתבנית החדשה
+    let paragraphIndex = 0;
+    let newDocXml = docXml.replace(/<w:t>REPLACECONTENT<\/w:t>/g, () => {
+      if (paragraphIndex < shortParagraphs.length) {
+        const text = shortParagraphs[paragraphIndex];
+        paragraphIndex++;
+        return `<w:t>${escapeXml(text)}</w:t>`;
+      }
+      return '<w:t></w:t>';
+    });
 
     // תיקון הגדרות שפה - החלפת כל הגדרה של ערבית לעברית
     newDocXml = newDocXml
@@ -2205,6 +2035,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         
         console.log(`✅ Successfully processed: ${cleanFilename(file.filename)}`);
         console.log(`📊 Final transcription: ${transcription.length} characters, ${transcription.split(/\s+/).length} words`);
+
+        // Check if we need to reset Gemini session after this file
+        processedFilesCount++;
+        if (processedFilesCount >= 3) {
+          console.log("♻️ Resetting model session after 3 files...");
+          processedFilesCount = 0; // איפוס הספירה
+
+          // המתנה למניעת throttling
+          await new Promise(r => setTimeout(r, 2000));
+
+          // יצירת instance חדש של genAI
+          genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+          console.log("✅ Model session reset completed");
+        }
 
         // Add delay between files to prevent API rate limiting and allow system recovery
         const currentFileIndex = files.indexOf(file);
