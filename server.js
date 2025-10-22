@@ -831,7 +831,40 @@ ${text}
 
     console.log(`🎯 Sending ${text.length} characters to Gemini for smart division...`);
 
-    const result = await model.generateContent(prompt);
+    // Retry mechanism with timeout
+    let result;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.log(`🔄 Attempt ${attempt}/3 for smart division...`);
+
+        // Create timeout promise
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+        );
+
+        // Create generation promise
+        const generatePromise = model.generateContent(prompt);
+
+        // Race between generation and timeout
+        result = await Promise.race([generatePromise, timeoutPromise]);
+
+        console.log(`✅ Smart division API call successful on attempt ${attempt}`);
+        break; // Success, exit retry loop
+
+      } catch (attemptError) {
+        console.error(`❌ Attempt ${attempt} failed:`, attemptError.message);
+
+        if (attempt === 3) {
+          throw attemptError; // Final attempt failed, throw error
+        }
+
+        // Wait before retry (exponential backoff)
+        const waitTime = attempt * 2000; // 2s, 4s
+        console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+
     const response = await result.response;
     let dividedText = response.text().trim();
 
