@@ -784,9 +784,12 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`✅ Merge completed: ${merged.length} total characters`);
 
   // שלב 2: חלוקה חכמה לפסקאות בגמיני
+  console.log(`🔍 Checking smart division conditions: language="${language}", length=${merged.length}`);
   if (language === 'Hebrew' && merged.length > 500) {
     console.log(`🎯 Starting smart paragraph division with Gemini...`);
     merged = await smartParagraphDivision(merged);
+  } else {
+    console.log(`❌ Smart division skipped - language: "${language}" === "Hebrew"? ${language === 'Hebrew'}, length > 500? ${merged.length > 500}`);
   }
 
   // Python will handle all text processing - no Node.js processing needed
@@ -1231,9 +1234,12 @@ ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${cust
     console.log(`✅ Direct transcription completed: ${transcription.length} characters`);
 
     // שלב 2: חלוקה חכמה לפסקאות בגמיני
+    console.log(`🔍 Checking smart division conditions: language="${language}", length=${transcription.length}`);
     if (language === 'Hebrew' && transcription.length > 500) {
       console.log(`🎯 Starting smart paragraph division with Gemini...`);
       transcription = await smartParagraphDivision(transcription);
+    } else {
+      console.log(`❌ Smart division skipped - language: "${language}" === "Hebrew"? ${language === 'Hebrew'}, length > 500? ${transcription.length > 500}`);
     }
 
     return transcription;
