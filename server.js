@@ -803,6 +803,13 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
 // 🎯 NEW: Smart paragraph division with Gemini
 async function smartParagraphDivision(text) {
   try {
+    // Check if text is too long (over 30K chars) and split it
+    const MAX_CHARS = 30000;
+    if (text.length > MAX_CHARS) {
+      console.log(`📏 Text too long (${text.length} chars), splitting into chunks...`);
+      return await smartParagraphDivisionChunked(text, MAX_CHARS);
+    }
+
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-pro",
       generationConfig: {
@@ -883,6 +890,123 @@ ${text}
     console.log(`⚠️ Falling back to original text`);
     return text; // חזור לטקסט המקורי אם נכשל
   }
+}
+
+// 🎯 NEW: Smart paragraph division for long texts (chunked processing)
+async function smartParagraphDivisionChunked(text, maxChars) {
+  try {
+    // Split text into chunks at sentence boundaries
+    const chunks = splitTextIntoChunks(text, maxChars);
+    console.log(`📦 Split into ${chunks.length} chunks for processing`);
+
+    const processedChunks = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      console.log(`🔄 Processing chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)...`);
+
+      // Add delay between chunks to avoid rate limiting
+      if (i > 0) {
+        console.log('⏱️ Waiting 5 seconds between chunks...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+
+      // Process chunk through smart division
+      const processedChunk = await smartParagraphDivisionSingle(chunks[i]);
+      processedChunks.push(processedChunk);
+    }
+
+    // Join all processed chunks
+    const result = processedChunks.join('\n\n');
+    console.log(`✅ Chunked processing completed: ${result.length} characters`);
+
+    return result;
+
+  } catch (error) {
+    console.error('🔥 Chunked smart division failed:', error);
+    return text;
+  }
+}
+
+// Helper function to split text into chunks at sentence boundaries
+function splitTextIntoChunks(text, maxChars) {
+  const chunks = [];
+  let currentChunk = '';
+
+  // Split by sentences (Hebrew and English)
+  const sentences = text.split(/(?<=[.!?])\s+|(?<=[״׳])\s+/).filter(s => s.trim());
+
+  for (const sentence of sentences) {
+    if (currentChunk.length + sentence.length > maxChars && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += (currentChunk ? ' ' : '') + sentence;
+    }
+  }
+
+  if (currentChunk.trim()) {
+    chunks.push(currentChunk.trim());
+  }
+
+  return chunks;
+}
+
+// Single chunk processing (same as original but without chunking check)
+async function smartParagraphDivisionSingle(text) {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.5-pro",
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 500000
+    }
+  });
+
+  const prompt = `אני נותן לך קטע מטקסט של שיעור תורה שנתמלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשנה שום מילה בטקסט! רק תחלק לפסקאות
+- שמור על כל הטקסט כפי שהוא, כולל שגיאות
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+  // Retry mechanism
+  let result;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      console.log(`🔄 Attempt ${attempt}/3 for chunk smart division...`);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+      );
+
+      const generatePromise = model.generateContent(prompt);
+      result = await Promise.race([generatePromise, timeoutPromise]);
+      break;
+
+    } catch (attemptError) {
+      console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
+      if (attempt === 3) throw attemptError;
+
+      const waitTime = attempt * 8000;
+      console.log(`⏳ Waiting ${waitTime / 1000} seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+  }
+
+  const response = await result.response;
+  return response.text().trim();
 }
 
 // Helper function for Hebrew text fixes only (paragraphs handled by Gemini)
