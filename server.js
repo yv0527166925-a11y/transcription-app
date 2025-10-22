@@ -63,7 +63,9 @@ const transporter = nodemailer.createTransport({
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+// 🔥 Configure Express for large uploads - no limits
+app.use(express.json({ limit: '1gb' })); // Large JSON limit for metadata
+app.use(express.urlencoded({ limit: '1gb', extended: true })); // Large form data limit
 app.use(express.static('.'));
 
 // API Routes
@@ -131,9 +133,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
-  limits: { fileSize: 500 * 1024 * 1024 }, // 🔥 INCREASED: 500MB for large files
+  limits: {
+    fileSize: 500 * 1024 * 1024, // 🔥 500MB per file
+    files: Infinity // 🔥 UNLIMITED: No limit on number of files
+  },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/i;
     if (allowedTypes.test(file.originalname) || file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
@@ -3696,7 +3701,7 @@ async function sendErrorEmail(senderEmail, errorMessage) {
 }
 
 // Start server without MongoDB
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   const ffmpegAvailable = checkFFmpegAvailability();
 
   console.log(`🚀 Enhanced server running on port ${PORT}`);
