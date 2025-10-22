@@ -116,16 +116,79 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         # שורה ריקה
         new_paragraphs.append('<w:p></w:p>')
 
-        # פסקאות תוכן - שומר על פסקאות גמיני!
+        # פסקאות תוכן - עם fallback חכם אם גמיני לא חילק
         import re
 
-        # עיבוד עברי בלבד - לא נוגע בחלוקת פסקאות
-        for section in sections:
-            # רק תיקון עברי - לא חלוקה לפסקאות!
-            processed_text = fix_hebrew_punctuation(section)
+        # בדיקה אם גמיני חילק לפסקאות או שלח גוש אחד
+        if len(sections) == 1 and len(sections[0]) > 500:
+            print("⚠️ Gemini didn't split paragraphs, using smart Python fallback", file=sys.stderr)
 
-            # יצירת פסקה כפי שגמיני חילק
-            content_paragraph = f'''
+            # חלוקה חכמה של Python לפסקאות של 5-10 שורות
+            all_text = sections[0]
+            all_text = fix_hebrew_punctuation(all_text)
+
+            # חלוקה לפסקאות לפי משפטים (לא מילים!)
+            sentences = re.split(r'(?<=[.!?:])\s+', all_text)
+            current_para = ""
+            sentence_count = 0
+
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
+
+                current_para += sentence + " "
+                sentence_count += 1
+
+                # יצירת פסקה: 4-7 משפטים (בערך 5-10 שורות)
+                if sentence_count >= 4 and len(current_para) >= 400:
+                    # בדוק מירכאות זוגיות
+                    quote_count = current_para.count('"')
+                    if quote_count % 2 == 0:  # זוגי מירכאות
+                        para_text = current_para.strip()
+                        if para_text:
+                            content_paragraph = f'''
+<w:p>
+  <w:pPr>
+    <w:jc w:val="{alignment}"/>
+    <w:spacing w:after="240"/>
+  </w:pPr>
+  <w:r>
+    <w:rPr>
+      <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+      <w:sz w:val="28"/>
+    </w:rPr>
+    <w:t>{escape_xml(para_text)}</w:t>
+  </w:r>
+</w:p>'''
+                            new_paragraphs.append(content_paragraph)
+                        current_para = ""
+                        sentence_count = 0
+
+            # פסקה אחרונה
+            if current_para.strip():
+                para_text = current_para.strip()
+                content_paragraph = f'''
+<w:p>
+  <w:pPr>
+    <w:jc w:val="{alignment}"/>
+    <w:spacing w:after="240"/>
+  </w:pPr>
+  <w:r>
+    <w:rPr>
+      <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+      <w:sz w:val="28"/>
+    </w:rPr>
+    <w:t>{escape_xml(para_text)}</w:t>
+  </w:r>
+</w:p>'''
+                new_paragraphs.append(content_paragraph)
+        else:
+            # גמיני חילק נכון - השתמש בפסקאות שלו
+            print(f"✅ Using Gemini's {len(sections)} paragraphs", file=sys.stderr)
+            for section in sections:
+                processed_text = fix_hebrew_punctuation(section)
+                content_paragraph = f'''
 <w:p>
   <w:pPr>
     <w:jc w:val="{alignment}"/>
@@ -139,7 +202,7 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
     <w:t>{escape_xml(processed_text)}</w:t>
   </w:r>
 </w:p>'''
-            new_paragraphs.append(content_paragraph)
+                new_paragraphs.append(content_paragraph)
 
         # החלפת התוכן
         import re
@@ -231,35 +294,103 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
         if is_rtl:
             clean_text = fix_hebrew_punctuation(clean_text)
 
-        # שומר על פסקאות גמיני - לא מחלק מחדש!
+        # עם fallback חכם אם גמיני לא חילק
         sections = [section.strip() for section in clean_text.split('\n\n') if section.strip()]
 
-        print(f"Creating {len(sections)} paragraphs from Gemini (language={language}, RTL={is_rtl})", file=sys.stderr)
+        # בדיקה אם גמיני חילק לפסקאות או שלח גוש אחד
+        if len(sections) == 1 and len(sections[0]) > 500:
+            print("⚠️ Gemini didn't split paragraphs, using smart Python fallback", file=sys.stderr)
 
-        for i, section in enumerate(sections):
-            lines = [line.strip() for line in section.split('\n') if line.strip()]
-            combined_text = ' '.join(lines).strip()
+            # חלוקה חכמה של Python לפסקאות של 5-10 שורות
+            all_text = sections[0]
 
-            # רק תיקון עברי - לא חלוקה לפסקאות!
+            # תיקון עברי תחילה
             if is_rtl:
-                combined_text = fix_hebrew_punctuation(combined_text)
+                all_text = fix_hebrew_punctuation(all_text)
 
-            # בדיקה אם צריך נקודה בסוף
-            if combined_text and not combined_text[-1] in '.!?:':
-                combined_text += '.'
+            # חלוקה לפסקאות לפי משפטים
+            sentences = re.split(r'(?<=[.!?:])\s+', all_text)
+            current_para = ""
+            sentence_count = 0
+            para_num = 0
 
-            paragraph = doc.add_paragraph()
-            run = paragraph.add_run(combined_text)
-            run.font.name = 'David'
-            run.font.size = Pt(14)
+            for sentence in sentences:
+                sentence = sentence.strip()
+                if not sentence:
+                    continue
 
-            if is_rtl:
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                set_rtl_paragraph(paragraph)
-            else:
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                current_para += sentence + " "
+                sentence_count += 1
 
-            print(f"Added paragraph {i+1} ({language}): {combined_text[:50]}...", file=sys.stderr)
+                # יצירת פסקה: 4-7 משפטים (בערך 5-10 שורות)
+                if sentence_count >= 4 and len(current_para) >= 400:
+                    # בדוק מירכאות זוגיות
+                    quote_count = current_para.count('"')
+                    if quote_count % 2 == 0:  # זוגי מירכאות
+                        para_text = current_para.strip()
+                        if para_text:
+                            paragraph = doc.add_paragraph()
+                            run = paragraph.add_run(para_text)
+                            run.font.name = 'David'
+                            run.font.size = Pt(14)
+
+                            if is_rtl:
+                                paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                                set_rtl_paragraph(paragraph)
+                            else:
+                                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                            para_num += 1
+                            print(f"Added smart paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
+
+                        current_para = ""
+                        sentence_count = 0
+
+            # פסקה אחרונה
+            if current_para.strip():
+                para_text = current_para.strip()
+                paragraph = doc.add_paragraph()
+                run = paragraph.add_run(para_text)
+                run.font.name = 'David'
+                run.font.size = Pt(14)
+
+                if is_rtl:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    set_rtl_paragraph(paragraph)
+                else:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                para_num += 1
+                print(f"Added final smart paragraph {para_num}: {para_text[:50]}...", file=sys.stderr)
+
+        else:
+            # גמיני חילק נכון - השתמש בפסקאות שלו
+            print(f"✅ Using Gemini's {len(sections)} paragraphs", file=sys.stderr)
+
+            for i, section in enumerate(sections):
+                lines = [line.strip() for line in section.split('\n') if line.strip()]
+                combined_text = ' '.join(lines).strip()
+
+                # תיקון עברי
+                if is_rtl:
+                    combined_text = fix_hebrew_punctuation(combined_text)
+
+                # בדיקה אם צריך נקודה בסוף
+                if combined_text and not combined_text[-1] in '.!?:':
+                    combined_text += '.'
+
+                paragraph = doc.add_paragraph()
+                run = paragraph.add_run(combined_text)
+                run.font.name = 'David'
+                run.font.size = Pt(14)
+
+                if is_rtl:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    set_rtl_paragraph(paragraph)
+                else:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+                print(f"Added Gemini paragraph {i+1}: {combined_text[:50]}...", file=sys.stderr)
 
         doc.save(output_path)
         print(f"Basic document saved successfully: {output_path}", file=sys.stderr)

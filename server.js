@@ -725,7 +725,7 @@ ${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${custom
   }
 }
 
-function mergeTranscriptionChunks(chunks) {
+async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`🔗 Merging ${chunks.length} transcription chunks...`);
   
   if (chunks.length === 0) return '';
@@ -783,10 +783,68 @@ function mergeTranscriptionChunks(chunks) {
 
   console.log(`✅ Merge completed: ${merged.length} total characters`);
 
+  // שלב 2: חלוקה חכמה לפסקאות בגמיני
+  if (language === 'Hebrew' && merged.length > 500) {
+    console.log(`🎯 Starting smart paragraph division with Gemini...`);
+    merged = await smartParagraphDivision(merged);
+  }
+
   // Python will handle all text processing - no Node.js processing needed
-  console.log(`📝 Sending raw transcription to Python for processing...`);
+  console.log(`📝 Sending processed transcription to Python...`);
 
   return merged;
+}
+
+// 🎯 NEW: Smart paragraph division with Gemini
+async function smartParagraphDivision(text) {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 65536
+      }
+    });
+
+    const prompt = `אני נותן לך טקסט של שיעור תורה שנתמלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשנה שום מילה בטקסט! רק תחלק לפסקאות
+- שמור על כל הטקסט כפי שהוא, כולל שגיאות
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+    console.log(`🎯 Sending ${text.length} characters to Gemini for smart division...`);
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let dividedText = response.text().trim();
+
+    console.log(`✅ Smart division completed: ${dividedText.length} characters`);
+
+    // וידוא שיש חלוקה לפסקאות
+    const paragraphCount = dividedText.split('\\n\\n').length;
+    console.log(`📊 Created ${paragraphCount} smart paragraphs`);
+
+    return dividedText;
+
+  } catch (error) {
+    console.error('🔥 Smart paragraph division failed:', error);
+    console.log(`⚠️ Falling back to original text`);
+    return text; // חזור לטקסט המקורי אם נכשל
+  }
 }
 
 // Helper function for Hebrew text fixes only (paragraphs handled by Gemini)
@@ -1169,8 +1227,15 @@ ${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${cust
       .replace(/\n{4,}/g, '\n\n\n')
       .replace(/^\s+|\s+$/gm, '')
       .trim();
-    
+
     console.log(`✅ Direct transcription completed: ${transcription.length} characters`);
+
+    // שלב 2: חלוקה חכמה לפסקאות בגמיני
+    if (language === 'Hebrew' && transcription.length > 500) {
+      console.log(`🎯 Starting smart paragraph division with Gemini...`);
+      transcription = await smartParagraphDivision(transcription);
+    }
+
     return transcription;
     
   } catch (error) {
@@ -1260,7 +1325,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     );
 
     // Merge all transcriptions
-    const finalTranscription = mergeTranscriptionChunks(transcriptions);
+    const finalTranscription = await mergeTranscriptionChunks(transcriptions, language);
 
     if (failedChunks.length > 0) {
       console.warn(`⚠️ Transcription completed with ${failedChunks.length} failed chunks out of ${transcriptions.length}`);
