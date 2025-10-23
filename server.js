@@ -1901,7 +1901,7 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
 const attachments = transcriptions.map(trans => {
   const cleanName = cleanFilename(trans.filename);
   return {
-    filename: `תמלול_מלא_${cleanName}.docx`,
+    filename: `${cleanName}.docx`,
     content: trans.wordDoc,
     contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   };
@@ -2463,7 +2463,7 @@ app.get('/api/download/:filename', (req, res) => {
     }
 
     const originalName = filename.replace(/_\d+\.docx$/, '.docx'); // Remove timestamp
-    const hebrewName = `תמלול_${originalName}`;
+    const hebrewName = originalName;
 
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(hebrewName)}`);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
@@ -3747,7 +3747,7 @@ async function sendTranscriptionResultsEmail(senderEmail, results, minutesUsed, 
       // Add Word file as attachment
       if (result.wordFilePath && fs.existsSync(result.wordFilePath)) {
         attachments.push({
-          filename: `${result.filename.replace(/\.[^/.]+$/, '')}_תמלול.docx`,
+          filename: `${result.filename.replace(/\.[^/.]+$/, '')}.docx`,
           path: result.wordFilePath
         });
       }
