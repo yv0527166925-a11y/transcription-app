@@ -633,10 +633,6 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
     
     const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
-🔥🔥🔥 הוראה ראשונה וקריטית ביותר:
-חלק את התמלול לפסקאות עם שורה ריקה כפולה (\\n\\n) בין כל פסקה!
-אסור לשלוח גוש אחד של טקסט!
-
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
 
@@ -651,29 +647,7 @@ ${contextPrompt}
 4. סיים ישירות עם התוכן - אל תוסיף סיכום
 5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
 
-📝 הוראות חלוקה לפסקאות - חובה מוחלטת:
-
-🎯 חוקי פסקאות נוקשים - חובה מוחלטת!:
-- כל פסקה תכלול בממוצע 5-10 שורות – לא פחות מדי ולא ארוכה מדי
-- מינימום 3 משפטים לפסקה, מקסימום 8 משפטים לפסקה
-- 🚨 חובה מוחלטת: הפרד כל פסקה עם שורה ריקה כפולה (\n\n)
-- אסור בהחלט לשלוח גוש טקסט אחד ארוך!
-
-📚 מעברי פסקאות מחייבים:
-- ציטוט מהתורה/חז"ל שעולה על 2 שורות - פסקה נפרדת
-- ציטוט קצר (עד 2 שורות) נשאר בתוך הפסקה
-- סיפור או משל חדש - פסקה נפרדת
-- מעבר בין "אומר", "כותב", "אמר" - פסקה נפרדת
-- שינוי מנושא לנושא (אפילו קשור)
-- דוגמה או סיפור אישי - פסקה נפרדת
-- מעבר מהלכה לסיפור או להיפך
-
-✂️ חתוך פסקאות ארוכות:
-- אם הפסקה עוברת 10 שורות או 8 משפטים - חתוך באמצע
-- מצא נקודה הגיונית לחיתוך (כמו "זה הדבר", "למה?", "הנה מה שקרה")
-- אל תעשה פסקאות קצרות מ-5 שורות אלא אם זה הכרחי
-
-${customInstructions ? `🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו עם התמלול:`;
+תתחיל עכשיו עם התמלול:`;
 
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
@@ -803,8 +777,8 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
 // 🎯 NEW: Smart paragraph division with Gemini
 async function smartParagraphDivision(text) {
   try {
-    // Check if text is too long (over 30K chars) and split it
-    const MAX_CHARS = 30000;
+    // Check if text is too long (over 15K chars) and split it
+    const MAX_CHARS = 15000;
     if (text.length > MAX_CHARS) {
       console.log(`📏 Text too long (${text.length} chars), splitting into chunks...`);
       return await smartParagraphDivisionChunked(text, MAX_CHARS);
@@ -818,7 +792,7 @@ async function smartParagraphDivision(text) {
       }
     });
 
-    const prompt = `אני נותן לך טקסט של שיעור תורה שנתמלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+    const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
 
 🎯 חוקי חלוקה חכמה:
 - כל פסקה צריכה להיות רעיון או נושא שלם
@@ -961,7 +935,7 @@ async function smartParagraphDivisionSingle(text) {
     }
   });
 
-  const prompt = `אני נותן לך קטע מטקסט של שיעור תורה שנתמלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+  const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
 
 🎯 חוקי חלוקה חכמה:
 - כל פסקה צריכה להיות רעיון או נושא שלם
@@ -1334,28 +1308,6 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
 🎯 ${(language === 'Hebrew' || language === 'he') ? 'תמלל לעברית תקנית:' : `Transcribe in ${language || 'the original language'}. Do NOT translate:`}
 
-📝 הוראות חלוקה לפסקאות - חובה מוחלטת:
-
-🎯 חוקי פסקאות נוקשים - חובה מוחלטת!:
-- כל פסקה תכלול בממוצע 5-10 שורות – לא פחות מדי ולא ארוכה מדי
-- מינימום 3 משפטים לפסקה, מקסימום 8 משפטים לפסקה
-- 🚨 חובה מוחלטת: הפרד כל פסקה עם שורה ריקה כפולה (\n\n)
-- אסור בהחלט לשלוח גוש טקסט אחד ארוך!
-
-📚 מעברי פסקאות מחייבים:
-- ציטוט מהתורה/חז"ל שעולה על 2 שורות - פסקה נפרדת
-- ציטוט קצר (עד 2 שורות) נשאר בתוך הפסקה
-- סיפור או משל חדש - פסקה נפרדת
-- מעבר בין "אומר", "כותב", "אמר" - פסקה נפרדת
-- שינוי מנושא לנושא (אפילו קשור)
-- דוגמה או סיפור אישי - פסקה נפרדת
-- מעבר מהלכה לסיפור או להיפך
-
-✂️ חתוך פסקאות ארוכות:
-- אם הפסקה עוברת 10 שורות או 8 משפטים - חתוך באמצע
-- מצא נקודה הגיונית לחיתוך (כמו "זה הדבר", "למה?", "הנה מה שקרה")
-- אל תעשה פסקאות קצרות מ-5 שורות אלא אם זה הכרחי
-
 🔤 עיצוב וסגנון:
 - מושגים דתיים מדויקים
 - ציטוטים במירכאות
@@ -1363,7 +1315,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 - החזר טקסט מוכן לשימוש ללא עיבוד נוסף
 🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
 
-${customInstructions ? `\n🎯 הנחיות אישיות מהמשתמש:\n${customInstructions}\n` : ''}תתחיל עכשיו ותמלל הכל ללא חריגות:`;
+תתחיל עכשיו ותמלל הכל ללא חריגות:`;
 
     console.log(`🎯 Starting direct transcription for: ${cleanFilename(filename)} (${fileSizeMB.toFixed(1)} MB)`);
 
