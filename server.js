@@ -884,9 +884,17 @@ async function smartParagraphDivisionChunked(text, maxChars) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      // Process chunk through smart division
-      const processedChunk = await smartParagraphDivisionSingle(chunks[i]);
-      processedChunks.push(processedChunk);
+      try {
+        // Process chunk through smart division
+        const processedChunk = await smartParagraphDivisionSingle(chunks[i]);
+        processedChunks.push(processedChunk);
+        console.log(`✅ Chunk ${i + 1}/${chunks.length} processed successfully (${processedChunk.length} chars)`);
+      } catch (error) {
+        console.error(`❌ Chunk ${i + 1}/${chunks.length} failed:`, error.message);
+        // Add original chunk without processing as fallback
+        processedChunks.push(chunks[i]);
+        console.log(`🔄 Added unprocessed chunk ${i + 1} as fallback (${chunks[i].length} chars)`);
+      }
     }
 
     // Join all processed chunks
@@ -2611,6 +2619,72 @@ app.post('/api/admin/add-minutes', (req, res) => {
   }
 });
 
+// Admin route to delete user
+app.post('/api/admin/delete-user', (req, res) => {
+  try {
+    console.log('🗑️ Admin delete-user endpoint called');
+    console.log('🗑️ Request body:', req.body);
+
+    const { adminEmail, userEmail } = req.body;
+
+    if (!adminEmail || !userEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'אימיילי אדמין ומשתמש נדרשים'
+      });
+    }
+
+    // Verify admin permissions
+    const admin = users.find(u => u.email.toLowerCase() === adminEmail.toLowerCase());
+    if (!admin || !admin.isAdmin) {
+      console.log('❌ Unauthorized delete attempt by:', adminEmail);
+      return res.status(403).json({
+        success: false,
+        error: 'הרשאות אדמין נדרשות'
+      });
+    }
+
+    // Find user to delete
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    if (userIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: `משתמש לא נמצא: ${userEmail}`
+      });
+    }
+
+    const userToDelete = users[userIndex];
+
+    // Prevent deletion of admin users
+    if (userToDelete.isAdmin) {
+      return res.status(400).json({
+        success: false,
+        error: 'לא ניתן למחוק משתמש אדמין'
+      });
+    }
+
+    // Delete the user
+    users.splice(userIndex, 1);
+    saveUsersData();
+
+    console.log(`✅ User deleted successfully: ${userEmail} by admin: ${adminEmail}`);
+    console.log(`📋 Total users now: ${users.length}`);
+
+    res.json({
+      success: true,
+      message: `המשתמש ${userEmail} נמחק בהצלחה`,
+      totalUsers: users.length
+    });
+
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה במחיקת המשתמש'
+    });
+  }
+});
+
 // Multer error handling middleware
 function handleMulterError(err, req, res, next) {
   if (err) {
@@ -2644,15 +2718,31 @@ function handleMulterError(err, req, res, next) {
   next();
 }
 
-// Enhanced transcription route
+
+// Enhanced transcription route (supports both regular files and Google Drive files)
 app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req, res) => {
   try {
     console.log('🎯 Enhanced transcription request received');
-    console.log('📁 Files uploaded:', req.files?.length || 0);
-    console.log('📧 Request body:', req.body);
-    
-    if (!req.files || req.files.length === 0) {
+    console.log('📁 Regular files uploaded:', req.files?.length || 0);
+
+    // Parse Google Drive files if any
+    const driveFiles = req.body.driveFiles ? JSON.parse(req.body.driveFiles) : [];
+    console.log('🔗 Google Drive files:', driveFiles?.length || 0);
+    console.log('📧 Request body:', { ...req.body, driveFiles: driveFiles?.length ? `${driveFiles.length} files` : 'none' });
+
+    // Check if we have any files at all (either uploaded or from Google Drive)
+    const totalFiles = (req.files?.length || 0) + (driveFiles?.length || 0);
+    if (totalFiles === 0) {
       return res.status(400).json({ success: false, error: 'לא נבחרו קבצים' });
+    }
+
+    // For now, if there are Google Drive files, return a message that it's coming soon
+    if (driveFiles && driveFiles.length > 0) {
+      console.log('🔗 Google Drive files detected - feature coming soon');
+      return res.status(501).json({
+        success: false,
+        error: 'תכונת Google Drive זמינה בקרוב - בינתיים השתמש בהעלאה רגילה מהמחשב'
+      });
     }
 
     const { email, language, customInstructions } = req.body;
@@ -2808,7 +2898,9 @@ app.post('/api/cancel-transcription', (req, res) => {
 app.get('/api/transcription-progress/:transcriptionId', (req, res) => {
   try {
     const { transcriptionId } = req.params;
+    console.log(`📊 Progress request for transcriptionId: '${transcriptionId}'`);
     const transcriptionData = activeTranscriptions.get(transcriptionId);
+    console.log(`📊 Found transcription data:`, transcriptionData ? 'Yes' : 'No');
 
     if (!transcriptionData) {
       return res.status(404).json({

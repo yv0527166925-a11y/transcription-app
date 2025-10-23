@@ -700,6 +700,10 @@
             border-left: 3px solid #ffc107;
         }
     </style>
+
+    <!-- Google APIs -->
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
 </head>
 <body>
     <div class="container">
@@ -931,6 +935,10 @@
                         </button>
                         <button type="button" class="btn-upload-option" onclick="selectFolder()" title="בחר תיקייה עם כל הקבצים שבתוכה">
                             📂 בחר תיקייה שלמה
+                        </button>
+                        <!-- Google Drive integration - ready but disabled for now -->
+                        <button type="button" class="btn-upload-option" onclick="selectFromGoogleDrive()" title="בחר קבצים מ-Google Drive" style="display: none;">
+                            🔗 Google Drive
                         </button>
                     </div>
 
@@ -2102,15 +2110,39 @@
             }, 2000);
 
             try {
+                // Prepare data for both regular files and Google Drive files
                 const formData = new FormData();
+                const driveFiles = [];
+
                 selectedFiles.forEach((item, index) => {
-                    formData.append('files', item.file);
+                    if (item.isGoogleDriveFile) {
+                        // Add Google Drive file info
+                        driveFiles.push({
+                            name: item.name,
+                            driveId: item.driveId,
+                            size: item.size,
+                            type: item.type
+                        });
+                    } else {
+                        // Add regular uploaded file
+                        formData.append('files', item.file);
+                    }
                 });
+
+                // Add metadata
                 formData.append('email', currentUser.email);
                 formData.append('language', language);
                 if (customInstructions) {
                     formData.append('customInstructions', customInstructions);
                 }
+
+                // Add Google Drive files as JSON if any
+                if (driveFiles.length > 0) {
+                    formData.append('driveFiles', JSON.stringify(driveFiles));
+                    console.log(`📁 Including ${driveFiles.length} Google Drive files`);
+                }
+
+                console.log(`📁 Processing ${selectedFiles.length} total files: ${selectedFiles.filter(f => !f.isGoogleDriveFile).length} uploaded + ${driveFiles.length} from Drive`);
 
                 const response = await fetch(`${API_BASE}/transcribe`, {
                     method: 'POST',
@@ -2132,10 +2164,12 @@
                 }
 
                 const data = await response.json();
+                console.log(`📦 Server response data:`, data);
 
                 // Store transcription ID for potential cancellation
                 if (data.success && data.transcriptionId) {
                     currentTranscriptionId = data.transcriptionId;
+                    console.log(`✅ Stored transcriptionId: ${currentTranscriptionId}`);
 
                     // Stop fake progress and start real progress checking
                     clearInterval(progressInterval);
@@ -2144,7 +2178,7 @@
                         try {
                             // Skip if no valid transcription ID
                             if (!currentTranscriptionId || currentTranscriptionId === 'null') {
-                                console.log('⏸️ No valid transcription ID, stopping progress check');
+                                console.log(`⏸️ No valid transcription ID: '${currentTranscriptionId}', stopping progress check`);
                                 clearInterval(realProgressCheck);
                                 return;
                             }
@@ -2482,18 +2516,156 @@
             switchAdminTab('add-minutes');
         }
 
-        function deleteUser(email) {
+        async function deleteUser(email) {
             if (confirm(`האם אתה בטוח שברצונך למחוק את המשתמש ${email}?`)) {
-                // TODO: Implement user deletion
-                showStatus('פונקציה זו תתווסף בקרוב', 'info');
+                try {
+                    const response = await fetch(`${API_BASE}/admin/delete-user`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            adminEmail: currentUser.email,
+                            userEmail: email
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        showStatus(`המשתמש ${email} נמחק בהצלחה`, 'success');
+                        loadUsers(); // Refresh user list
+                    } else {
+                        showStatus(data.error || 'שגיאה במחיקת המשתמש', 'error');
+                    }
+                } catch (error) {
+                    console.error('Delete user error:', error);
+                    showStatus('שגיאה בחיבור לשרת', 'error');
+                }
             }
         }
 
+        // ========== Google Drive Integration ==========
+
+        const GOOGLE_DRIVE_CONFIG = {
+            CLIENT_ID: '354026645134-dbrlb166ou0lcikr8cpr28a6jps7bvfg.apps.googleusercontent.com',
+            API_KEY: 'AIzaSyBk8PrWr2qY6X9rJ8lK4tH3mN5pQ7vR9sT', // You'll need to add this
+            DISCOVERY_DOC: 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest',
+            SCOPES: 'https://www.googleapis.com/auth/drive.readonly'
+        };
+
+        let gapi_initialized = false;
+        let google_auth_initialized = false;
+
+        // Initialize Google APIs
+        async function initializeGoogleAPIs() {
+            try {
+                console.log('🔗 Initializing Google APIs...');
+
+                // Initialize gapi
+                await new Promise((resolve, reject) => {
+                    gapi.load('auth2:picker', resolve);
+                });
+
+                console.log('✅ Google APIs loaded');
+                gapi_initialized = true;
+
+            } catch (error) {
+                console.error('❌ Failed to initialize Google APIs:', error);
+                showStatus('שגיאה בטעינת Google Drive API', 'error');
+            }
+        }
+
+        // Select files from Google Drive
+        async function selectFromGoogleDrive() {
+            try {
+                if (!gapi_initialized) {
+                    showStatus('טוען Google Drive API...', 'info');
+                    await initializeGoogleAPIs();
+                }
+
+                // Authenticate user
+                const authInstance = gapi.auth2.getAuthInstance();
+                if (!authInstance.isSignedIn.get()) {
+                    console.log('🔐 User not signed in, prompting for authentication...');
+                    await authInstance.signIn();
+                }
+
+                console.log('✅ User authenticated with Google');
+
+                // Create and show picker
+                const picker = new google.picker.PickerBuilder()
+                    .addView(google.picker.ViewId.DOCS)
+                    .setOAuthToken(authInstance.currentUser.get().getAuthResponse().access_token)
+                    .setCallback(handleGoogleDriveSelection)
+                    .build();
+
+                picker.setVisible(true);
+
+            } catch (error) {
+                console.error('❌ Google Drive selection failed:', error);
+                showStatus('שגיאה בחיבור ל-Google Drive', 'error');
+            }
+        }
+
+        // Handle file selection from Google Drive
+        function handleGoogleDriveSelection(data) {
+            if (data.action === google.picker.Action.PICKED) {
+                const files = data.docs;
+                console.log('📁 Selected files from Google Drive:', files);
+
+                // Process selected files
+                processGoogleDriveFiles(files);
+            }
+        }
+
+        // Process Google Drive files
+        async function processGoogleDriveFiles(driveFiles) {
+            try {
+                showStatus('מעבד קבצים מ-Google Drive...', 'info');
+
+                const audioVideoFiles = driveFiles.filter(file => {
+                    const mimeType = file.mimeType || '';
+                    return mimeType.startsWith('audio/') || mimeType.startsWith('video/');
+                });
+
+                if (audioVideoFiles.length === 0) {
+                    showStatus('לא נמצאו קבצי אודיו או וידאו בבחירה', 'error');
+                    return;
+                }
+
+                console.log(`📎 Found ${audioVideoFiles.length} audio/video files`);
+
+                // Add files to selection (convert to File-like objects)
+                const fileObjects = audioVideoFiles.map(driveFile => ({
+                    name: driveFile.name,
+                    size: driveFile.sizeBytes || 0,
+                    type: driveFile.mimeType || '',
+                    driveId: driveFile.id,
+                    isGoogleDriveFile: true
+                }));
+
+                // Add to selectedFiles array
+                selectedFiles.push(...fileObjects);
+                updateSelectedFilesDisplay();
+                updateCostEstimate();
+
+                showStatus(`נוספו ${audioVideoFiles.length} קבצים מ-Google Drive`, 'success');
+
+            } catch (error) {
+                console.error('❌ Error processing Google Drive files:', error);
+                showStatus('שגיאה בעיבוד קבצי Google Drive', 'error');
+            }
+        }
+
+        // Initialize Google APIs when page loads
+        window.addEventListener('load', () => {
+            initializeGoogleAPIs();
+            testAPI();
+        });
+
         // Initialize app
         updateSubmitButton();
-        
-        // Test API when page loads
-        window.addEventListener('load', testAPI);
     </script>
 </body>
 </html>
