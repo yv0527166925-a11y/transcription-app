@@ -34,6 +34,69 @@ let genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // ספירת קבצים לאיפוס genAI כל 3 קבצים
 let processedFilesCount = 0;
 
+// Rate limiting storage
+const rateLimits = {
+  registration: new Map(), // IP -> { count, resetTime }
+  verification: new Map(), // email -> { count, resetTime }
+  login: new Map() // IP -> { count, resetTime }
+};
+
+// Rate limiting helper functions
+function getRateLimitKey(type, identifier) {
+  return `${type}_${identifier}`;
+}
+
+function isRateLimited(type, identifier, maxAttempts = 5, windowMinutes = 15) {
+  const now = Date.now();
+  const key = getRateLimitKey(type, identifier);
+  const limitMap = rateLimits[type];
+
+  if (!limitMap) return false;
+
+  const record = limitMap.get(key);
+
+  if (!record) {
+    // First attempt
+    limitMap.set(key, { count: 1, resetTime: now + (windowMinutes * 60 * 1000) });
+    return false;
+  }
+
+  if (now > record.resetTime) {
+    // Reset window
+    limitMap.set(key, { count: 1, resetTime: now + (windowMinutes * 60 * 1000) });
+    return false;
+  }
+
+  if (record.count >= maxAttempts) {
+    console.log(`⛔ Rate limit exceeded for ${type}:${identifier} (${record.count}/${maxAttempts})`);
+    return true;
+  }
+
+  // Increment counter
+  record.count++;
+  return false;
+}
+
+function getClientIP(req) {
+  return req.headers['x-forwarded-for'] ||
+         req.connection.remoteAddress ||
+         req.socket.remoteAddress ||
+         (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+         '127.0.0.1';
+}
+
+// Clean up old rate limit records every hour
+setInterval(() => {
+  const now = Date.now();
+  Object.values(rateLimits).forEach(limitMap => {
+    for (const [key, record] of limitMap.entries()) {
+      if (now > record.resetTime) {
+        limitMap.delete(key);
+      }
+    }
+  });
+  console.log('🧹 Cleaned up old rate limit records');
+}, 60 * 60 * 1000);
 
 // Email transporter with timeout settings
 const transporter = nodemailer.createTransport({
@@ -2501,6 +2564,17 @@ app.get('/api/test', (req, res) => {
 // Authentication routes
 app.post('/api/login', (req, res) => {
   try {
+    const clientIP = getClientIP(req);
+
+    // Rate limiting: 10 login attempts per IP per 15 minutes
+    if (isRateLimited('login', clientIP, 10, 15)) {
+      console.log(`⛔ Login rate limit exceeded for IP: ${clientIP}`);
+      return res.status(429).json({
+        success: false,
+        error: 'יותר מדי ניסיונות התחברות. נסה שוב בעוד 15 דקות.'
+      });
+    }
+
     console.log('🔐 Login attempt:', req.body);
     
     const { email, password } = req.body;
@@ -2514,6 +2588,17 @@ app.post('/api/login', (req, res) => {
     console.log('📋 Available users:', users.map(u => ({ email: u.email, isAdmin: u.isAdmin })));
     
     if (user) {
+      // Check if email verification is required (for new users only)
+      if (user.emailVerified === false) {
+        console.log('❌ Login blocked - email not verified for:', user.email);
+        return res.json({
+          success: false,
+          error: 'יש לאמת את כתובת המייל קודם. בדוק את תיבת הדואר שלך.',
+          needsVerification: true,
+          email: user.email
+        });
+      }
+
       console.log('✅ Login successful for:', user.email);
       res.json({ success: true, user: { ...user, password: undefined } });
     } else {
@@ -2550,21 +2635,44 @@ app.post('/api/user-sync', (req, res) => {
   }
 });
 
-app.post('/api/register', (req, res) => {
+app.post('/api/register', async (req, res) => {
   try {
+    const clientIP = getClientIP(req);
+
+    // Rate limiting: 3 registrations per IP per hour
+    if (isRateLimited('registration', clientIP, 3, 60)) {
+      console.log(`⛔ Registration rate limit exceeded for IP: ${clientIP}`);
+      return res.status(429).json({
+        success: false,
+        error: 'יותר מדי הרשמות מהכתובת שלך. נסה שוב בעוד שעה.'
+      });
+    }
+
     console.log('📝 Registration attempt:', req.body);
-    
+
     const { name, email, password, phone } = req.body;
-    
+
     if (!name || !email || !password) {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
     }
-    
+
     if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) {
       console.log('❌ User already exists:', email);
       return res.json({ success: false, error: 'משתמש עם האימייל הזה כבר קיים' });
     }
-    
+
+    // Additional rate limiting: 1 registration per email per day
+    if (isRateLimited('registration', email, 1, 24 * 60)) {
+      console.log(`⛔ Email registration rate limit exceeded: ${email}`);
+      return res.json({
+        success: false,
+        error: 'כבר נרשמת עם האימייל הזה היום. נסה שוב מחר.'
+      });
+    }
+
+    // Generate verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
     const newUser = {
       id: users.length + 1,
       name,
@@ -2576,18 +2684,131 @@ app.post('/api/register', (req, res) => {
       totalTranscribed: 0,
       history: [],
       transcriptionHistory: [],
-      joinDate: new Date().toISOString() // Add join date
+      joinDate: new Date().toISOString(),
+      emailVerified: false,
+      verificationCode: verificationCode,
+      verificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     };
-    
+
+    // Rate limiting for email sending: 3 emails per email address per hour
+    if (isRateLimited('verification', `email_${email}`, 3, 60)) {
+      console.log(`⛔ Email sending rate limit exceeded: ${email}`);
+      return res.json({
+        success: false,
+        error: 'נשלחו יותר מדי מיילי אימות. נסה שוב בעוד שעה.'
+      });
+    }
+
+    // Send verification email
+    try {
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: 'אמת את המייל שלך - מערכת תמלול',
+        html: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #3b82f6;">ברוך הבא למערכת התמלול! 🎙️</h2>
+            <p>שלום ${name},</p>
+            <p>תודה שנרשמת למערכת התמלול שלנו. כדי להשלים את ההרשמה, אנא אמת את כתובת המייל שלך.</p>
+
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+              <h3 style="margin: 0;">קוד האימות שלך:</h3>
+              <div style="font-size: 32px; font-weight: bold; color: #3b82f6; margin: 10px 0; letter-spacing: 5px;">
+                ${verificationCode}
+              </div>
+              <p style="margin: 0; color: #666;">הקוד תקף למשך 24 שעות</p>
+            </div>
+
+            <p>אחרי שתאמת את המייל, תוכל להתחבר ולהתחיל להשתמש במערכת.</p>
+
+            <p style="margin-top: 30px;">
+              בברכה,<br>
+              צוות מערכת התמלול
+            </p>
+          </div>
+        `
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log('✅ Verification email sent to:', email);
+
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      return res.json({ success: false, error: 'שגיאה בשליחת מייל אימות' });
+    }
+
     users.push(newUser);
     saveUsersData(); // Save after adding new user
-    console.log('✅ User registered successfully:', newUser.email);
+    console.log('✅ User registered successfully (pending verification):', newUser.email);
     console.log('📋 Total users now:', users.length);
-    
-    res.json({ success: true, user: { ...newUser, password: undefined } });
+
+    res.json({
+      success: true,
+      message: 'הרשמה הושלמה! נשלח אליך מייל עם קוד אימות.',
+      needsVerification: true
+    });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ success: false, error: 'שגיאה בהרשמה' });
+  }
+});
+
+// Email verification endpoint
+app.post('/api/verify-email', (req, res) => {
+  try {
+    const { email, verificationCode } = req.body;
+
+    // Rate limiting: 5 verification attempts per email per 15 minutes
+    if (isRateLimited('verification', email, 5, 15)) {
+      console.log(`⛔ Verification rate limit exceeded for email: ${email}`);
+      return res.status(429).json({
+        success: false,
+        error: 'יותר מדי ניסיונות אימות. נסה שוב בעוד 15 דקות.'
+      });
+    }
+
+    if (!email || !verificationCode) {
+      return res.json({ success: false, error: 'אימייל וקוד אימות נדרשים' });
+    }
+
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      console.log('❌ User not found for verification:', email);
+      return res.json({ success: false, error: 'משתמש לא נמצא' });
+    }
+
+    if (user.emailVerified) {
+      console.log('⚠️ User already verified:', email);
+      return res.json({ success: false, error: 'המייל כבר מאומת' });
+    }
+
+    if (user.verificationCode !== verificationCode) {
+      console.log('❌ Invalid verification code for:', email);
+      return res.json({ success: false, error: 'קוד אימות שגוי' });
+    }
+
+    if (new Date() > new Date(user.verificationExpires)) {
+      console.log('❌ Verification code expired for:', email);
+      return res.json({ success: false, error: 'קוד האימות פג תוקף. אנא הירשם מחדש.' });
+    }
+
+    // Mark as verified
+    user.emailVerified = true;
+    delete user.verificationCode;
+    delete user.verificationExpires;
+    saveUsersData();
+
+    console.log('✅ Email verified successfully for:', email);
+
+    res.json({
+      success: true,
+      message: 'המייל אומת בהצלחה! כעת תוכל להתחבר.',
+      user: { ...user, password: undefined }
+    });
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ success: false, error: 'שגיאה באימות מייל' });
   }
 });
 

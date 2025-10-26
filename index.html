@@ -19,6 +19,95 @@
             color: #6b7280;
         }
 
+        /* Cookie Banner Styles */
+        .cookie-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2d3748;
+            color: white;
+            padding: 20px;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 10000;
+            border-top: 3px solid #3b82f6;
+        }
+
+        .cookie-banner-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .cookie-banner-text {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .cookie-banner-text h4 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .cookie-banner-text p {
+            margin: 0;
+            color: #e2e8f0;
+            line-height: 1.5;
+        }
+
+        .cookie-banner-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .cookie-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 100px;
+        }
+
+        .cookie-btn-accept {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .cookie-btn-accept:hover {
+            background: #2563eb;
+        }
+
+        .cookie-btn-decline {
+            background: transparent;
+            color: #e2e8f0;
+            border: 2px solid #4a5568;
+        }
+
+        .cookie-btn-decline:hover {
+            background: #4a5568;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .cookie-banner-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .cookie-banner-buttons {
+                justify-content: center;
+                width: 100%;
+            }
+        }
+
         .container {
             background: #ffffff;
             border-radius: 8px;
@@ -776,6 +865,34 @@
                 <!-- Status for auth messages -->
                 <div class="status" id="registerAuthStatus" style="display: none;"></div>
             </div>
+
+            <!-- Email Verification Tab -->
+            <div id="verificationTab" class="tab-content">
+                <div class="auth-container">
+                    <h3>אימות מייל</h3>
+                    <p>נשלח קוד אימות לכתובת המייל שלך. אנא הזן את הקוד כדי להשלים את ההרשמה.</p>
+
+                    <form id="verificationForm">
+                        <div class="form-group">
+                            <label for="verificationEmail">אימייל:</label>
+                            <input type="email" id="verificationEmail" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="verificationCode">קוד אימות (6 ספרות):</label>
+                            <input type="text" id="verificationCode" maxlength="6" pattern="[0-9]{6}" required
+                                   placeholder="123456" style="text-align: center; font-size: 18px; letter-spacing: 3px;">
+                        </div>
+                        <button type="submit" class="btn">אמת מייל</button>
+                    </form>
+
+                    <div class="text-center" style="margin-top: 20px;">
+                        <button class="link-btn" onclick="switchTab('register')">חזור להרשמה</button>
+                        <button class="link-btn" onclick="switchTab('login')">יש לך חשבון? התחבר כאן</button>
+                    </div>
+                </div>
+                <!-- Status for verification messages -->
+                <div class="status" id="verificationAuthStatus" style="display: none;"></div>
+            </div>
         </div>
 
         <!-- Main App Section -->
@@ -1056,12 +1173,31 @@
        </div>
     </div>
 
+    <!-- Cookie Consent Banner -->
+    <div id="cookieBanner" class="cookie-banner" style="display: none;">
+        <div class="cookie-banner-content">
+            <div class="cookie-banner-text">
+                <h4>שימוש בעוגיות</h4>
+                <p>האתר שלנו משתמש בעוגיות כדי לשפר את החוויה שלך, לזכור את פרטי ההתחברות ולהבטיח פעולה תקינה של המערכת.</p>
+            </div>
+            <div class="cookie-banner-buttons">
+                <button class="cookie-btn cookie-btn-accept" onclick="acceptCookies()">
+                    ✅ אישור
+                </button>
+                <button class="cookie-btn cookie-btn-decline" onclick="declineCookies()">
+                    ❌ דחייה
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // API Configuration
         const API_BASE = '/api';
         
         // Global state
         let currentUser = null;
+        let cookiesAccepted = false;
 
         // Save user to localStorage
         function saveUserToStorage(user) {
@@ -1086,6 +1222,32 @@
         // Clear user from storage
         function clearUserFromStorage() {
             localStorage.removeItem('currentUser');
+        }
+
+        // Cookie consent functions
+        function checkCookieConsent() {
+            const consent = localStorage.getItem('cookieConsent');
+            if (consent === null) {
+                // Show banner if no choice made yet
+                document.getElementById('cookieBanner').style.display = 'block';
+                return false;
+            }
+            cookiesAccepted = consent === 'accepted';
+            return true;
+        }
+
+        function acceptCookies() {
+            localStorage.setItem('cookieConsent', 'accepted');
+            cookiesAccepted = true;
+            document.getElementById('cookieBanner').style.display = 'none';
+            console.log('✅ Cookies accepted');
+        }
+
+        function declineCookies() {
+            localStorage.setItem('cookieConsent', 'declined');
+            cookiesAccepted = false;
+            document.getElementById('cookieBanner').style.display = 'none';
+            console.log('❌ Cookies declined - using localStorage only');
         }
         let selectedFiles = [];
         let selectedPayment = null;
@@ -1261,13 +1423,22 @@
                     showAuthStatus('✅ התחברת בהצלחה!', 'success');
                     updateDebugInfo('✅ התחברות הצליחה!');
                     setTimeout(() => showApp(), 1000); // Small delay to show success message
+                } else if (data.needsVerification) {
+                    // Redirect to verification if email not verified
+                    document.getElementById('verificationEmail').value = data.email;
+                    switchTab('verification');
+                    showVerificationStatus(data.error || 'נדרש אימות מייל', 'error');
                 } else {
                     showAuthStatus(data.error || 'שגיאה בהתחברות', 'error');
                     updateDebugInfo(`❌ התחברות נכשלה: ${data.error}`);
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                if (error.message.includes('429')) {
+                    showAuthStatus('יותר מדי ניסיונות התחברות. נסה שוב מאוחר יותר.', 'error');
+                } else {
+                    showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                }
                 updateDebugInfo(`❌ שגיאה: ${error.message}`);
             }
         });
@@ -1307,18 +1478,31 @@
                 console.log('Register response:', data);
                 
                 if (data.success) {
-                    currentUser = data.user;
-                    saveUserToStorage(currentUser);
-                    showAuthStatus('✅ ההרשמה הושלמה בהצלחה!', 'success');
-                    updateDebugInfo('✅ הרשמה הצליחה!');
-                    setTimeout(() => showApp(), 2000); // Longer delay to read success message
+                    if (data.needsVerification) {
+                        // Registration successful, needs email verification
+                        document.getElementById('verificationEmail').value = email;
+                        switchTab('verification');
+                        showVerificationStatus(data.message || 'נשלח אליך מייל עם קוד אימות', 'success');
+                        updateDebugInfo('✅ הרשמה הצליחה! נדרש אימות מייל');
+                    } else {
+                        // Legacy path for existing users (shouldn't happen with new logic)
+                        currentUser = data.user;
+                        saveUserToStorage(currentUser);
+                        showAuthStatus('✅ ההרשמה הושלמה בהצלחה!', 'success');
+                        updateDebugInfo('✅ הרשמה הצליחה!');
+                        setTimeout(() => showApp(), 2000);
+                    }
                 } else {
                     showAuthStatus(data.error || 'שגיאה בהרשמה', 'error');
                     updateDebugInfo(`❌ הרשמה נכשלה: ${data.error}`);
                 }
             } catch (error) {
                 console.error('Register error:', error);
-                showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                if (error.message.includes('429')) {
+                    showAuthStatus('יותר מדי הרשמות. נסה שוב מאוחר יותר.', 'error');
+                } else {
+                    showAuthStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                }
                 updateDebugInfo(`❌ שגיאה: ${error.message}`);
             }
         });
@@ -1327,6 +1511,61 @@
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('appSection').style.display = 'block';
             updateDashboard();
+        }
+
+        // Email verification form handler
+        document.getElementById('verificationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('verificationEmail').value;
+            const verificationCode = document.getElementById('verificationCode').value;
+
+            updateDebugInfo('מאמת קוד...');
+
+            try {
+                const response = await fetch(`${API_BASE}/verify-email`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({ email, verificationCode })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Verification response:', data);
+
+                if (data.success) {
+                    currentUser = data.user;
+                    saveUserToStorage(currentUser);
+                    showVerificationStatus('✅ המייל אומת בהצלחה!', 'success');
+                    updateDebugInfo('✅ אימות הצליח!');
+                    setTimeout(() => showApp(), 2000);
+                } else {
+                    showVerificationStatus(data.error || 'שגיאה באימות', 'error');
+                    updateDebugInfo(`❌ אימות נכשל: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Verification error:', error);
+                if (error.message.includes('429')) {
+                    showVerificationStatus('יותר מדי ניסיונות אימות. נסה שוב מאוחר יותר.', 'error');
+                } else {
+                    showVerificationStatus(`שגיאה בחיבור: ${error.message}`, 'error');
+                }
+                updateDebugInfo(`❌ שגיאה: ${error.message}`);
+            }
+        });
+
+        // Show verification status
+        function showVerificationStatus(message, type) {
+            const statusDiv = document.getElementById('verificationAuthStatus');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusDiv.style.display = 'block';
         }
 
         function logout() {
@@ -2727,6 +2966,9 @@
 
         // Initialize Google APIs when page loads
         window.addEventListener('load', async () => {
+            // Check cookie consent first
+            checkCookieConsent();
+
             // Check for stored user first
             if (!(await checkStoredUser())) {
                 // Only show auth interface if no stored user
