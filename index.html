@@ -1505,9 +1505,6 @@
                         // Show verification tab
                         document.getElementById('verificationTab').classList.add('active');
 
-                        // Check cookie consent for new users
-                        checkCookieConsent();
-
                         showVerificationStatus(data.message || 'נשלח אליך מייל עם קוד אימות', 'success');
                         updateDebugInfo('✅ הרשמה הצליחה! נדרש אימות מייל');
                     } else {
@@ -1537,6 +1534,9 @@
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('appSection').style.display = 'block';
             updateDashboard();
+
+            // Check cookie consent when entering the app
+            checkCookieConsent();
         }
 
         // Email verification form handler
