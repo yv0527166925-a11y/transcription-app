@@ -1062,6 +1062,31 @@
         
         // Global state
         let currentUser = null;
+
+        // Save user to localStorage
+        function saveUserToStorage(user) {
+            localStorage.setItem('currentUser', JSON.stringify(user));
+        }
+
+        // Load user from localStorage
+        function loadUserFromStorage() {
+            const stored = localStorage.getItem('currentUser');
+            if (stored) {
+                try {
+                    currentUser = JSON.parse(stored);
+                    return currentUser;
+                } catch (e) {
+                    console.error('Error parsing stored user:', e);
+                    localStorage.removeItem('currentUser');
+                }
+            }
+            return null;
+        }
+
+        // Clear user from storage
+        function clearUserFromStorage() {
+            localStorage.removeItem('currentUser');
+        }
         let selectedFiles = [];
         let selectedPayment = null;
         let currentTranscriptionId = null; // Track current transcription for cancellation
@@ -1073,6 +1098,42 @@
             if (debugInfo) {
                 debugInfo.innerHTML = `🔧 ${message}`;
             }
+        }
+
+        // Check for stored user on page load
+        async function checkStoredUser() {
+            const storedUser = loadUserFromStorage();
+            if (storedUser) {
+                console.log('🔄 משחזר משתמש מאוחסן:', storedUser.email);
+                currentUser = storedUser;
+
+                // Sync with server to get latest data
+                try {
+                    console.log('🔄 מסנכרן נתונים עם השרת...');
+                    const response = await fetch(`${API_BASE}/user-sync`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: storedUser.email })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.user) {
+                            // Update with fresh server data
+                            currentUser = data.user;
+                            saveUserToStorage(currentUser);
+                            console.log('✅ נתונים מעודכנים מהשרת');
+                        }
+                    }
+                } catch (error) {
+                    console.log('⚠️ לא ניתן לסנכרן עם השרת, משתמש בנתונים מקומיים');
+                }
+
+                updateDashboard();
+                showApp();
+                return true;
+            }
+            return false;
         }
 
         // Test API connectivity on load
@@ -1196,6 +1257,7 @@
                 
                 if (data.success) {
                     currentUser = data.user;
+                    saveUserToStorage(currentUser);
                     showAuthStatus('✅ התחברת בהצלחה!', 'success');
                     updateDebugInfo('✅ התחברות הצליחה!');
                     setTimeout(() => showApp(), 1000); // Small delay to show success message
@@ -1246,6 +1308,7 @@
                 
                 if (data.success) {
                     currentUser = data.user;
+                    saveUserToStorage(currentUser);
                     showAuthStatus('✅ ההרשמה הושלמה בהצלחה!', 'success');
                     updateDebugInfo('✅ הרשמה הצליחה!');
                     setTimeout(() => showApp(), 2000); // Longer delay to read success message
@@ -1268,6 +1331,7 @@
 
         function logout() {
             currentUser = null;
+            clearUserFromStorage();
             document.getElementById('authSection').style.display = 'block';
             document.getElementById('appSection').style.display = 'none';
             document.getElementById('loginForm').reset();
@@ -1355,6 +1419,7 @@
                     // Update dashboard if this is the current user
                     if (currentUser && currentUser.email === email) {
                         currentUser.remainingMinutes = data.newBalance;
+                        saveUserToStorage(currentUser);
                         updateDashboard();
                     }
                 } else {
@@ -2224,6 +2289,7 @@
 
                     currentUser.remainingMinutes -= data.estimatedMinutes || totalMinutes;
                     currentUser.totalTranscribed += data.estimatedMinutes || totalMinutes;
+                    saveUserToStorage(currentUser);
 
                     updateDashboard();
                     showStatus(`
@@ -2277,6 +2343,7 @@
             
             setTimeout(() => {
                 currentUser.remainingMinutes += selectedPayment.minutes;
+                saveUserToStorage(currentUser);
                 updateDashboard();
                 
                 document.querySelectorAll('.payment-option').forEach(option => {
@@ -2659,7 +2726,14 @@
         }
 
         // Initialize Google APIs when page loads
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+            // Check for stored user first
+            if (!(await checkStoredUser())) {
+                // Only show auth interface if no stored user
+                document.getElementById('authSection').style.display = 'block';
+                document.getElementById('appSection').style.display = 'none';
+            }
+
             initializeGoogleAPIs();
             testAPI();
         });

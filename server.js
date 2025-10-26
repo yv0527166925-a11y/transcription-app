@@ -2526,6 +2526,30 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// User sync endpoint - sync localStorage with server data
+app.post('/api/user-sync', (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.json({ success: false, error: 'Email required' });
+    }
+
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (user) {
+      console.log('🔄 User sync successful for:', user.email);
+      res.json({ success: true, user: { ...user, password: undefined } });
+    } else {
+      console.log('❌ User not found for sync:', email);
+      res.json({ success: false, error: 'User not found' });
+    }
+  } catch (error) {
+    console.error('User sync error:', error);
+    res.status(500).json({ success: false, error: 'Server error' });
+  }
+});
+
 app.post('/api/register', (req, res) => {
   try {
     console.log('📝 Registration attempt:', req.body);
