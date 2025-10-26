@@ -1377,7 +1377,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 
-קובץ: ${sanitizeFilename(filename)}
+קובץ: ${cleanFilename(filename)}
 גודל: ${fileSizeMB.toFixed(1)} MB
 
 🔥🔥🔥 הוראות קריטיות - אסור לך להתעלם מהן:
