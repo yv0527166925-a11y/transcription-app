@@ -2966,15 +2966,15 @@
 
         // Initialize Google APIs when page loads
         window.addEventListener('load', async () => {
-            // Check cookie consent first
-            checkCookieConsent();
-
             // Check for stored user first
             if (!(await checkStoredUser())) {
                 // Only show auth interface if no stored user
                 document.getElementById('authSection').style.display = 'block';
                 document.getElementById('appSection').style.display = 'none';
             }
+
+            // Check cookie consent after user state is determined
+            checkCookieConsent();
 
             initializeGoogleAPIs();
             testAPI();
