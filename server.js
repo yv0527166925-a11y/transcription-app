@@ -1220,6 +1220,37 @@ function applyHebrewTextFixes(text) {
   return text;
 }
 
+// Helper function to sanitize filename for API calls
+function sanitizeFilename(filename) {
+  if (!filename) return filename;
+
+  // Replace problematic characters that can cause API issues
+  let sanitized = filename
+    .replace(/['"]/g, '') // Remove single and double quotes
+    .replace(/['׳״]/g, '') // Remove Hebrew geresh and gershayim
+    .replace(/[<>:"|?*]/g, '_') // Replace other problematic chars with underscore
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+
+  // If still too long (over 150 chars), truncate while preserving extension
+  if (sanitized.length > 150) {
+    const extension = path.extname(sanitized);
+    const nameWithoutExt = sanitized.slice(0, -extension.length);
+    const maxNameLength = 150 - extension.length - 3; // -3 for "..."
+
+    if (maxNameLength > 0) {
+      sanitized = nameWithoutExt.slice(0, maxNameLength) + '...' + extension;
+      console.log(`✂️ Truncated long filename: "${filename}" → "${sanitized}"`);
+    }
+  }
+
+  if (sanitized !== filename) {
+    console.log(`🧹 Sanitized filename: "${filename}" → "${sanitized}"`);
+  }
+
+  return sanitized;
+}
+
 // Helper function to clean filename for display
 function cleanFilename(filename) {
   console.log(`🔍 Original filename: "${filename}"`);
@@ -1346,7 +1377,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 
-קובץ: ${cleanFilename(filename)}
+קובץ: ${sanitizeFilename(filename)}
 גודל: ${fileSizeMB.toFixed(1)} MB
 
 🔥🔥🔥 הוראות קריטיות - אסור לך להתעלם מהן:
