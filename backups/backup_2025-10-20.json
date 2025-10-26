@@ -1,0 +1,18 @@
+{
+  "date": "2025-10-20T11:19:52.142Z",
+  "users": [
+    {
+      "id": 1,
+      "name": "מנהל המערכת",
+      "email": "admin@example.com",
+      "password": "S3cur3P@ssw0rd_Adm!n25",
+      "isAdmin": true,
+      "remainingMinutes": 1000,
+      "totalTranscribed": 0,
+      "history": [],
+      "joinDate": "2024-01-01T00:00:00.000Z",
+      "transcriptionHistory": []
+    }
+  ],
+  "totalUsers": 1
+}
