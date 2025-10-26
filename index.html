@@ -1505,6 +1505,9 @@
                         // Show verification tab
                         document.getElementById('verificationTab').classList.add('active');
 
+                        // Check cookie consent for new users
+                        checkCookieConsent();
+
                         showVerificationStatus(data.message || 'נשלח אליך מייל עם קוד אימות', 'success');
                         updateDebugInfo('✅ הרשמה הצליחה! נדרש אימות מייל');
                     } else {
