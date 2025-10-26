@@ -1325,7 +1325,12 @@
             document.querySelectorAll('#authSection .nav-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelectorAll('#authSection .tab-content').forEach(content => content.classList.remove('active'));
 
-            event.target.classList.add('active');
+            // Find and activate the correct tab button
+            const tabButton = document.querySelector(`#authSection .nav-tab[onclick*="${tabName}"]`);
+            if (tabButton) {
+                tabButton.classList.add('active');
+            }
+
             document.getElementById(tabName + 'Tab').classList.add('active');
 
             // Clear auth status when switching tabs
@@ -1426,7 +1431,15 @@
                 } else if (data.needsVerification) {
                     // Redirect to verification if email not verified
                     document.getElementById('verificationEmail').value = data.email;
-                    switchTab('verification');
+
+                    // Hide all tabs
+                    document.querySelectorAll('#authSection .tab-content').forEach(content => {
+                        content.classList.remove('active');
+                    });
+
+                    // Show verification tab
+                    document.getElementById('verificationTab').classList.add('active');
+
                     showVerificationStatus(data.error || 'נדרש אימות מייל', 'error');
                 } else {
                     showAuthStatus(data.error || 'שגיאה בהתחברות', 'error');
@@ -1476,12 +1489,22 @@
 
                 const data = await response.json();
                 console.log('Register response:', data);
+                console.log('needsVerification:', data.needsVerification);
+                console.log('success:', data.success);
                 
                 if (data.success) {
                     if (data.needsVerification) {
                         // Registration successful, needs email verification
                         document.getElementById('verificationEmail').value = email;
-                        switchTab('verification');
+
+                        // Hide all tabs
+                        document.querySelectorAll('#authSection .tab-content').forEach(content => {
+                            content.classList.remove('active');
+                        });
+
+                        // Show verification tab
+                        document.getElementById('verificationTab').classList.add('active');
+
                         showVerificationStatus(data.message || 'נשלח אליך מייל עם קוד אימות', 'success');
                         updateDebugInfo('✅ הרשמה הצליחה! נדרש אימות מייל');
                     } else {
