@@ -1414,7 +1414,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
 🔤 עיצוב וסגנון:
 - מושגים דתיים מדויקים
-- ציטוטים במירכאות
+- ציטוטים במירכאות - ודא שכל ציטוט (פסוק, מאמר חז"ל, אמרה) ודו שיח ישיר עטוף במירכאות ("...") באופן מדויק ונכון תחבירית
 - השתמש ברווחים תקניים בעברית
 - החזר טקסט מוכן לשימוש ללא עיבוד נוסף
 🚨 זה קובץ של ${fileSizeMB.toFixed(1)} MB - אני מצפה לתמלול ארוך ומפורט!
