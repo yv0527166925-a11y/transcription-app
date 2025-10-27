@@ -821,15 +821,11 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`✅ Merge completed: ${merged.length} total characters`);
 
   // שלב 2: חלוקה חכמה לפסקאות בגמיני
-  console.log(`🔍 Checking smart division conditions: language="${language}", length=${merged.length}`);
-  if ((language === 'Hebrew' || language === 'he') && merged.length > 500) {
-    console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    console.log(`🎯 Starting smart paragraph division with Gemini...`);
-    merged = await smartParagraphDivision(merged);
-  } else {
-    console.log(`❌ Smart division skipped - language: "${language}" (Hebrew/he)? ${(language === 'Hebrew' || language === 'he')}, length > 500? ${merged.length > 500}`);
-  }
+  console.log(`🔍 Starting smart paragraph division for all languages, length=${merged.length}`);
+  console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  console.log(`🎯 Starting smart paragraph division with Gemini...`);
+  merged = await smartParagraphDivision(merged);
 
   // Python will handle all text processing - no Node.js processing needed
   console.log(`📝 Sending processed transcription to Python...`);
@@ -1449,15 +1445,11 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     console.log(`✅ Direct transcription completed: ${transcription.length} characters`);
 
     // שלב 2: חלוקה חכמה לפסקאות בגמיני
-    console.log(`🔍 Checking smart division conditions: language="${language}", length=${transcription.length}`);
-    if ((language === 'Hebrew' || language === 'he') && transcription.length > 500) {
-      console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      console.log(`🎯 Starting smart paragraph division with Gemini...`);
-      transcription = await smartParagraphDivision(transcription);
-    } else {
-      console.log(`❌ Smart division skipped - language: "${language}" (Hebrew/he)? ${(language === 'Hebrew' || language === 'he')}, length > 500? ${transcription.length > 500}`);
-    }
+    console.log(`🔍 Starting smart paragraph division for all languages, length=${transcription.length}`);
+    console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log(`🎯 Starting smart paragraph division with Gemini...`);
+    transcription = await smartParagraphDivision(transcription);
 
     return transcription;
     
