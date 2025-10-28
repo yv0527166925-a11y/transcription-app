@@ -773,6 +773,130 @@
             font-weight: 600;
         }
 
+        .payment-terms {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .terms-btn {
+            background: none;
+            border: none;
+            color: #0D9488;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .terms-btn:hover {
+            background: rgba(13, 148, 136, 0.1);
+            text-decoration: none;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 30px;
+            border: none;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            position: relative;
+            direction: rtl;
+            text-align: right;
+        }
+
+        .close {
+            color: #aaa;
+            float: left;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+
+        .terms-text {
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .terms-text h2 {
+            color: #0D9488;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            text-align: center;
+        }
+
+        .terms-text h3 {
+            color: #0D9488;
+            margin: 25px 0 15px 0;
+            font-size: 1.3em;
+            border-bottom: 2px solid #0D9488;
+            padding-bottom: 8px;
+        }
+
+        .terms-text p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .terms-text strong {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .legal-notice {
+            background: rgba(13, 148, 136, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            border-right: 4px solid #0D9488;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .modal-content {
+                margin: 2% auto;
+                width: 95%;
+                padding: 20px;
+            }
+
+            .terms-text h2 {
+                font-size: 1.5em;
+            }
+
+            .terms-text h3 {
+                font-size: 1.2em;
+            }
+        }
+
         .admin-panel {
             background: rgba(255, 193, 7, 0.1);
             padding: 20px;
@@ -1340,6 +1464,10 @@
                 <button class="btn" id="purchaseBtn" disabled onclick="processPurchase()">
                     💳 לתשלום
                 </button>
+
+                <div class="payment-terms">
+                    <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש ומדיניות ביטול עסקה</button>
+                </div>
             </div>
         </div>
 
@@ -2819,6 +2947,23 @@
             }, 2000);
         }
 
+        // Terms modal functions
+        function openTermsModal() {
+            document.getElementById('termsModal').style.display = 'block';
+        }
+
+        function closeTermsModal() {
+            document.getElementById('termsModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('termsModal');
+            if (event.target == modal) {
+                closeTermsModal();
+            }
+        }
+
         // History functions
         function loadHistory() {
             const tbody = document.getElementById('historyTableBody');
@@ -3206,6 +3351,41 @@
         // Initialize app
         updateSubmitButton();
     </script>
+    <!-- Terms Modal -->
+    <div id="termsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeTermsModal()">&times;</span>
+            <h2>תקנון שימוש ומדיניות ביטול עסקה</h2>
+            <div class="terms-text">
+                <p>אנו מספקים שירות תמלול המבוצע באופן אוטומטי. תקנון זה נועד להבהיר את תנאי השירות, מגבלותיו ומדיניות הביטולים.</p>
+
+                <h3>1. אופי השירות ומגבלותיו</h3>
+                <p><strong>שירות "כמות שהוא" (As-Is):</strong> שירות התמלול מסופק באופן אוטומטי לחלוטין. התוצר הסופי מתקבל ישירות מהמערכת האוטומטית ומוצע ללקוח במתכונתו הגולמית, "כמות שהוא".</p>
+
+                <p><strong>אין התחייבות לדיוק:</strong> הטכנולוגיה שבה אנו משתמשים, על אף התקדמותה, עלולה לייצר שגיאות, אי-דיוקים והשמטות בטקסט המתומלל. לפיכך, איננו מתחייבים לרמת דיוק כלשהי או לשלמות התוצר.</p>
+
+                <p><strong>השירות אינו כולל התערבות אנושית:</strong> השירות אינו כולל עריכה, הגהה, תיקונים או כל בדיקה אנושית של התמלול. התוצר המתקבל הוא סופי.</p>
+
+                <h3>2. אחריות הלקוח על איכות חומר הגלם</h3>
+                <p>איכות התמלול תלויה באופן ישיר ובלעדי באיכות קובץ השמע/וידאו שנמסר על ידי הלקוח.</p>
+
+                <p>גורמים כגון: רעשי רקע, דוברים המדברים בו-זמנית, דיבור חלש או לא ברור, מבטא כבד ואיכות הקלטה ירודה, צפויים לפגוע משמעותית באיכות התמלול.</p>
+
+                <p>האחריות המלאה על איכות קובץ המקור ועל התוצאות הנובעות ממנו חלה על הלקוח בלבד.</p>
+
+                <h3>3. מדיניות ביטולים והחזרים</h3>
+                <p><strong>כל הרכישות באתר הן סופיות.</strong> לא ניתן לבטל עסקה ולקבל החזר כספי מרגע ביצוע התשלום.</p>
+
+                <p>חוסר שביעות רצון מאיכות התמלול, לרבות שגיאות או השמטות, אינו מהווה עילה לקבלת החזר כספי.</p>
+
+                <h3>4. הסכמת הלקוח</h3>
+                <p>ביצוע הזמנה באתר מהווה הצהרה והסכמה מלאה של הלקוח לכל התנאים המפורטים בתקנון זה, לרבות ההבנה כי ייתכנו שגיאות בתוצר וכי לא יינתן החזר כספי.</p>
+
+                <p class="legal-notice"><strong>הערה חשובה:</strong> נוסח זה הוא בגדר המלצה כללית. מומלץ להתייעץ עם גורם משפטי מוסמך על מנת לוודא שהמדיניות תואמת את כל דרישות החוק בישראל.</p>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 
