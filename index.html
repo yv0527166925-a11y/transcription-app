@@ -1486,6 +1486,24 @@
        </div>
     </div>
 
+    <!-- Accessibility Button -->
+    <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9998;">
+        <button style="
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+            ♿ נגישות
+        </button>
+    </div>
+
     <!-- Cookie Consent Banner -->
     <div id="cookieBanner" class="cookie-banner" style="display: none;">
         <div class="cookie-banner-content">
@@ -2926,25 +2944,41 @@
             document.getElementById('purchaseBtn').disabled = false;
         }
 
-        function processPurchase() {
-            if (!selectedPayment) return;
-            
-            showStatus('<div class="spinner"></div>מעבד תשלום...', 'processing');
-            
-            setTimeout(() => {
-                currentUser.remainingMinutes += selectedPayment.minutes;
-                saveUserToStorage(currentUser);
-                updateDashboard();
-                
-                document.querySelectorAll('.payment-option').forEach(option => {
-                    option.classList.remove('selected');
+        async function processPurchase() {
+            if (!currentUser || !currentUser.email) {
+                showStatus('יש להתחבר למערכת כדי לבצע תשלום', 'error');
+                return;
+            }
+
+            showStatus('<div class="spinner"></div>מעביר לדף תשלום...', 'processing');
+
+            try {
+                // Request payment initiation from server
+                const response = await fetch('/api/payment/initiate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userEmail: currentUser.email,
+                        packageType: 'basic' // Default package - user will choose in Tranzila store
+                    })
                 });
-                const minutes = selectedPayment.minutes;
-                selectedPayment = null;
-                document.getElementById('purchaseBtn').disabled = true;
-                
-                showStatus(`✅ התשלום בוצע בהצלחה!<br>נוספו ${minutes} דקות לחשבון`, 'success');
-            }, 2000);
+
+                const data = await response.json();
+
+                if (data.success && data.paymentUrl) {
+                    console.log('💳 Redirecting to Tranzila payment page');
+                    // Redirect to Tranzila hosted payment page
+                    window.location.href = data.paymentUrl;
+                } else {
+                    throw new Error(data.error || 'שגיאה ביצירת עמוד תשלום');
+                }
+
+            } catch (error) {
+                console.error('💳 Payment initiation error:', error);
+                showStatus(`❌ שגיאה: ${error.message}`, 'error');
+            }
         }
 
         // Terms modal functions
@@ -3355,33 +3389,57 @@
     <div id="termsModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeTermsModal()">&times;</span>
-            <h2>תקנון שימוש ומדיניות ביטול עסקה</h2>
+            <h2>תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</h2>
             <div class="terms-text">
-                <p>אנו מספקים שירות תמלול המבוצע באופן אוטומטי. תקנון זה נועד להבהיר את תנאי השירות, מגבלותיו ומדיניות הביטולים.</p>
+                <p>ברוכים הבאים לאתר "תמלול חכם". תקנון זה מסדיר את היחסים בין מפעיל האתר לבין המשתמשים בשירותי התמלול האוטומטיים המוצעים בו. שימוש באתר וביצוע הזמנה מהווים הסכמה מלאה לכל התנאים המפורטים להלן.</p>
 
-                <h3>1. אופי השירות ומגבלותיו</h3>
+                <h3>1. פרטי העסק ומפעיל האתר</h3>
+                <p><strong>שם העסק:</strong> תמלול חכם</p>
+                <p><strong>שם משפטי:</strong> יעקב וניט, ע.פ. 040427486</p>
+                <p><strong>כתובת:</strong> נויפלד 21, בני ברק, ישראל</p>
+                <p><strong>פרטי יצירת קשר:</strong></p>
+                <ul>
+                    <li>דוא"ל: yv0527166925@gmail.com</li>
+                    <li>טלפון: 0527166925</li>
+                </ul>
+                <p><strong>הערה:</strong> השם לחיוב אשר יופיע בפירוט עסקאות האשראי של הלקוח הוא "תמלול חכם".</p>
+
+                <h3>2. אופי השירות ומגבלותיו</h3>
                 <p><strong>שירות "כמות שהוא" (As-Is):</strong> שירות התמלול מסופק באופן אוטומטי לחלוטין. התוצר הסופי מתקבל ישירות מהמערכת האוטומטית ומוצע ללקוח במתכונתו הגולמית, "כמות שהוא".</p>
 
                 <p><strong>אין התחייבות לדיוק:</strong> הטכנולוגיה שבה אנו משתמשים, על אף התקדמותה, עלולה לייצר שגיאות, אי-דיוקים והשמטות בטקסט המתומלל. לפיכך, איננו מתחייבים לרמת דיוק כלשהי או לשלמות התוצר.</p>
 
                 <p><strong>השירות אינו כולל התערבות אנושית:</strong> השירות אינו כולל עריכה, הגהה, תיקונים או כל בדיקה אנושית של התמלול. התוצר המתקבל הוא סופי.</p>
 
-                <h3>2. אחריות הלקוח על איכות חומר הגלם</h3>
+                <h3>3. אחריות הלקוח על איכות חומר הגלם</h3>
                 <p>איכות התמלול תלויה באופן ישיר ובלעדי באיכות קובץ השמע/וידאו שנמסר על ידי הלקוח.</p>
 
                 <p>גורמים כגון: רעשי רקע, דוברים המדברים בו-זמנית, דיבור חלש או לא ברור, מבטא כבד ואיכות הקלטה ירודה, צפויים לפגוע משמעותית באיכות התמלול.</p>
 
                 <p>האחריות המלאה על איכות קובץ המקור ועל התוצאות הנובעות ממנו חלה על הלקוח בלבד.</p>
 
-                <h3>3. מדיניות ביטולים והחזרים</h3>
-                <p><strong>כל הרכישות באתר הן סופיות.</strong> לא ניתן לבטל עסקה ולקבל החזר כספי מרגע ביצוע התשלום.</p>
+                <h3>4. מדיניות ביטולים והחזרים</h3>
+                <p><strong>4.1.</strong> על פי חוק הגנת הצרכן, התשמ"א-1981, לקוח רשאי לבטל עסקת מכר מרחוק בתוך 14 ימים מיום ביצוע העסקה, ולקבל החזר כספי, בניכוי דמי ביטול בשיעור 5% מערך העסקה או 100 ש"ח, הנמוך מביניהם.</p>
 
-                <p>חוסר שביעות רצון מאיכות התמלול, לרבות שגיאות או השמטות, אינו מהווה עילה לקבלת החזר כספי.</p>
+                <p><strong>4.2.</strong> עם זאת, יש לשים לב: שירותי התמלול באתר הם בגדר "מידע" כהגדרתו בחוק המחשבים, והם שירותים המופקים בהתאמה אישית עבור הלקוח. לפיכך, זכות הביטול המצוינת בסעיף 4.1 לא תחול במקרה שבו החל תהליך עיבוד קובץ השמע/וידאו שהועלה על ידי הלקוח.</p>
 
-                <h3>4. הסכמת הלקוח</h3>
-                <p>ביצוע הזמנה באתר מהווה הצהרה והסכמה מלאה של הלקוח לכל התנאים המפורטים בתקנון זה, לרבות ההבנה כי ייתכנו שגיאות בתוצר וכי לא יינתן החזר כספי.</p>
+                <p><strong>4.3.</strong> הגשת קובץ וביצוע תשלום מהווים הסכמה מצד הלקוח להתחיל במתן השירות באופן מיידי. מרגע שהחל תהליך התמלול, לא ניתן לבטל את העסקה ולקבל החזר כספי.</p>
 
-                <p class="legal-notice"><strong>הערה חשובה:</strong> נוסח זה הוא בגדר המלצה כללית. מומלץ להתייעץ עם גורם משפטי מוסמך על מנת לוודא שהמדיניות תואמת את כל דרישות החוק בישראל.</p>
+                <p><strong>4.4.</strong> חוסר שביעות רצון מאיכות התמלול, לרבות שגיאות או השמטות הנובעות מאיכות קובץ המקור, אינו מהווה עילה לביטול העסקה לאחר תחילת העיבוד.</p>
+
+                <h3>5. מדיניות פרטיות ואבטחת מידע</h3>
+                <p><strong>איסוף מידע:</strong> אנו אוספים את המידע הנחוץ לצורך אספקת השירות בלבד, לרבות שם הלקוח, כתובת דוא"ל, וקבצי המקור (שמע/וידאו) המועלים למערכת. פרטי התשלום וכרטיסי האשראי מעובדים ישירות על ידי חברת סליקה חיצונית מאובטחת ואינם נשמרים במערכות האתר.</p>
+
+                <p><strong>שימוש במידע:</strong> השימוש במידע נועד אך ורק לצורך מתן השירות: עיבוד הקבצים, שליחת התוצר הסופי ללקוח, ויצירת קשר במידת הצורך בנוגע להזמנה.</p>
+
+                <p><strong>שיתוף מידע:</strong> אנו מתחייבים לא להעביר או למכור את פרטי הלקוחות או את קבצי המקור לצדדים שלישיים, למעט במקרה של חובה חוקית על פי דין.</p>
+
+                <p><strong>שמירת מידע ומחיקתו:</strong> התמלולים הסופיים יישמרו במערכת למשך 30 ימים לאחר אספקת השירות, וזאת לצורכי גיבוי ושירות לקוחות. לאחר תקופה זו, כל הקבצים יימחקו מהשרתים באופן סופי.</p>
+
+                <h3>6. הסכמת הלקוח</h3>
+                <p>ביצוע הזמנה באתר מהווה הצהרה והסכמה מלאה של הלקוח לכל התנאים המפורטים בתקנון זה, לרבות ההבנה כי ייתכנו שגיאות בתוצר, כי איכות התוצר תלויה בקובץ המקור, וכי לא יינתן החזר כספי לאחר תחילת העיבוד.</p>
+
+                <p class="legal-notice"><strong>הערה חשובה:</strong> נוסח זה הוכן כמענה לדרישות חברת הסליקה ובהתבסס על החוק. עם זאת, הוא אינו מהווה תחליף לייעוץ משפטי. מומלץ להתייעץ עם גורם משפטי מוסמך על מנת לוודא שהתקנון תואם באופן מלא את כל צרכיך והדרישות החוקיות העדכניות.</p>
             </div>
         </div>
     </div>
