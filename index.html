@@ -1488,7 +1488,7 @@
 
     <!-- Accessibility Button -->
     <div style="position: fixed; bottom: 20px; left: 20px; z-index: 9998;">
-        <button style="
+        <button id="accessibilityBtn" style="
             background: #2563eb;
             color: white;
             border: none;
@@ -1499,9 +1499,57 @@
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             transition: all 0.3s ease;
-        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'" onclick="showAccessibilityModal()">
             ♿ נגישות
         </button>
+    </div>
+
+    <!-- Accessibility Modal -->
+    <div id="accessibilityModal" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        z-index: 10000;
+        justify-content: center;
+        align-items: center;
+    ">
+        <div style="
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            text-align: center;
+            position: relative;
+        ">
+            <button onclick="closeAccessibilityModal()" style="
+                position: absolute;
+                top: 15px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: #666;
+                padding: 5px;
+            ">×</button>
+
+            <h2 style="color: #2563eb; margin-bottom: 20px; font-size: 24px;">פטור מהנגשה</h2>
+
+            <p style="font-size: 18px; line-height: 1.6; margin-bottom: 15px; color: #333;">
+                לאתר זה קיים פטור מחובת הנגשה.
+            </p>
+
+            <p style="font-size: 16px; line-height: 1.6; color: #555;">
+                במידה והנכם זקוקים לסיוע בתפעול האתר או בצריכת השירותים המפורסמים בו,
+                ניתן לפנות ליעקב וניט בטלפון: <strong>052-7166925</strong>.
+            </p>
+        </div>
     </div>
 
     <!-- Cookie Consent Banner -->
@@ -2860,6 +2908,9 @@
                             const progressResponse = await fetch(`${API_BASE}/transcription-progress/${currentTranscriptionId}`);
                             console.log(`📡 Progress response status: ${progressResponse.status}`);
 
+                            // Log the full URL for debugging
+                            console.log(`🌐 Full URL: ${API_BASE}/transcription-progress/${currentTranscriptionId}`);
+
                             if (progressResponse.ok) {
                                 const progressData = await progressResponse.json();
                                 console.log(`📊 Progress data received:`, progressData);
@@ -2950,34 +3001,49 @@
                 return;
             }
 
-            showStatus('<div class="spinner"></div>מעביר לדף תשלום...', 'processing');
+            showStatus('<div class="spinner"></div>מעביר למיני חנות...', 'processing');
 
             try {
-                // Request payment initiation from server
-                const response = await fetch('/api/payment/initiate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        userEmail: currentUser.email,
-                        packageType: 'basic' // Default package - user will choose in Tranzila store
-                    })
-                });
+                // הפניה ישירה למיני חנות טרנזילה עם פרטי המשתמש
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = 'https://pay.tranzila.com/fxptimlulh';
 
-                const data = await response.json();
+                // הוספת פרטי המשתמש כ-hidden inputs
+                const contactInput = document.createElement('input');
+                contactInput.type = 'hidden';
+                contactInput.name = 'contact';
+                contactInput.value = currentUser.email;
+                form.appendChild(contactInput);
 
-                if (data.success && data.paymentUrl) {
-                    console.log('💳 Redirecting to Tranzila payment page');
-                    // Redirect to Tranzila hosted payment page
-                    window.location.href = data.paymentUrl;
-                } else {
-                    throw new Error(data.error || 'שגיאה ביצירת עמוד תשלום');
-                }
+                const emailInput = document.createElement('input');
+                emailInput.type = 'hidden';
+                emailInput.name = 'email';
+                emailInput.value = currentUser.email;
+                form.appendChild(emailInput);
+
+                // הוספת custom fields כגיבוי (טרנזילה תחזיר אותם)
+                const custom1Input = document.createElement('input');
+                custom1Input.type = 'hidden';
+                custom1Input.name = 'custom1';
+                custom1Input.value = currentUser.email;
+                form.appendChild(custom1Input);
+
+                // הוספת קובץ הקריאה חזרה (callback)
+                const callbackInput = document.createElement('input');
+                callbackInput.type = 'hidden';
+                callbackInput.name = 'callback_url';
+                callbackInput.value = window.location.origin + '/api/payment/callback';
+                form.appendChild(callbackInput);
+
+                document.body.appendChild(form);
+
+                console.log('💳 Redirecting to Tranzila mini-store');
+                form.submit();
 
             } catch (error) {
-                console.error('💳 Payment initiation error:', error);
-                showStatus(`❌ שגיאה: ${error.message}`, 'error');
+                console.error('❌ Payment error:', error);
+                showStatus('שגיאה בהפניה לתשלום: ' + error.message, 'error');
             }
         }
 
@@ -3384,6 +3450,53 @@
 
         // Initialize app
         updateSubmitButton();
+
+        // בדיקת סטטוס תשלום מה-URL parameters
+        function checkPaymentStatus() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paymentStatus = urlParams.get('payment');
+
+            if (paymentStatus === 'success') {
+                showStatus('✅ התשלום בוצע בהצלחה! הדקות נוספו לחשבונך', 'success');
+                // נקה את ה-URL parameter
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+
+                // רענן את יתרת הדקות של המשתמש
+                if (currentUser && currentUser.email) {
+                    refreshUserData();
+                }
+            } else if (paymentStatus === 'error') {
+                showStatus('❌ התשלום נכשל. אנא נסה שוב או צור קשר עם התמיכה', 'error');
+                // נקה את ה-URL parameter
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        }
+
+        // רענון נתוני המשתמש מהשרת
+        async function refreshUserData() {
+            try {
+                // בהנחה שיש route קיים לקבלת נתוני משתמש
+                // או שנבדוק ישירות את הקובץ users_data.json
+                const response = await fetch('/users_data.json');
+                if (response.ok) {
+                    const users = await response.json();
+                    const user = users.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
+                    if (user) {
+                        currentUser.remainingMinutes = user.remainingMinutes;
+                        updateDashboard();
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error refreshing user data:', error);
+            }
+        }
+
+        // בדיקת payment status כאשר הדף נטען
+        document.addEventListener('DOMContentLoaded', function() {
+            checkPaymentStatus();
+        });
     </script>
     <!-- Terms Modal -->
     <div id="termsModal" class="modal">
@@ -3444,6 +3557,186 @@
             </div>
         </div>
     </div>
+
+    <script>
+        // פונקציות לחלון הנגישות
+        function showAccessibilityModal() {
+            const modal = document.getElementById('accessibilityModal');
+            modal.style.display = 'flex';
+        }
+
+        function closeAccessibilityModal() {
+            const modal = document.getElementById('accessibilityModal');
+            modal.style.display = 'none';
+        }
+
+        // סגירת החלון בלחיצה על הרקע
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('accessibilityModal');
+            if (event.target === modal) {
+                closeAccessibilityModal();
+            }
+        });
+
+        // סגירת החלון בלחיצה על מקש ESC
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeAccessibilityModal();
+            }
+        });
+    </script>
+
+    <!-- Footer with Terms and Privacy Policy -->
+    <footer class="main-footer">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>פנינים עריכה תורנית</h3>
+                    <p>מערכת תמלול חכמה עם טכנולוגיית AI מתקדמת</p>
+                </div>
+
+                <div class="footer-section">
+                    <h4>תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</h4>
+                    <div class="footer-terms">
+                        <p>ברוכים הבאים לאתר "תמלול חכם". תקנון זה מסדיר את היחסים בין מפעיל האתר לבין המשתמשים בשירותי התמלול האוטומטיים המוצעים בו. שימוש באתר וביצוע הזמנה מהווים הסכמה מלאה לכל התנאים המפורטים להלן.</p>
+
+                        <h5>1. כללי, פרטי העסק ומפעיל האתר</h5>
+                        <p><strong>1.1.</strong> ברוכים הבאים לאתר "תמלול חכם" (להלן: "האתר").</p>
+                        <p><strong>1.2.</strong> האתר מופעל ומנוהל על ידי "פנינים עריכה תורנית" (להלן: "העסק").</p>
+                        <p><strong>1.3.</strong> הישות המשפטית העומדת מאחורי העסק והאתר הינה יעקב וניט, ע.פ. 040427486 (להלן: "מפעיל האתר").</p>
+                        <p><strong>1.4.</strong> כתובת העסק: נויפלד 21, בני ברק, ישראל.</p>
+                        <p><strong>1.5.</strong> פרטי יצירת קשר:</p>
+                        <ul>
+                            <li>דוא"ל: yv0527166925@gmail.com</li>
+                            <li>טלפון: 0527166925</li>
+                        </ul>
+                        <p><strong>1.6.</strong> הערה חשובה: השם לחיוב אשר יופיע בפירוט עסקאות האשראי של הלקוח הוא שם העסק, "פנינים עריכה תורנית". ביצוע עסקה באתר מהווה הסכמה לחיוב תחת שם זה.</p>
+
+                        <h5>2. אופי השירות ומגבלותיו</h5>
+                        <p><strong>שירות "כמות שהוא" (As-Is):</strong> שירות התמלול מסופק באופן אוטומטי לחלוטין. התוצר הסופי מתקבל ישירות מהמערכת האוטומטית ומוצע ללקוח במתכונתו הגולמית, "כמות שהוא".</p>
+                        <p><strong>אין התחייבות לדיוק:</strong> הטכנולוגיה שבה אנו משתמשים, על אף התקדמותה, עלולה לייצר שגיאות, אי-דיוקים והשמטות בטקסט המתומלל. לפיכך, איננו מתחייבים לרמת דיוק כלשהי או לשלמות התוצר.</p>
+                        <p><strong>השירות אינו כולל התערבות אנושית:</strong> השירות אינו כולל עריכה, הגהה, תיקונים או כל בדיקה אנושית של התמלול. התוצר המתקבל הוא סופי.</p>
+
+                        <h5>3. אחריות הלקוח על איכות חומר הגלם</h5>
+                        <p>איכות התמלול תלויה באופן ישיר ובלעדי באיכות קובץ השמע/וידאו שנמסר על ידי הלקוח.</p>
+                        <p>גורמים כגון: רעשי רקע, דוברים המדברים בו-זמנית, דיבור חלש או לא ברור, מבטא כבד ואיכות הקלטה ירודה, צפויים לפגוע משמעותית באיכות התמלול.</p>
+                        <p>האחריות המלאה על איכות קובץ המקור ועל התוצאות הנובעות ממנו חלה על הלקוח בלבד.</p>
+
+                        <h5>4. מדיניות ביטולים והחזרים</h5>
+                        <p><strong>4.1.</strong> על פי חוק הגנת הצרכן, התשמ"א-1981, לקוח רשאי לבטל עסקת מכר מרחוק בתוך 14 ימים מיום ביצוע העסקה, ולקבל החזר כספי, בניכוי דמי ביטול בשיעור 5% מערך העסקה או 100 ש"ח, הנמוך מביניהם.</p>
+                        <p><strong>4.2.</strong> עם זאת, יש לשים לב: שירותי התמלול באתר הם בגדר "מידע" כהגדרתו בחוק המחשבים, והם שירותים המופקים בהתאמה אישית עבור הלקוח. לפיכך, זכות הביטול המצוינת בסעיף 4.1 לא תחול במקרה שבו החל תהליך עיבוד קובץ השמע/וידאו שהועלה על ידי הלקוח.</p>
+                        <p><strong>4.3.</strong> הגשת קובץ וביצוע תשלום מהווים הסכמה מצד הלקוח להתחיל במתן השירות באופן מיידי. מרגע שהחל תהליך התמלול, לא ניתן לבטל את העסקה ולקבל החזר כספי.</p>
+                        <p><strong>4.4.</strong> חוסר שביעות רצון מאיכות התמלול, לרבות שגיאות או השמטות הנובעות מאיכות קובץ המקור, אינו מהווה עילה לביטול העסקה לאחר תחילת העיבוד.</p>
+
+                        <h5>5. מדיניות פרטיות ואבטחת מידע</h5>
+                        <p><strong>איסוף מידע:</strong> אנו אוספים את המידע הנחוץ לצורך אספקת השירות בלבד, לרבות שם הלקוח, כתובת דוא"ל, וקבצי המקור (שמע/וידאו) המועלים למערכת. פרטי התשלום וכרטיסי האשראי מעובדים ישירות על ידי חברת סליקה חיצונית מאובטחת ואינם נשמרים במערכות האתר.</p>
+                        <p><strong>שימוש במידע:</strong> השימוש במידע נועד אך ורק לצורך מתן השירות: עיבוד הקבצים, שליחת התוצר הסופי ללקוח, ויצירת קשר במידת הצורך בנוגע להזמנה.</p>
+                        <p><strong>שיתוף מידע:</strong> אנו מתחייבים לא להעביר או למכור את פרטי הלקוחות או את קבצי המקור לצדדים שלישיים, למעט במקרה של חובה חוקית על פי דין.</p>
+                        <p><strong>שמירת מידע ומחיקתו:</strong> התמלולים הסופיים יישמרו במערכת למשך 30 ימים לאחר אספקת השירות, וזאת לצורכי גיבוי ושירות לקוחות. לאחר תקופה זו, כל הקבצים יימחקו מהשרתים באופן סופי.</p>
+
+                        <h5>6. הסכמת הלקוח</h5>
+                        <p>ביצוע הזמנה באתר מהווה הצהרה והסכמה מלאה של הלקוח לכל התנאים המפורטים בתקנון זה, לרבות ההבנה כי ייתכנו שגיאות בתוצר, כי איכות התוצר תלויה בקובץ המקור, וכי לא יינתן החזר כספי לאחר תחילת העיבוד.</p>
+
+                        <p class="legal-notice"><strong>הערה חשובה:</strong> נוסח זה הוכן כמענה לדרישות חברת הסליקה ובהתבסס על החוק. עם זאת, הוא אינו מהווה תחליף לייעוץ משפטי. מומלץ להתייעץ עם גורם משפטי מוסמך על מנת לוודא שהתקנון תואם באופן מלא את כל צרכיך והדרישות החוקיות העדכניות.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2024 פנינים עריכה תורנית. כל הזכויות שמורות.</p>
+                <p class="legal-notice">תקנון זה נכתב בהתבסס על החוק הישראלי ודרישות חברות הסליקה.</p>
+            </div>
+        </div>
+    </footer>
+
+    <style>
+        .main-footer {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+            margin-top: 60px;
+            padding: 40px 0 20px;
+            position: relative;
+        }
+
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .footer-section h3 {
+            color: #0D9488;
+            margin-bottom: 15px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .footer-section h4 {
+            color: #14B8A6;
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        .footer-section h5 {
+            color: #22d3ee;
+            margin: 20px 0 10px 0;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .footer-section p {
+            line-height: 1.6;
+            margin-bottom: 12px;
+            color: #cbd5e1;
+        }
+
+        .footer-terms {
+            font-size: 14px;
+        }
+
+        .footer-terms p {
+            margin-bottom: 8px;
+        }
+
+        .footer-bottom {
+            border-top: 1px solid #475569;
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        .footer-bottom p {
+            margin: 5px 0;
+            color: #94a3b8;
+        }
+
+        .footer-bottom .legal-notice {
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        @media (max-width: 768px) {
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+
+            .footer-terms {
+                font-size: 13px;
+            }
+
+            .main-footer {
+                padding: 30px 0 15px;
+            }
+        }
+    </style>
 
 </body>
 </html>
