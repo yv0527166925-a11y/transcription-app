@@ -877,6 +877,7 @@ ${text}
     // Retry mechanism with timeout
     let result;
     for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/3...`);
       try {
         console.log(`🔄 Attempt ${attempt}/3 for smart division...`);
 
@@ -895,9 +896,11 @@ ${text}
         break; // Success, exit retry loop
 
       } catch (attemptError) {
+        console.log(`🔍 DEBUG: Caught error on attempt ${attempt}, checking retry logic...`);
         console.error(`❌ Attempt ${attempt} failed:`, attemptError.message);
 
         if (attempt === 3) {
+          console.log(`🔍 DEBUG: This was the final attempt (${attempt}/3), throwing error...`);
           throw attemptError; // Final attempt failed, throw error
         }
 
@@ -1027,6 +1030,7 @@ ${text}
   // Retry mechanism
   let result;
   for (let attempt = 1; attempt <= 3; attempt++) {
+    console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/3...`);
     try {
       console.log(`🔄 Attempt ${attempt}/3 for chunk smart division...`);
 
