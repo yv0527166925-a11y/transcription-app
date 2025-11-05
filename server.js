@@ -893,7 +893,17 @@ ${text}
         result = await Promise.race([generatePromise, timeoutPromise]);
 
         console.log(`✅ Smart division API call successful on attempt ${attempt}`);
-        break; // Success, exit retry loop
+
+        const response = await result.response;
+        let dividedText = response.text().trim();
+
+        console.log(`✅ Smart division completed: ${dividedText.length} characters`);
+
+        // וידוא שיש חלוקה לפסקאות
+        const paragraphCount = dividedText.split('\\n\\n').length;
+        console.log(`📊 Created ${paragraphCount} smart paragraphs`);
+
+        return dividedText;
 
       } catch (attemptError) {
         console.log(`🔍 DEBUG: Caught error on attempt ${attempt}, checking retry logic...`);
@@ -911,16 +921,8 @@ ${text}
       }
     }
 
-    const response = await result.response;
-    let dividedText = response.text().trim();
-
-    console.log(`✅ Smart division completed: ${dividedText.length} characters`);
-
-    // וידוא שיש חלוקה לפסקאות
-    const paragraphCount = dividedText.split('\\n\\n').length;
-    console.log(`📊 Created ${paragraphCount} smart paragraphs`);
-
-    return dividedText;
+    // If we get here, all attempts failed
+    throw new Error('All retry attempts failed');
 
   } catch (error) {
     console.error('🔥 Smart paragraph division failed:', error);
@@ -1043,7 +1045,14 @@ ${text}
       console.log(`🔍 DEBUG: Starting Promise.race...`);
       result = await Promise.race([generatePromise, timeoutPromise]);
       console.log(`🔍 DEBUG: Promise.race completed successfully`);
-      break;
+
+      console.log(`🔍 DEBUG: Getting response from result...`);
+      const response = await result.response;
+      console.log(`🔍 DEBUG: Reading response text...`);
+      const text = response.text().trim();
+      console.log(`🔍 DEBUG: Response text read successfully`);
+
+      return text;
 
     } catch (attemptError) {
       console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
@@ -1055,8 +1064,8 @@ ${text}
     }
   }
 
-  const response = await result.response;
-  return response.text().trim();
+  // If we get here, all attempts failed
+  throw new Error('All retry attempts failed');
 }
 
 // Helper function for Hebrew text fixes only (paragraphs handled by Gemini)
