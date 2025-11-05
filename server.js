@@ -836,8 +836,8 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
 // 🎯 NEW: Smart paragraph division with Gemini
 async function smartParagraphDivision(text) {
   try {
-    // Check if text is too long (over 7.5K chars) and split it - reduced for better concurrent processing
-    const MAX_CHARS = 7500; // ~1500 words - reduced for better stability with concurrent requests
+    // Check if text is too long (over 5K chars) and split it - reduced for better concurrent processing
+    const MAX_CHARS = 5000; // ~1000 words - reduced for better stability with concurrent requests
     if (text.length > MAX_CHARS) {
       console.log(`📏 Text too long (${text.length} chars), splitting into chunks...`);
       return await smartParagraphDivisionChunked(text, MAX_CHARS);
@@ -914,62 +914,16 @@ ${text}
           throw attemptError; // Final attempt failed, throw error
         }
 
-        // Longer delays for better rate limiting: 15s, 30s, 50s, 60s, 70s
-        const waitTimes = [15000, 30000, 50000, 60000, 70000];
-        const waitTime = waitTimes[attempt - 1] || 70000;
+        // Extended delays for better rate limiting: 30s, 60s, 90s, 120s, 150s
+        const waitTimes = [30000, 60000, 90000, 120000, 150000];
+        const waitTime = waitTimes[attempt - 1] || 150000;
         console.log(`⏳ Waiting ${waitTime / 1000} seconds before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
 
-    // If initial fast retries failed, try longer retries (5 minutes between attempts for 30 minutes total)
-    console.log('🔄 Initial retries failed, starting extended retry phase with 5-minute intervals...');
-
-    for (let longAttempt = 1; longAttempt <= 6; longAttempt++) {
-      try {
-        console.log(`🔄 Extended attempt ${longAttempt}/6 for smart division (5-minute intervals)...`);
-
-        // Create timeout promise
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
-        );
-
-        // Create generation promise
-        const generatePromise = model.generateContent(prompt);
-
-        // Race between generation and timeout
-        result = await Promise.race([generatePromise, timeoutPromise]);
-
-        console.log(`✅ Smart division API call successful on extended attempt ${longAttempt}`);
-
-        const response = await result.response;
-        let dividedText = response.text().trim();
-
-        console.log(`✅ Smart division completed: ${dividedText.length} characters`);
-
-        // וידוא שיש חלוקה לפסקאות
-        const paragraphCount = dividedText.split('\\n\\n').length;
-        console.log(`📊 Created ${paragraphCount} smart paragraphs`);
-
-        return dividedText;
-
-      } catch (longAttemptError) {
-        console.error(`❌ Extended attempt ${longAttempt} failed:`, longAttemptError.message);
-
-        if (longAttempt === 6) {
-          console.log(`🔍 All extended attempts failed, throwing final error...`);
-          throw longAttemptError; // Final extended attempt failed
-        }
-
-        // Wait 5 minutes between extended attempts
-        const longWaitTime = 5 * 60 * 1000; // 5 minutes
-        console.log(`⏳ Waiting ${longWaitTime / 1000} seconds (5 minutes) before next extended retry...`);
-        await new Promise(resolve => setTimeout(resolve, longWaitTime));
-      }
-    }
-
-    // If we get here, all attempts (fast + extended) failed
-    throw new Error('All retry attempts (fast + extended) failed');
+    // If we get here, all attempts failed
+    throw new Error('All retry attempts failed');
 
   } catch (error) {
     console.error('🔥 Smart paragraph division failed:', error);
@@ -1105,9 +1059,9 @@ ${text}
       console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
       if (attempt === 5) throw attemptError;
 
-      // Longer delays for better rate limiting: 15s, 30s, 50s, 60s, 70s
-      const waitTimes = [15000, 30000, 50000, 60000, 70000];
-      const waitTime = waitTimes[attempt - 1] || 70000;
+      // Extended delays for better rate limiting: 30s, 60s, 90s, 120s, 150s
+      const waitTimes = [30000, 60000, 90000, 120000, 150000];
+      const waitTime = waitTimes[attempt - 1] || 150000;
       console.log(`⏳ Waiting ${waitTime / 1000} seconds before retry...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
