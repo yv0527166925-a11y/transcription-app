@@ -836,8 +836,8 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
 // 🎯 NEW: Smart paragraph division with Gemini
 async function smartParagraphDivision(text) {
   try {
-    // Check if text is too long (over 15K chars) and split it
-    const MAX_CHARS = 15000;
+    // Check if text is too long (over 9K chars) and split it - reduced to avoid PROHIBITED_CONTENT
+    const MAX_CHARS = 9000;
     if (text.length > MAX_CHARS) {
       console.log(`📏 Text too long (${text.length} chars), splitting into chunks...`);
       return await smartParagraphDivisionChunked(text, MAX_CHARS);
