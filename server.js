@@ -1033,13 +1033,16 @@ ${text}
     console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/3...`);
     try {
       console.log(`🔄 Attempt ${attempt}/3 for chunk smart division...`);
+      console.log(`🔍 DEBUG: About to call model.generateContent...`);
 
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
       );
 
       const generatePromise = model.generateContent(prompt);
+      console.log(`🔍 DEBUG: Starting Promise.race...`);
       result = await Promise.race([generatePromise, timeoutPromise]);
+      console.log(`🔍 DEBUG: Promise.race completed successfully`);
       break;
 
     } catch (attemptError) {
