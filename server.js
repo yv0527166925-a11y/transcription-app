@@ -996,17 +996,10 @@ async function smartParagraphDivisionChunked(text, maxChars) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      try {
-        // Process chunk through smart division
-        const processedChunk = await smartParagraphDivisionSingle(chunks[i]);
-        processedChunks.push(processedChunk);
-        console.log(`✅ Chunk ${i + 1}/${chunks.length} processed successfully (${processedChunk.length} chars)`);
-      } catch (error) {
-        console.error(`❌ Chunk ${i + 1}/${chunks.length} failed:`, error.message);
-        // Add original chunk without processing as fallback
-        processedChunks.push(chunks[i]);
-        console.log(`🔄 Added unprocessed chunk ${i + 1} as fallback (${chunks[i].length} chars)`);
-      }
+      // 🆕 Use the new fallback function instead of inline code
+      const processedChunk = await smartParagraphDivisionWithFlashFallback(chunks[i]);
+      processedChunks.push(processedChunk);
+      console.log(`✅ Chunk ${i + 1}/${chunks.length} processed (${processedChunk.length} chars)`);
     }
 
     // Join all processed chunks
@@ -1043,6 +1036,65 @@ function splitTextIntoChunks(text, maxChars) {
   }
 
   return chunks;
+}
+
+// 🆕 NEW: Smart paragraph division with Flash fallback for failed chunks
+async function smartParagraphDivisionWithFlashFallback(text) {
+  // First try Gemini Pro
+  try {
+    const processedText = await smartParagraphDivisionSingle(text);
+    console.log(`✅ Gemini Pro processed chunk successfully (${processedText.length} chars)`);
+    return processedText;
+  } catch (error) {
+    console.log(`⚠️ Gemini Pro failed, trying Flash 2.0 fallback:`, error.message);
+
+    // Fallback to Flash 2.0
+    try {
+      const flashModel = genAI.getGenerativeModel({
+        model: "gemini-2.0-flash-exp",
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 500000
+        }
+      });
+
+      const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+-- **שפר מירכאות** - ודא שכל ציטוט (פסוק, מאמר חז"ל, אמרה) ודו שיח ישיר עטוף במירכאות ("...") באופן מדויק ונכון תחבירית
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשנה שום מילה בטקסט! רק תחלק לפסקאות
+- שמור על כל הטקסט כפי שהוא, כולל שגיאות
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+      const result = await flashModel.generateContent(prompt);
+      const response = await result.response;
+      let dividedText = response.text();
+
+      if (dividedText && dividedText.length > text.length * 0.8) {
+        console.log(`✅ Flash 2.0 fallback successful (${dividedText.length} chars)`);
+        return dividedText;
+      } else {
+        throw new Error('Flash output too short or empty');
+      }
+    } catch (flashError) {
+      console.error(`❌ Flash 2.0 fallback also failed:`, flashError.message);
+      console.log(`⚠️ Returning original text for this chunk`);
+      return text;
+    }
+  }
 }
 
 // Single chunk processing (same as original but without chunking check)
