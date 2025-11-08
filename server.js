@@ -2724,6 +2724,13 @@ app.post('/api/login', (req, res) => {
     // Clean email from invisible characters and trim
     if (email) {
       email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+      // Fix Punycode corruption - if contains xn-- convert back
+      if (email.includes('xn--')) {
+        console.log('🚨 Detected Punycode corruption in login email:', email);
+        email = email.replace(/\.xn--com-[a-z0-9]+/g, '.com');
+        console.log('🔧 Fixed Punycode corruption to:', email);
+      }
     }
     
     if (!email || !password) {
@@ -2804,7 +2811,16 @@ app.post('/api/register', async (req, res) => {
 
     // Clean email from invisible characters and trim
     if (email) {
+      const originalEmail = email;
       email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width characters
+
+      // Fix Punycode corruption - if contains xn-- convert back
+      if (email.includes('xn--')) {
+        console.log('🚨 Detected Punycode corruption in email:', email);
+        email = email.replace(/\.xn--com-[a-z0-9]+/g, '.com');
+        console.log('🔧 Fixed Punycode corruption to:', email);
+      }
+
       console.log('📧 Email after cleaning:', JSON.stringify(email));
     }
 
