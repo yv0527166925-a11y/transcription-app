@@ -2718,8 +2718,13 @@ app.post('/api/login', (req, res) => {
     }
 
     console.log('🔐 Login attempt:', req.body);
-    
-    const { email, password } = req.body;
+
+    let { email, password } = req.body;
+
+    // Clean email from invisible characters and trim
+    if (email) {
+      email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+    }
     
     if (!email || !password) {
       return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
@@ -2791,8 +2796,17 @@ app.post('/api/register', async (req, res) => {
     }
 
     console.log('📝 Registration attempt:', req.body);
+    console.log('📧 Email debug - original:', JSON.stringify(req.body.email));
+    console.log('📧 Email debug - length:', req.body.email?.length);
+    console.log('📧 Email debug - charCodes:', req.body.email?.split('').map(c => c.charCodeAt(0)));
 
-    const { name, email, password, phone } = req.body;
+    let { name, email, password, phone } = req.body;
+
+    // Clean email from invisible characters and trim
+    if (email) {
+      email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width characters
+      console.log('📧 Email after cleaning:', JSON.stringify(email));
+    }
 
     if (!name || !email || !password) {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
@@ -2818,7 +2832,7 @@ app.post('/api/register', async (req, res) => {
     const newUser = {
       id: users.length + 1,
       name,
-      email: email.toLowerCase(),
+      email: email,
       password,
       phone: phone || '',
       isAdmin: false,
