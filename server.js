@@ -2721,28 +2721,47 @@ app.post('/api/login', (req, res) => {
 
     let { email, password } = req.body;
 
-    // Clean email from invisible characters and corruption
+    // AGGRESSIVE email cleanup for copy-paste corruption
     if (email) {
       const originalEmail = email;
 
-      // Step 1: Remove all invisible/zero-width characters
-      email = email.trim().replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+      // Step 1: Remove ALL whitespace and invisible characters including RTL/LTR marks
+      email = email.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u202A-\u202E]/g, '');
 
-      // Step 2: Remove all spaces (common in copy-paste)
-      email = email.replace(/\s+/g, '');
+      // Step 2: FORCE fix ANY xn-- corruption by replacing with known domains
+      email = email.replace(/gmail\.xn--.*?$/gi, 'gmail.com');
+      email = email.replace(/yahoo\.xn--.*?$/gi, 'yahoo.com');
+      email = email.replace(/hotmail\.xn--.*?$/gi, 'hotmail.com');
+      email = email.replace(/outlook\.xn--.*?$/gi, 'outlook.com');
 
-      // Step 3: Fix Punycode corruption patterns
-      email = email.replace(/\.xn--com-[a-z0-9]+/gi, '.com');
-      email = email.replace(/\.xn--org-[a-z0-9]+/gi, '.org');
-      email = email.replace(/\.xn--net-[a-z0-9]+/gi, '.net');
+      // Step 3: Generic xn-- pattern fix for any domain
+      email = email.replace(/\.xn--.*?$/gi, '.com');
 
-      // Step 4: Normalize common domain corruptions
-      email = email.replace(/gmail\.xn--[a-z0-9-]+/gi, 'gmail.com');
-      email = email.replace(/yahoo\.xn--[a-z0-9-]+/gi, 'yahoo.com');
-      email = email.replace(/hotmail\.xn--[a-z0-9-]+/gi, 'hotmail.com');
+      // Step 4: Double check - if still contains xn--, brute force it
+      if (email.includes('xn--')) {
+        console.log('🚨🚨 STUBBORN xn-- corruption in LOGIN:', email);
+
+        // Split by @ and fix the domain part
+        const parts = email.split('@');
+        if (parts.length === 2) {
+          let domain = parts[1];
+
+          // If domain contains xn--, assume it should be .com
+          if (domain.includes('xn--')) {
+            if (domain.includes('gmail')) domain = 'gmail.com';
+            else if (domain.includes('yahoo')) domain = 'yahoo.com';
+            else if (domain.includes('hotmail')) domain = 'hotmail.com';
+            else if (domain.includes('outlook')) domain = 'outlook.com';
+            else domain = domain.split('.')[0] + '.com'; // Default to .com
+          }
+
+          email = parts[0] + '@' + domain;
+          console.log('🔧 FORCE fixed LOGIN email to:', email);
+        }
+      }
 
       if (originalEmail !== email) {
-        console.log('🚨 Login email corruption detected and fixed:');
+        console.log('🚨 LOGIN email corruption detected and AGGRESSIVELY fixed:');
         console.log('   Original:', JSON.stringify(originalEmail));
         console.log('   Fixed:   ', JSON.stringify(email));
       }
@@ -2824,28 +2843,47 @@ app.post('/api/register', async (req, res) => {
 
     let { name, email, password, phone } = req.body;
 
-    // Clean email from invisible characters and corruption
+    // AGGRESSIVE email cleanup for copy-paste corruption
     if (email) {
       const originalEmail = email;
 
-      // Step 1: Remove all invisible/zero-width characters
-      email = email.trim().replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+      // Step 1: Remove ALL whitespace and invisible characters including RTL/LTR marks
+      email = email.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u202A-\u202E]/g, '');
 
-      // Step 2: Remove all spaces (common in copy-paste)
-      email = email.replace(/\s+/g, '');
+      // Step 2: FORCE fix ANY xn-- corruption by replacing with known domains
+      email = email.replace(/gmail\.xn--.*?$/gi, 'gmail.com');
+      email = email.replace(/yahoo\.xn--.*?$/gi, 'yahoo.com');
+      email = email.replace(/hotmail\.xn--.*?$/gi, 'hotmail.com');
+      email = email.replace(/outlook\.xn--.*?$/gi, 'outlook.com');
 
-      // Step 3: Fix Punycode corruption patterns
-      email = email.replace(/\.xn--com-[a-z0-9]+/gi, '.com');
-      email = email.replace(/\.xn--org-[a-z0-9]+/gi, '.org');
-      email = email.replace(/\.xn--net-[a-z0-9]+/gi, '.net');
+      // Step 3: Generic xn-- pattern fix for any domain
+      email = email.replace(/\.xn--.*?$/gi, '.com');
 
-      // Step 4: Normalize common domain corruptions
-      email = email.replace(/gmail\.xn--[a-z0-9-]+/gi, 'gmail.com');
-      email = email.replace(/yahoo\.xn--[a-z0-9-]+/gi, 'yahoo.com');
-      email = email.replace(/hotmail\.xn--[a-z0-9-]+/gi, 'hotmail.com');
+      // Step 4: Double check - if still contains xn--, brute force it
+      if (email.includes('xn--')) {
+        console.log('🚨🚨 STUBBORN xn-- corruption detected:', email);
+
+        // Split by @ and fix the domain part
+        const parts = email.split('@');
+        if (parts.length === 2) {
+          let domain = parts[1];
+
+          // If domain contains xn--, assume it should be .com
+          if (domain.includes('xn--')) {
+            if (domain.includes('gmail')) domain = 'gmail.com';
+            else if (domain.includes('yahoo')) domain = 'yahoo.com';
+            else if (domain.includes('hotmail')) domain = 'hotmail.com';
+            else if (domain.includes('outlook')) domain = 'outlook.com';
+            else domain = domain.split('.')[0] + '.com'; // Default to .com
+          }
+
+          email = parts[0] + '@' + domain;
+          console.log('🔧 FORCE fixed domain to:', email);
+        }
+      }
 
       if (originalEmail !== email) {
-        console.log('🚨 Email corruption detected and fixed:');
+        console.log('🚨 Email corruption detected and AGGRESSIVELY fixed:');
         console.log('   Original:', JSON.stringify(originalEmail));
         console.log('   Fixed:   ', JSON.stringify(email));
       }
