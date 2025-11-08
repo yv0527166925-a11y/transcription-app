@@ -2721,15 +2721,30 @@ app.post('/api/login', (req, res) => {
 
     let { email, password } = req.body;
 
-    // Clean email from invisible characters and trim
+    // Clean email from invisible characters and corruption
     if (email) {
-      email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+      const originalEmail = email;
 
-      // Fix Punycode corruption - if contains xn-- convert back
-      if (email.includes('xn--')) {
-        console.log('🚨 Detected Punycode corruption in login email:', email);
-        email = email.replace(/\.xn--com-[a-z0-9]+/g, '.com');
-        console.log('🔧 Fixed Punycode corruption to:', email);
+      // Step 1: Remove all invisible/zero-width characters
+      email = email.trim().replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+
+      // Step 2: Remove all spaces (common in copy-paste)
+      email = email.replace(/\s+/g, '');
+
+      // Step 3: Fix Punycode corruption patterns
+      email = email.replace(/\.xn--com-[a-z0-9]+/gi, '.com');
+      email = email.replace(/\.xn--org-[a-z0-9]+/gi, '.org');
+      email = email.replace(/\.xn--net-[a-z0-9]+/gi, '.net');
+
+      // Step 4: Normalize common domain corruptions
+      email = email.replace(/gmail\.xn--[a-z0-9-]+/gi, 'gmail.com');
+      email = email.replace(/yahoo\.xn--[a-z0-9-]+/gi, 'yahoo.com');
+      email = email.replace(/hotmail\.xn--[a-z0-9-]+/gi, 'hotmail.com');
+
+      if (originalEmail !== email) {
+        console.log('🚨 Login email corruption detected and fixed:');
+        console.log('   Original:', JSON.stringify(originalEmail));
+        console.log('   Fixed:   ', JSON.stringify(email));
       }
     }
     
@@ -2809,19 +2824,31 @@ app.post('/api/register', async (req, res) => {
 
     let { name, email, password, phone } = req.body;
 
-    // Clean email from invisible characters and trim
+    // Clean email from invisible characters and corruption
     if (email) {
       const originalEmail = email;
-      email = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, ''); // Remove zero-width characters
 
-      // Fix Punycode corruption - if contains xn-- convert back
-      if (email.includes('xn--')) {
-        console.log('🚨 Detected Punycode corruption in email:', email);
-        email = email.replace(/\.xn--com-[a-z0-9]+/g, '.com');
-        console.log('🔧 Fixed Punycode corruption to:', email);
+      // Step 1: Remove all invisible/zero-width characters
+      email = email.trim().replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '');
+
+      // Step 2: Remove all spaces (common in copy-paste)
+      email = email.replace(/\s+/g, '');
+
+      // Step 3: Fix Punycode corruption patterns
+      email = email.replace(/\.xn--com-[a-z0-9]+/gi, '.com');
+      email = email.replace(/\.xn--org-[a-z0-9]+/gi, '.org');
+      email = email.replace(/\.xn--net-[a-z0-9]+/gi, '.net');
+
+      // Step 4: Normalize common domain corruptions
+      email = email.replace(/gmail\.xn--[a-z0-9-]+/gi, 'gmail.com');
+      email = email.replace(/yahoo\.xn--[a-z0-9-]+/gi, 'yahoo.com');
+      email = email.replace(/hotmail\.xn--[a-z0-9-]+/gi, 'hotmail.com');
+
+      if (originalEmail !== email) {
+        console.log('🚨 Email corruption detected and fixed:');
+        console.log('   Original:', JSON.stringify(originalEmail));
+        console.log('   Fixed:   ', JSON.stringify(email));
       }
-
-      console.log('📧 Email after cleaning:', JSON.stringify(email));
     }
 
     if (!name || !email || !password) {
