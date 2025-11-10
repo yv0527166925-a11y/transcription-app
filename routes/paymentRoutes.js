@@ -204,15 +204,22 @@ router.post('/callback', async (req, res) => {
 
         // עדכון המערכת הראשית - הודעה לשרת הראשי לרענן את הנתונים בזיכרון
         try {
-            const serverUrl = process.env.BASE_URL || 'http://localhost:3000';
-            await axios.post(`${serverUrl}/api/internal/reload-users`, {
+            const serverUrl = 'https://transcription-app-2uci.onrender.com';
+            console.log(`🔄 Attempting to reload users data at: ${serverUrl}/api/internal/reload-users`);
+
+            const response = await axios.post(`${serverUrl}/api/internal/reload-users`, {
                 userEmail,
                 minutes,
                 source: 'payment-callback'
+            }, {
+                timeout: 10000
             });
-            console.log('✅ Main server users data reloaded');
+
+            console.log('✅ Main server users data reloaded successfully:', response.data);
         } catch (reloadError) {
             console.error('⚠️ Failed to reload main server users data:', reloadError.message);
+            console.error('⚠️ Status:', reloadError.response?.status);
+            console.error('⚠️ Response:', reloadError.response?.data);
             // לא נכשיל את התשלום בגלל זה - זה רק sync issue
         }
 
