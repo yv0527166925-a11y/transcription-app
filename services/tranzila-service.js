@@ -70,6 +70,13 @@ class TranzilaService {
       custom3: orderId
     };
 
+    console.log(`💳 Payment URL params:`, {
+      email: params.email,
+      contact: params.contact,
+      userName: userName,
+      amount: params.sum
+    });
+
     // Create query string
     const queryString = Object.keys(params)
       .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)

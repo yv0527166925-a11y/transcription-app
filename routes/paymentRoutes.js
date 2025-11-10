@@ -108,9 +108,27 @@ router.post('/initiate', async (req, res) => {
             });
         }
 
-        // מציאת שם המשתמש
-        const user = findUserByEmail(userEmail);
-        const userName = user ? user.name : '';
+        // מציאת שם המשתמש מהמערכת הראשית
+        let userName = '';
+        try {
+            const serverUrl = 'https://transcription-app-2uci.onrender.com';
+            const userSyncResponse = await axios.post(`${serverUrl}/api/user-sync`, {
+                email: userEmail
+            }, { timeout: 5000 });
+
+            if (userSyncResponse.data.success && userSyncResponse.data.user) {
+                userName = userSyncResponse.data.user.name || '';
+                console.log(`👤 Found user name from main server: "${userName}"`);
+            } else {
+                console.log(`👤 User not found in main server: ${userEmail}`);
+            }
+        } catch (userLookupError) {
+            console.error('⚠️ Failed to lookup user from main server:', userLookupError.message);
+            // Fallback to local JSON lookup
+            const localUser = findUserByEmail(userEmail);
+            userName = localUser ? localUser.name : '';
+            console.log(`👤 Fallback to local lookup, using: "${userName}"`);
+        }
 
         // יצירת מזהה הזמנה ייחודי
         const orderId = tranzilaService.generateOrderId(userEmail, packageType);
