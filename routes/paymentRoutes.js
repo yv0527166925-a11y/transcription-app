@@ -170,8 +170,11 @@ router.post('/callback', async (req, res) => {
         const user = findUserByEmail(userEmail);
         if (!user) {
             console.log('❌ User not found:', userEmail);
+            console.log('📋 Available users:', readUsersData().map(u => u.email));
             return res.status(404).send('User not found');
         }
+
+        console.log('✅ User found:', { email: user.email, currentMinutes: user.remainingMinutes });
 
         // הוספת הדקות למשתמש
         const updatedUser = addMinutesToUser(userEmail, minutes);
@@ -179,6 +182,12 @@ router.post('/callback', async (req, res) => {
             console.log('❌ Failed to update user minutes');
             return res.status(500).send('Failed to update user');
         }
+
+        console.log('✅ User updated successfully:', {
+            email: updatedUser.email,
+            newMinutes: updatedUser.remainingMinutes,
+            minutesAdded: minutes
+        });
 
         // יצירת רשומת עסקה
         const transaction = saveTransaction({
