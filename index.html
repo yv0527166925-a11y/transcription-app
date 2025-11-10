@@ -3513,16 +3513,43 @@
         // רענון נתוני המשתמש מהשרת
         async function refreshUserData() {
             try {
-                // בהנחה שיש route קיים לקבלת נתוני משתמש
-                // או שנבדוק ישירות את הקובץ users_data.json
-                const response = await fetch('/users_data.json');
+                if (!currentUser || !currentUser.email) {
+                    console.log('⚠️ No current user to refresh');
+                    return;
+                }
+
+                console.log('🔄 Refreshing user data after payment...');
+
+                // שימוש ב-API sync הקיים
+                const response = await fetch(`${API_BASE}/user-sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentUser.email })
+                });
+
                 if (response.ok) {
-                    const users = await response.json();
-                    const user = users.find(u => u.email.toLowerCase() === currentUser.email.toLowerCase());
-                    if (user) {
-                        currentUser.remainingMinutes = user.remainingMinutes;
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        const oldMinutes = currentUser.remainingMinutes;
+                        currentUser.remainingMinutes = data.user.remainingMinutes;
+                        currentUser.totalTranscribed = data.user.totalTranscribed;
+
+                        // עדכון localStorage
+                        saveUserToStorage(currentUser);
+
+                        // עדכון הדף
                         updateDashboard();
+
+                        console.log('✅ User data refreshed:', {
+                            oldMinutes,
+                            newMinutes: currentUser.remainingMinutes,
+                            change: currentUser.remainingMinutes - oldMinutes
+                        });
+                    } else {
+                        console.log('⚠️ User sync failed:', data);
                     }
+                } else {
+                    console.error('❌ Failed to refresh user data:', response.status);
                 }
             } catch (error) {
                 console.error('❌ Error refreshing user data:', error);
