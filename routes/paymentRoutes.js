@@ -107,11 +107,15 @@ router.post('/initiate', async (req, res) => {
             });
         }
 
+        // מציאת שם המשתמש
+        const user = findUserByEmail(userEmail);
+        const userName = user ? user.name : '';
+
         // יצירת מזהה הזמנה ייחודי
         const orderId = tranzilaService.generateOrderId(userEmail, packageType);
 
         // יצירת URL לתשלום
-        const paymentUrl = tranzilaService.createPaymentUrl(userEmail, packageType, orderId);
+        const paymentUrl = tranzilaService.createPaymentUrl(userEmail, packageType, orderId, userName);
 
         console.log(`💳 Created payment URL for ${userEmail}: ${orderId}`);
 

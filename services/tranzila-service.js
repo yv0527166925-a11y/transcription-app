@@ -43,7 +43,7 @@ class TranzilaService {
    * Creates payment URL for Tranzila hosted page
    * יוצר URL לתשלום בדף המתארח של טרנזילה
    */
-  createPaymentUrl(userEmail, packageType, orderId) {
+  createPaymentUrl(userEmail, packageType, orderId, userName = '') {
     if (!this.packages[packageType]) {
       throw new Error('Invalid package type');
     }
@@ -59,6 +59,7 @@ class TranzilaService {
 
       // Customer details
       email: userEmail,
+      contact: userName || '',
 
       // Order details
       remarks: `${packageInfo.name} - ${packageInfo.minutes} דקות`,
@@ -92,15 +93,17 @@ class TranzilaService {
       }
 
       // במיני חנות, הנתונים מגיעים בשדות שונים
-      console.log('🔍 Looking for user email in callback data:', {
+      console.log('🔍 Looking for user data in callback:', {
         email: callbackData.email,
+        contact: callbackData.contact,
         custom1: callbackData.custom1,
         custom2: callbackData.custom2,
         custom3: callbackData.custom3
       });
 
-      // נחפש את האימייל בשדות הרלוונטיים (לא contact כי זה שם)
+      // נחפש את האימייל בשדות הרלוונטיים
       const userEmail = callbackData.email || callbackData.custom1;
+      const userName = callbackData.contact || '';
 
       if (!userEmail) {
         console.error('❌ No user email found in callback data!');
@@ -115,6 +118,7 @@ class TranzilaService {
 
       console.log('✅ Payment successful from mini-store:', {
         userEmail,
+        userName,
         amount,
         minutes,
         confirmationCode
