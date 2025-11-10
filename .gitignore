@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# Log files
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Uploads
+uploads/
+
+# Music Player - DO NOT COMMIT
+player.html
+
+# Temporary files
+tmp/
+temp/

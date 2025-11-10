@@ -1,0 +1,62 @@
+[
+  {
+    "id": 1,
+    "userEmail": "admin@example.com",
+    "amount": 20,
+    "minutes": 119,
+    "confirmationCode": "TEST456",
+    "status": "completed",
+    "metadata": {
+      "Response": "000",
+      "ConfirmationCode": "TEST456",
+      "sum": "20",
+      "contact": "admin@example.com"
+    },
+    "createdAt": "2025-11-01T19:09:00.960Z"
+  },
+  {
+    "id": 2,
+    "userEmail": "admin@example.com",
+    "amount": 30,
+    "minutes": 179,
+    "confirmationCode": "TEST789",
+    "status": "completed",
+    "metadata": {
+      "Response": "000",
+      "ConfirmationCode": "TEST789",
+      "sum": "30",
+      "contact": "admin@example.com"
+    },
+    "createdAt": "2025-11-01T19:13:13.658Z"
+  },
+  {
+    "id": 3,
+    "userEmail": "admin@example.com",
+    "amount": 20,
+    "minutes": 120,
+    "confirmationCode": "TEST123",
+    "status": "completed",
+    "metadata": {
+      "Response": "000",
+      "ConfirmationCode": "TEST123",
+      "sum": "20",
+      "contact": "admin@example.com"
+    },
+    "createdAt": "2025-11-01T19:18:36.750Z"
+  },
+  {
+    "id": 4,
+    "userEmail": "admin@example.com",
+    "amount": 70,
+    "minutes": 420,
+    "confirmationCode": "TEST999",
+    "status": "completed",
+    "metadata": {
+      "Response": "000",
+      "ConfirmationCode": "TEST999",
+      "sum": "70",
+      "contact": "admin@example.com"
+    },
+    "createdAt": "2025-11-01T19:19:15.931Z"
+  }
+]

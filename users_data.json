@@ -5,8 +5,8 @@
     "email": "admin@example.com",
     "password": "S3cur3P@ssw0rd_Adm!n25",
     "isAdmin": true,
-    "remainingMinutes": 1000,
-    "totalTranscribed": 0,
+    "remainingMinutes": 1053,
+    "totalTranscribed": 7,
     "history": [],
     "joinDate": "2024-01-01T00:00:00.000Z",
     "transcriptionHistory": []

@@ -135,10 +135,6 @@ app.use(express.static('.'));
 // const userRoutes = require('./routes/userRoutes'); // Disabled MongoDB routes
 // app.use('/api/users', userRoutes); // Disabled MongoDB routes
 
-// Payment Routes - Tranzila Integration
-const paymentRoutes = require('./routes/paymentRoutes');
-app.use('/api/payment', paymentRoutes);
-
 // Enhanced file storage with proper UTF-8 encoding
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -1600,7 +1596,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     
     // Transcribe each chunk with retry mechanism
     const transcriptions = [];
-    const maxRetries = 5;
+    const maxRetries = 2;
 
     for (let i = 0; i < chunksData.chunks.length; i++) {
       const chunk = chunksData.chunks[i];
@@ -1613,9 +1609,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
         try {
           if (retryCount > 0) {
             console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
-            // Exponential backoff: 5s, 15s, 30s, 45s, 60s
-            const backoffDelays = [5000, 15000, 30000, 45000, 60000];
-            const backoffDelay = backoffDelays[retryCount - 1] || 60000;
+            // Exponential backoff: 5s, 15s, 30s
+            const backoffDelay = Math.min(5000 * Math.pow(2, retryCount - 1), 30000);
             console.log(`⏳ Waiting ${backoffDelay/1000}s before retry...`);
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
@@ -1904,6 +1899,9 @@ async function createWordDocument(transcription, filename, duration) {
       }
     }
 
+    // 🎯 NEW: הוסף חותמות זמן נסתרות כ-Custom Properties (בלי לשנות תוכן!)
+    addTimestampsToDocument(newZip, transcription, duration);
+
     const buffer = await newZip.generateAsync({
       type: 'nodebuffer',
       compression: 'DEFLATE',
@@ -1917,6 +1915,75 @@ async function createWordDocument(transcription, filename, duration) {
     console.error('Error creating template-based Word document:', error);
     console.log('⚠️ Falling back to HTML method');
     return await createWordDocumentFallback(transcription, filename, duration);
+  }
+}
+
+// 🎯 NEW: Add hidden timestamps to Word document (without changing content!)
+function addTimestampsToDocument(zip, transcription, duration) {
+  try {
+    console.log('🎯 Adding hidden timestamps to Word document...');
+
+    // חישוב חותמות זמן בסיסיות לכל מילה
+    const words = transcription.split(/\s+/).filter(w => w.trim().length > 0);
+    const timePerWord = duration ? (duration * 60) / words.length : 1; // duration in minutes, convert to seconds
+
+    const timestampData = {
+      version: "1.0",
+      totalDuration: duration ? duration * 60 : words.length, // in seconds
+      audioSync: words.map((word, index) => ({
+        index,
+        word: word.trim(),
+        startTime: index * timePerWord,
+        endTime: (index + 1) * timePerWord
+      }))
+    };
+
+    // יצירת Custom Properties XML
+    const customPropsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+    <property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="audioTimestamps">
+        <vt:lpwstr>${Buffer.from(JSON.stringify(timestampData)).toString('base64')}</vt:lpwstr>
+    </property>
+    <property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="syncVersion">
+        <vt:lpwstr>1.0</vt:lpwstr>
+    </property>
+    <property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="4" name="wordCount">
+        <vt:i4>${words.length}</vt:i4>
+    </property>
+</Properties>`;
+
+    // הוסף את קובץ Custom Properties
+    zip.file('docProps/custom.xml', customPropsXml);
+
+    // עדכן את Content Types לכלול Custom Properties
+    let contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+    <Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+    <Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/>
+    <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`;
+
+    zip.file('[Content_Types].xml', contentTypesXml);
+
+    // עדכן את ה-relationships לכלול Custom Properties
+    let relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+    <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+    <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+    <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+    <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" Target="docProps/custom.xml"/>
+</Relationships>`;
+
+    zip.file('_rels/.rels', relsXml);
+
+    console.log(`✅ Hidden timestamps added: ${words.length} words, ${timePerWord.toFixed(2)}s per word`);
+
+  } catch (error) {
+    console.error('❌ Error adding timestamps to document:', error);
+    // לא נוריד את התהליך אם יש שגיאה - הקובץ עדיין יעבוד בלי חותמות זמן
   }
 }
 
@@ -2723,54 +2790,8 @@ app.post('/api/login', (req, res) => {
     }
 
     console.log('🔐 Login attempt:', req.body);
-
-    let { email, password } = req.body;
-
-    // AGGRESSIVE email cleanup for copy-paste corruption
-    if (email) {
-      const originalEmail = email;
-
-      // Step 1: Remove ALL whitespace and invisible characters including RTL/LTR marks
-      email = email.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u202A-\u202E]/g, '');
-
-      // Step 2: FORCE fix ANY xn-- corruption by replacing with known domains
-      email = email.replace(/gmail\.xn--.*?$/gi, 'gmail.com');
-      email = email.replace(/yahoo\.xn--.*?$/gi, 'yahoo.com');
-      email = email.replace(/hotmail\.xn--.*?$/gi, 'hotmail.com');
-      email = email.replace(/outlook\.xn--.*?$/gi, 'outlook.com');
-
-      // Step 3: Generic xn-- pattern fix for any domain
-      email = email.replace(/\.xn--.*?$/gi, '.com');
-
-      // Step 4: Double check - if still contains xn--, brute force it
-      if (email.includes('xn--')) {
-        console.log('🚨🚨 STUBBORN xn-- corruption in LOGIN:', email);
-
-        // Split by @ and fix the domain part
-        const parts = email.split('@');
-        if (parts.length === 2) {
-          let domain = parts[1];
-
-          // If domain contains xn--, assume it should be .com
-          if (domain.includes('xn--')) {
-            if (domain.includes('gmail')) domain = 'gmail.com';
-            else if (domain.includes('yahoo')) domain = 'yahoo.com';
-            else if (domain.includes('hotmail')) domain = 'hotmail.com';
-            else if (domain.includes('outlook')) domain = 'outlook.com';
-            else domain = domain.split('.')[0] + '.com'; // Default to .com
-          }
-
-          email = parts[0] + '@' + domain;
-          console.log('🔧 FORCE fixed LOGIN email to:', email);
-        }
-      }
-
-      if (originalEmail !== email) {
-        console.log('🚨 LOGIN email corruption detected and AGGRESSIVELY fixed:');
-        console.log('   Original:', JSON.stringify(originalEmail));
-        console.log('   Fixed:   ', JSON.stringify(email));
-      }
-    }
+    
+    const { email, password } = req.body;
     
     if (!email || !password) {
       return res.json({ success: false, error: 'אימייל וסיסמה נדרשים' });
@@ -2842,57 +2863,8 @@ app.post('/api/register', async (req, res) => {
     }
 
     console.log('📝 Registration attempt:', req.body);
-    console.log('📧 Email debug - original:', JSON.stringify(req.body.email));
-    console.log('📧 Email debug - length:', req.body.email?.length);
-    console.log('📧 Email debug - charCodes:', req.body.email?.split('').map(c => c.charCodeAt(0)));
 
-    let { name, email, password, phone } = req.body;
-
-    // AGGRESSIVE email cleanup for copy-paste corruption
-    if (email) {
-      const originalEmail = email;
-
-      // Step 1: Remove ALL whitespace and invisible characters including RTL/LTR marks
-      email = email.replace(/[\s\u200B-\u200D\uFEFF\u00A0\u202A-\u202E]/g, '');
-
-      // Step 2: FORCE fix ANY xn-- corruption by replacing with known domains
-      email = email.replace(/gmail\.xn--.*?$/gi, 'gmail.com');
-      email = email.replace(/yahoo\.xn--.*?$/gi, 'yahoo.com');
-      email = email.replace(/hotmail\.xn--.*?$/gi, 'hotmail.com');
-      email = email.replace(/outlook\.xn--.*?$/gi, 'outlook.com');
-
-      // Step 3: Generic xn-- pattern fix for any domain
-      email = email.replace(/\.xn--.*?$/gi, '.com');
-
-      // Step 4: Double check - if still contains xn--, brute force it
-      if (email.includes('xn--')) {
-        console.log('🚨🚨 STUBBORN xn-- corruption detected:', email);
-
-        // Split by @ and fix the domain part
-        const parts = email.split('@');
-        if (parts.length === 2) {
-          let domain = parts[1];
-
-          // If domain contains xn--, assume it should be .com
-          if (domain.includes('xn--')) {
-            if (domain.includes('gmail')) domain = 'gmail.com';
-            else if (domain.includes('yahoo')) domain = 'yahoo.com';
-            else if (domain.includes('hotmail')) domain = 'hotmail.com';
-            else if (domain.includes('outlook')) domain = 'outlook.com';
-            else domain = domain.split('.')[0] + '.com'; // Default to .com
-          }
-
-          email = parts[0] + '@' + domain;
-          console.log('🔧 FORCE fixed domain to:', email);
-        }
-      }
-
-      if (originalEmail !== email) {
-        console.log('🚨 Email corruption detected and AGGRESSIVELY fixed:');
-        console.log('   Original:', JSON.stringify(originalEmail));
-        console.log('   Fixed:   ', JSON.stringify(email));
-      }
-    }
+    const { name, email, password, phone } = req.body;
 
     if (!name || !email || !password) {
       return res.json({ success: false, error: 'שם, אימייל וסיסמה נדרשים' });
@@ -2918,7 +2890,7 @@ app.post('/api/register', async (req, res) => {
     const newUser = {
       id: users.length + 1,
       name,
-      email: email,
+      email: email.toLowerCase(),
       password,
       phone: phone || '',
       isAdmin: false,
@@ -4392,6 +4364,175 @@ async function sendErrorEmail(senderEmail, errorMessage) {
     console.error('📧 Error sending error email:', error);
   }
 }
+
+// 🎯 NEW: API endpoint to parse uploaded DOCX file and check for timestamps
+app.post('/api/parse-docx-upload', upload.single('docxFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'לא נמצא קובץ'
+      });
+    }
+
+    console.log(`📄 Processing uploaded DOCX: ${req.file.originalname}`);
+
+    // קרא את הקובץ שהועלה
+    const fileBuffer = req.file.buffer;
+
+    // בדוק אם יש חותמות זמן מוטמעות
+    try {
+      const zip = new JSZip();
+      await zip.loadAsync(fileBuffer);
+
+      // נסה לקרוא Custom Properties
+      const customPropsFile = zip.file('docProps/custom.xml');
+      let timestampData = null;
+
+      if (customPropsFile) {
+        const customPropsXml = await customPropsFile.async('text');
+        const timestampMatch = customPropsXml.match(/<property[^>]*name="audioTimestamps"[^>]*>\s*<vt:lpwstr>(.*?)<\/vt:lpwstr>/);
+
+        if (timestampMatch) {
+          try {
+            const timestampDataBase64 = timestampMatch[1];
+            const timestampDataJson = Buffer.from(timestampDataBase64, 'base64').toString('utf8');
+            timestampData = JSON.parse(timestampDataJson);
+            console.log(`🎯 Found embedded timestamps: ${timestampData.audioSync?.length || 0} words`);
+          } catch (error) {
+            console.error('Error parsing embedded timestamps:', error);
+          }
+        }
+      }
+
+      // חלץ טקסט רגיל מ-document.xml
+      const docXml = await zip.file('word/document.xml').async('text');
+      const textContent = docXml
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (timestampData) {
+        // אם יש חותמות זמן מוטמעות, החזר אותן
+        res.json({
+          success: true,
+          text: textContent,
+          hasTimestamps: true,
+          timestampData: timestampData,
+          wordCount: timestampData.audioSync?.length || 0,
+          duration: timestampData.totalDuration || 0
+        });
+      } else {
+        // אם אין חותמות זמן, החזר רק טקסט רגיל
+        res.json({
+          success: true,
+          text: textContent,
+          hasTimestamps: false
+        });
+      }
+
+    } catch (error) {
+      console.error('Error reading DOCX as ZIP:', error);
+      res.status(500).json({
+        success: false,
+        error: 'שגיאה בקריאת קובץ Word'
+      });
+    }
+
+  } catch (error) {
+    console.error('API error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאת שרת'
+    });
+  }
+});
+
+// 🎯 NEW: API endpoint to read embedded timestamps from Word document
+app.post('/api/read-word-timestamps', async (req, res) => {
+  try {
+    const { file } = req.body;
+
+    if (!file || !file.name) {
+      return res.status(400).json({
+        success: false,
+        error: 'קובץ לא נמצא'
+      });
+    }
+
+    console.log(`📄 Reading timestamps from Word document: ${file.name}`);
+
+    // אם זה קובץ שהועלה כ-base64 או path
+    let fileBuffer;
+    if (file.path && fs.existsSync(file.path)) {
+      fileBuffer = fs.readFileSync(file.path);
+    } else if (file.content) {
+      fileBuffer = Buffer.from(file.content, 'base64');
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'לא ניתן לקרוא קובץ'
+      });
+    }
+
+    // קרא את הקובץ כ-ZIP
+    const zip = new JSZip();
+    await zip.loadAsync(fileBuffer);
+
+    // נסה לקרוא Custom Properties
+    const customPropsFile = zip.file('docProps/custom.xml');
+    if (!customPropsFile) {
+      return res.json({
+        success: true,
+        hasTimestamps: false,
+        message: 'קובץ Word לא מכיל חותמות זמן מוטמעות'
+      });
+    }
+
+    const customPropsXml = await customPropsFile.async('text');
+
+    // חיפוש אחר חותמות הזמן
+    const timestampMatch = customPropsXml.match(/<property[^>]*name="audioTimestamps"[^>]*>\s*<vt:lpwstr>(.*?)<\/vt:lpwstr>/);
+
+    if (!timestampMatch) {
+      return res.json({
+        success: true,
+        hasTimestamps: false,
+        message: 'לא נמצאו חותמות זמן בקובץ'
+      });
+    }
+
+    // פענח את חותמות הזמן
+    const timestampDataBase64 = timestampMatch[1];
+    const timestampDataJson = Buffer.from(timestampDataBase64, 'base64').toString('utf8');
+    const timestampData = JSON.parse(timestampDataJson);
+
+    // חלץ גם את הטקסט הרגיל
+    const docXml = await zip.file('word/document.xml').async('text');
+    const textContent = docXml
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    console.log(`✅ Found embedded timestamps: ${timestampData.audioSync?.length || 0} words`);
+
+    res.json({
+      success: true,
+      hasTimestamps: true,
+      text: textContent,
+      timestampData: timestampData,
+      wordCount: timestampData.audioSync?.length || 0,
+      duration: timestampData.totalDuration || 0
+    });
+
+  } catch (error) {
+    console.error('Error reading Word timestamps:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בקריאת חותמות זמן מהקובץ'
+    });
+  }
+});
 
 // Start server without MongoDB
 const server = app.listen(PORT, () => {

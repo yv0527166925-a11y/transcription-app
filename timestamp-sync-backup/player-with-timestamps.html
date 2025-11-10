@@ -1,0 +1,1508 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>נגן מוזיקה מסונכרן - תמלול חכם</title>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0D9488;
+            --primary-light: #14B8A6;
+            --success-color: #10B981;
+            --text-primary: #111827;
+            --text-secondary: #6B7280;
+            --bg-primary: #FFFFFF;
+            --bg-secondary: #F9FAFB;
+            --accent-color: #F59E0B;
+            --highlight-color: #FBBF24;
+            --current-segment: #ECFDF5;
+            --clickable-hover: #FEF3C7;
+            --error-highlight: #FEE2E2;
+            --border-color: #E5E7EB;
+            --shadow-subtle: 0 4px 6px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 10px 25px rgba(0, 0, 0, 0.1);
+            --border-radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, #ffffff 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-subtle);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+            flex: 1;
+            align-items: start;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        /* Player Section */
+        .player-section {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: var(--shadow-medium);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .file-upload {
+            margin-bottom: 30px;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 30px 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: var(--bg-secondary);
+        }
+
+        .upload-area:hover {
+            border-color: var(--primary-color);
+            background: var(--current-segment);
+        }
+
+        .upload-area.dragover {
+            border-color: var(--primary-color);
+            background: var(--current-segment);
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .file-input-wrapper {
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            background: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .file-input-wrapper:hover {
+            background: var(--primary-light);
+        }
+
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+
+        /* Audio Player */
+        .audio-player {
+            margin-bottom: 20px;
+        }
+
+        .audio-controls {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        audio {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .playback-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .time-info {
+            display: flex;
+            gap: 15px;
+        }
+
+        .playback-speed {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .speed-btn {
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s ease;
+        }
+
+        .speed-btn:hover,
+        .speed-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* File Info */
+        .file-info {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 0.85rem;
+        }
+
+        .file-info-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .file-info-label {
+            color: var(--text-secondary);
+        }
+
+        .file-info-value {
+            font-weight: 500;
+        }
+
+        /* Text Display Section */
+        .text-section {
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            box-shadow: var(--shadow-medium);
+            min-height: 700px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .text-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .text-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .text-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: opacity 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .control-btn:hover {
+            opacity: 0.9;
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .edit-toggle.active {
+            background: #DC2626;
+        }
+
+        /* Text Display */
+        .text-display {
+            flex: 1;
+            font-size: 1.1rem;
+            line-height: 1.9;
+            padding: 20px 0;
+            overflow-y: auto;
+            max-height: none;
+            direction: rtl;
+        }
+
+        .text-word {
+            display: inline;
+            padding: 2px 4px;
+            margin: 0 1px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .text-word:hover {
+            background: var(--clickable-hover);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .text-word.current-word {
+            background: var(--current-segment);
+            border: 2px solid var(--primary-color);
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+        }
+
+        .text-word.error-highlight {
+            background: var(--error-highlight);
+            border: 2px solid #DC2626;
+        }
+
+        .text-word.editable {
+            background: #FEF3C7;
+            border: 1px dashed var(--accent-color);
+        }
+
+        .text-sentence {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .text-sentence:hover {
+            background: var(--bg-secondary);
+        }
+
+        .text-sentence.current-sentence {
+            background: var(--current-segment);
+            border-right: 4px solid var(--primary-color);
+        }
+
+        .timestamp-info {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            position: absolute;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            white-space: nowrap;
+            z-index: 100;
+        }
+
+        .text-word:hover .timestamp-info {
+            opacity: 1;
+        }
+
+        /* Navigation Controls */
+        .navigation-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: 1px solid var(--primary-color);
+            background: var(--bg-primary);
+            color: var(--primary-color);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Status Messages */
+        .status-message {
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .status-success {
+            background: #D1FAE5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+        }
+
+        .status-error {
+            background: #FEE2E2;
+            color: #DC2626;
+            border: 1px solid #FECACA;
+        }
+
+        .status-info {
+            background: #DBEAFE;
+            color: #1D4ED8;
+            border: 1px solid #BFDBFE;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .text-section,
+            .player-section {
+                padding: 20px;
+            }
+
+            .text-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+
+        /* Help Text */
+        .help-text {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 60px 20px;
+        }
+
+        .help-text h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+
+        .help-text p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .help-text .features {
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 נגן מוזיקה מסונכרן</h1>
+            <p class="subtitle">לחץ על כל מילה בטקסט כדי לקפוץ למיקום המדויק בקובץ האודיו 🎯</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Player Section -->
+            <section class="player-section">
+                <div class="file-upload">
+                    <!-- Audio File Upload -->
+                    <div class="upload-area" id="audioUploadArea">
+                        <div class="upload-icon">🎵</div>
+                        <div class="upload-text">גרור קובץ אודיו לכאן או לחץ לבחירה</div>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="audioFileInput" class="file-input"
+                                   accept="audio/*">
+                            <span>בחר קובץ אודיו</span>
+                        </div>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 10px;">
+                            נתמך: MP3, WAV, M4A, OGG
+                        </p>
+                    </div>
+
+                    <!-- Text Input Area -->
+                    <div class="text-input-area" style="margin-top: 20px;">
+                        <label for="textInput" style="display: block; margin-bottom: 10px; font-weight: 600; color: var(--primary-color);">
+                            📝 הדבק את הטקסט מ-Word:
+                        </label>
+                        <textarea
+                            id="textInput"
+                            placeholder="1. פתח את קובץ ה-Word שלך&#10;2. לחץ Ctrl+A כדי לבחור הכל&#10;3. לחץ Ctrl+C כדי להעתיק&#10;4. הדבק כאן עם Ctrl+V"
+                            style="width: 100%; min-height: 200px; padding: 15px; border: 2px dashed var(--border-color); border-radius: 8px; font-family: inherit; font-size: 14px; line-height: 1.6; resize: vertical; direction: rtl; text-align: right;"
+                            dir="rtl"></textarea>
+                        <button id="processTextBtn" class="control-btn" style="margin-top: 10px; background: var(--success-color);">
+                            עבד טקסט 🎯
+                        </button>
+                    </div>
+                </div>
+
+                <div id="fileInfo" class="file-info" style="display: none;">
+                    <div class="file-info-item">
+                        <span class="file-info-label">🎵 אודיו:</span>
+                        <span class="file-info-value" id="audioFileName">-</span>
+                    </div>
+                    <div class="file-info-item">
+                        <span class="file-info-label">📄 טקסט:</span>
+                        <span class="file-info-value" id="textFileName">-</span>
+                    </div>
+                    <div class="file-info-item">
+                        <span class="file-info-label">⏱️ אורך:</span>
+                        <span class="file-info-value" id="audioDuration">-</span>
+                    </div>
+                    <div class="file-info-item">
+                        <span class="file-info-label">📊 מילים:</span>
+                        <span class="file-info-value" id="wordCount">-</span>
+                    </div>
+                </div>
+
+                <div class="audio-player">
+                    <div class="audio-controls">
+                        <audio id="audioPlayer" controls style="display: none;">
+                            <source type="audio/mpeg">
+                            הדפדפן שלך לא תומך בנגן אודיו.
+                        </audio>
+
+                        <div class="playback-info" id="playbackInfo" style="display: none;">
+                            <div class="time-info">
+                                <span>⏰ <span id="currentTime">00:00</span></span>
+                                <span>📏 <span id="totalTime">00:00</span></span>
+                            </div>
+                            <div class="playback-speed">
+                                <span style="font-size: 0.8rem;">מהירות:</span>
+                                <button class="speed-btn" data-speed="0.5">0.5x</button>
+                                <button class="speed-btn active" data-speed="1">1x</button>
+                                <button class="speed-btn" data-speed="1.25">1.25x</button>
+                                <button class="speed-btn" data-speed="1.5">1.5x</button>
+                                <button class="speed-btn" data-speed="2">2x</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="statusMessages"></div>
+            </section>
+
+            <!-- Text Section -->
+            <section class="text-section">
+                <div class="text-header">
+                    <h3 class="text-title">📄 טקסט מסונכרן</h3>
+                    <div class="text-controls">
+                        <button class="control-btn" id="editToggle" style="display: none;">
+                            ✏️ עריכה
+                        </button>
+                        <button class="control-btn" id="saveChanges" style="display: none;">
+                            💾 שמור
+                        </button>
+                        <button class="control-btn" id="saveToWord" style="display: none;">
+                            💾 שמור לוורד
+                        </button>
+                        <button class="control-btn" id="exportSRT" style="display: none;">
+                            🎬 ייצא SRT
+                        </button>
+                        <button class="control-btn" id="calibrateSync" style="display: none; background: var(--primary-color);">
+                            🎯 כיול סינכרון
+                        </button>
+                    </div>
+                    <div id="calibrationInstructions" style="display: none; background: #E3F2FD; border: 1px solid #1976D2; border-radius: 6px; padding: 15px; margin-top: 10px;">
+                        <strong>🎯 מצב כיול סינכרון:</strong><br>
+                        1. השמע את האודיו<br>
+                        2. כשאתה שומע מילה - לחץ עליה בטקסט ברגע שאתה שומע אותה<br>
+                        3. עשה את זה לכמה מילים (לפחות 3-4)<br>
+                        4. לחץ "סיום כיול" כשסיימת<br>
+                        <button class="control-btn" id="finishCalibration" style="margin-top: 10px; background: var(--success-color);">
+                            ✅ סיום כיול
+                        </button>
+                        <button class="control-btn" id="clearCalibration" style="margin-top: 10px; background: var(--error-highlight);">
+                            🗑️ נקה נקודות
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-display" id="textDisplay">
+                    <div class="help-text">
+                        <h3>🚀 איך זה עובד?</h3>
+                        <div class="features">
+                            <p><strong>🎯 לחיצה על מילה</strong> - קופצת ישירות לנקודת הזמן באודיו</p>
+                            <p><strong>🔄 סנכרון אוטומטי</strong> - המילה הנוכחית מסומנת בזמן השמעה</p>
+                            <p><strong>✏️ עריכה בזמן אמת</strong> - תקן טעויות תמלול מיידית</p>
+                            <p><strong>💾 שמירה</strong> - שמור את השינויים לקובץ חדש</p>
+                        </div>
+                        <p style="margin-top: 30px; color: var(--accent-color);">
+                            <strong>העלה קבצי אודיו וטקסט כדי להתחיל 👆</strong>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="navigation-controls" id="navigationControls" style="display: none;">
+                    <button class="nav-btn" id="prevWord" disabled>⏮️ מילה קודמת</button>
+                    <button class="nav-btn" id="nextWord" disabled>מילה הבאה ⏭️</button>
+                    <button class="nav-btn" id="markError" disabled>🚨 סמן שגיאה</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let audioPlayer;
+        let textData = [];
+        let originalText = '';
+        let currentWordIndex = 0;
+        let isEditMode = false;
+        let audioFile = null;
+        let textFile = null;
+        let originalDocxPath = null; // נתיב הקובץ Word המקורי
+        let syncPoints = []; // נקודות סינכרון שנקבעות ידנית
+        let calibrationMode = false; // מצב כיול
+
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePlayer();
+        });
+
+        function initializePlayer() {
+            audioPlayer = document.getElementById('audioPlayer');
+            setupFileUpload();
+            setupAudioControls();
+            setupTextControls();
+            setupNavigation();
+        }
+
+        function setupFileUpload() {
+            const audioUploadArea = document.getElementById('audioUploadArea');
+            const audioFileInput = document.getElementById('audioFileInput');
+            const processTextBtn = document.getElementById('processTextBtn');
+            const textInput = document.getElementById('textInput');
+
+            // Audio file drag and drop
+            audioUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.add('dragover');
+            });
+
+            audioUploadArea.addEventListener('dragleave', () => {
+                audioUploadArea.classList.remove('dragover');
+            });
+
+            audioUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                audioUploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('audio/')) {
+                    handleAudioFile(files[0]);
+                }
+            });
+
+            // Audio file input
+            audioFileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleAudioFile(e.target.files[0]);
+                }
+            });
+
+            audioUploadArea.addEventListener('click', () => {
+                audioFileInput.click();
+            });
+
+            // Text processing
+            processTextBtn.addEventListener('click', () => {
+                const text = textInput.value.trim();
+                if (text) {
+                    handleTextInput(text);
+                } else {
+                    showStatus('אנא הדבק טקסט מ-Word', 'error');
+                }
+            });
+
+            // Auto-process text on paste
+            textInput.addEventListener('paste', () => {
+                setTimeout(() => {
+                    if (textInput.value.trim()) {
+                        processTextBtn.style.background = 'var(--success-color)';
+                        processTextBtn.textContent = 'עבד טקסט 🎯';
+                    }
+                }, 100);
+            });
+        }
+
+        function handleAudioFile(file) {
+            audioFile = file;
+            loadAudioFile(file);
+            showStatus(`אודיו נטען: ${file.name}`, 'success');
+
+            // בדוק אם יש גם טקסט
+            if (originalText.trim()) {
+                processFiles();
+            }
+        }
+
+        function handleTextInput(text) {
+            originalText = text;
+            textFile = { name: 'טקסט_מועתק.txt' }; // קובץ וירטואלי
+            processTextContent(text, 'טקסט מ-Word');
+            showStatus('טקסט עובד בהצלחה!', 'success');
+
+            // בדוק אם יש גם אודיו
+            if (audioFile) {
+                processFiles();
+            }
+        }
+
+        function loadDocxFile(file) {
+            showStatus('קורא קובץ Word...', 'info');
+
+            // אם זה קובץ קיים במחשב, נקרא אותו דרך API
+            if (file.path || file.webkitRelativePath) {
+                const filePath = file.path || file.webkitRelativePath;
+
+                fetch('/api/read-docx', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        processTextContent(data.text, file.name);
+                        originalDocxPath = data.filePath; // שמירת נתיב הקובץ המקורי
+                        showStatus(`קובץ Word נטען בהצלחה: ${file.name}`, 'success');
+                    } else {
+                        showStatus('שגיאה בקריאת קובץ Word', 'error');
+                        // fallback לקריאה רגילה
+                        loadTextFileFromDocx(file);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error reading DOCX:', error);
+                    loadTextFileFromDocx(file);
+                });
+            } else {
+                // קובץ שהועלה מהדפדפן
+                loadTextFileFromDocx(file);
+            }
+        }
+
+        function loadTextFileFromDocx(file) {
+            showStatus('מנתח קובץ Word עם השרת...', 'info');
+            console.log('Loading DOCX file:', file.name);
+
+            // ישר לשרת במקום לנסות עם JSZip שלא זמין
+            tryServerDocxParsing(file);
+        }
+
+        function tryServerDocxParsing(file) {
+            showStatus('שולח קובץ לניתוח בשרת...', 'info');
+            console.log('Trying server parsing for:', file.name, 'Size:', file.size);
+
+            // 🎯 NEW: שימוש בAPI מאוחד שבודק גם חותמות זמן וגם טקסט רגיל
+            const formData = new FormData();
+            formData.append('docxFile', file);
+
+            fetch('/api/parse-docx-upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Server response status:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Server response data:', data);
+
+                if (!data.success) {
+                    showStatus(`❌ שגיאה בשרת: ${data.error || 'לא ניתן לחלץ טקסט'}`, 'error');
+                    return;
+                }
+
+                if (data.hasTimestamps && data.timestampData) {
+                    // 🎯 יש חותמות זמן מוטמעות!
+                    console.log('🎯 Found embedded timestamps in Word document!');
+                    processTextContent(data.text, file.name, data.timestampData);
+                    showStatus(`🎯 קובץ Word עם חותמות זמן מוטמעות: ${data.wordCount} מילים (${data.duration}s)`, 'success');
+                } else {
+                    // טקסט רגיל בלי חותמות זמן
+                    processTextContent(data.text, file.name);
+                    showStatus(`✅ קובץ Word נותח בהצלחה: ${data.text.length} תווים`, 'success');
+                }
+            })
+            .catch(error => {
+                console.error('Server DOCX parsing failed:', error);
+                showStatus(`❌ שגיאה בניתוח קובץ Word: ${error.message}`, 'error');
+
+                // אם השרת נכשל, תן אופציה להעלות כטקסט
+                showStatus('💡 נסה לייצא את הקובץ כ-TXT ולהעלות אותו במקום', 'info');
+            });
+        }
+
+        function loadAudioFile(file) {
+            const url = URL.createObjectURL(file);
+            audioPlayer.src = url;
+            audioPlayer.style.display = 'block';
+            document.getElementById('playbackInfo').style.display = 'flex';
+            document.getElementById('audioFileName').textContent = file.name;
+
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                document.getElementById('audioDuration').textContent = formatTime(audioPlayer.duration);
+                document.getElementById('totalTime').textContent = formatTime(audioPlayer.duration);
+            });
+
+            showStatus(`קובץ אודיו נטען: ${file.name}`, 'success');
+        }
+
+        function loadTextFile(file) {
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                let text = e.target.result;
+
+                if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+                    // For demo purposes, assuming plain text.
+                    // In production, you'd need a library to parse DOCX
+                    showStatus('שימו לב: קבצי DOCX מוצגים כטקסט פשוט. השתמשו בקבצי TXT לתוצאות מיטביות.', 'info');
+                }
+
+                processTextContent(text, file.name);
+            };
+
+            reader.readAsText(file, 'utf-8');
+        }
+
+        function processTextContent(text, fileName, embeddedTimestampData = null) {
+            document.getElementById('textFileName').textContent = fileName;
+
+            // שמירת הטקסט המקורי כמו שהוא
+            originalText = text;
+
+            // 🎯 NEW: אם יש חותמות זמן מוטמעות, השתמש בהן!
+            if (embeddedTimestampData && embeddedTimestampData.audioSync) {
+                console.log('🎯 Using embedded timestamps from Word document');
+                textData = embeddedTimestampData.audioSync;
+
+                document.getElementById('wordCount').textContent = textData.length;
+                renderTextDisplay();
+                showStatus(`🎯 טקסט עם חותמות זמן מוטמעות: ${textData.length} מילים`, 'success');
+
+                // אם יש אודיו, אפשר לשחק מיד
+                if (audioFile) {
+                    processFiles();
+                }
+                return;
+            }
+
+            // אחרת, המשך עם הלוגיקה הרגילה
+            // מצא וזהה כותרת - השורה הראשונה בדרך כלל
+            const lines = text.trim().split('\n');
+            let titleLines = 0;
+            let contentStartIndex = 0;
+
+            // זיהוי אוטומטי של כותרת - שורות קצרות בהתחלה
+            for (let i = 0; i < Math.min(3, lines.length); i++) {
+                const line = lines[i].trim();
+                if (line.length === 0) {
+                    titleLines++;
+                    continue;
+                }
+
+                // אם השורה קצרה מ-50 תווים וזה ההתחלה, כנראה שזו כותרת
+                if (line.length < 50 && i <= 2) {
+                    console.log(`Detected title line ${i}: "${line}"`);
+                    titleLines = i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            // הפרד בין כותרת לתוכן
+            const titleText = lines.slice(0, titleLines).join('\n').trim();
+            const contentText = lines.slice(titleLines).join('\n').trim();
+
+            console.log('Title detected:', titleText);
+            console.log('Content starts from line:', titleLines);
+
+            // Split רק את תוכן הטקסט למילים (בלי הכותרת)
+            const words = contentText.split(/\s+/).filter(w => w.trim().length > 0);
+
+            // רק חשב זמנים אם האודיו נטען ויש duration
+            let duration;
+            let timePerWord;
+
+            if (audioPlayer && audioPlayer.duration && audioPlayer.duration > 0) {
+                duration = audioPlayer.duration;
+                timePerWord = duration / words.length;
+            } else {
+                // ברירת מחדל - 1 שנייה לכל 3 מילים (קצב קריאה ממוצע)
+                timePerWord = 1 / 3;
+                duration = words.length * timePerWord;
+            }
+
+            textData = words.map((word, index) => ({
+                word: word,
+                startTime: index * timePerWord,
+                endTime: (index + 1) * timePerWord,
+                index: index
+            }));
+
+            console.log('Total words:', words.length);
+            console.log('Time per word:', timePerWord.toFixed(2) + 's');
+
+            document.getElementById('wordCount').textContent = words.length;
+            renderTextDisplay();
+            showStatus(`טקסט נטען: ${words.length} מילים`, 'success');
+
+            // אם האודיו נטען אחרי הטקסט, חשב מחדש את הזמנים
+            if (audioPlayer && (!audioPlayer.duration || audioPlayer.duration === 0)) {
+                audioPlayer.addEventListener('loadedmetadata', function() {
+                    console.log('Audio loaded after text, recalculating timing...');
+                    processTextContent(text, fileName, embeddedTimestampData); // חזור על התהליך
+                }, { once: true });
+            }
+        }
+
+        function processFiles() {
+            document.getElementById('fileInfo').style.display = 'block';
+            document.getElementById('editToggle').style.display = 'inline-block';
+            document.getElementById('saveToWord').style.display = 'inline-block';
+            document.getElementById('exportSRT').style.display = 'inline-block';
+            document.getElementById('calibrateSync').style.display = 'inline-block';
+            document.getElementById('navigationControls').style.display = 'flex';
+
+            showStatus('🎉 הקבצים מוכנים! לחץ "כיול סינכרון" לסינכרון מדויק', 'success');
+        }
+
+        function renderTextDisplay() {
+            const textDisplay = document.getElementById('textDisplay');
+
+            console.log('Rendering text with', textData.length, 'words');
+            console.log('Original text preview:', originalText.substring(0, 200));
+
+            // זיהוי כותרת (אותו אלגוריתם כמו ב-processTextContent)
+            const lines = originalText.trim().split('\n');
+            let titleLines = 0;
+
+            for (let i = 0; i < Math.min(3, lines.length); i++) {
+                const line = lines[i].trim();
+                if (line.length === 0) {
+                    titleLines++;
+                    continue;
+                }
+                if (line.length < 50 && i <= 2) {
+                    titleLines = i + 1;
+                } else {
+                    break;
+                }
+            }
+
+            const titleText = lines.slice(0, titleLines).join('\n').trim();
+            const contentText = lines.slice(titleLines).join('\n').trim();
+
+            let html = '';
+            let wordIndex = 0;
+
+            // הוספת כותרת (ללא סינכרון)
+            if (titleText) {
+                html += `<div style="text-align: center; font-size: 1.5em; font-weight: bold; color: var(--primary-color); margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid var(--border-color);">
+                    ${titleText.replace(/\n/g, '<br>')}
+                </div>`;
+            }
+
+            // פיצול תוכן הטקסט לפסקאות (רק החלק המסונכרן)
+            const paragraphs = contentText.split('\n\n');
+
+            paragraphs.forEach((paragraph, pIndex) => {
+                if (pIndex > 0 || titleText) {
+                    html += '<br><br>'; // הפרדת פסקאות
+                }
+
+                // פיצול הפסקה לשורות
+                const pLines = paragraph.split('\n');
+
+                pLines.forEach((line, lIndex) => {
+                    if (lIndex > 0) {
+                        html += '<br>'; // הפרדת שורות
+                    }
+
+                    // פיצול השורה למילים
+                    const words = line.trim().split(/\s+/).filter(w => w.length > 0);
+
+                    words.forEach((word, wIndex) => {
+                        if (wIndex > 0) {
+                            html += ' '; // רווח בין מילים
+                        }
+
+                        const wordData = textData[wordIndex];
+                        if (wordData && wordIndex < textData.length) {
+                            html += `<span class="text-word" data-index="${wordIndex}" data-time="${wordData.startTime}">
+                                ${word}
+                                <span class="timestamp-info">${formatTime(wordData.startTime)}</span>
+                            </span>`;
+                            wordIndex++;
+                        } else {
+                            html += word;
+                        }
+                    });
+                });
+            });
+
+            console.log('Processed', wordIndex, 'words (excluding title)');
+            textDisplay.innerHTML = html;
+
+            // Add click listeners to words
+            textDisplay.querySelectorAll('.text-word').forEach(word => {
+                word.addEventListener('click', function() {
+                    const time = parseFloat(this.dataset.time);
+                    const index = parseInt(this.dataset.index);
+
+                    if (calibrationMode) {
+                        // במצב כיול - הוסף נקודת סינכרון
+                        addCalibrationPoint(index, audioPlayer.currentTime);
+                    } else {
+                        // במצב רגיל - קפוץ לזמן
+                        jumpToTime(time, index);
+                    }
+                });
+            });
+        }
+
+        function jumpToTime(time, index) {
+            audioPlayer.currentTime = time;
+            currentWordIndex = index;
+            updateCurrentWord();
+
+            showStatus(`🎯 קפיצה למילה: "${textData[index].word}" (${formatTime(time)})`, 'info');
+        }
+
+        function setupAudioControls() {
+            audioPlayer.addEventListener('timeupdate', function() {
+                updateCurrentTime();
+                updateCurrentWord();
+            });
+
+            // Speed controls
+            document.querySelectorAll('.speed-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const speed = parseFloat(this.dataset.speed);
+                    audioPlayer.playbackRate = speed;
+
+                    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
+
+        function updateCurrentTime() {
+            document.getElementById('currentTime').textContent = formatTime(audioPlayer.currentTime);
+        }
+
+        function updateCurrentWord() {
+            if (textData.length === 0) return;
+
+            const currentTime = audioPlayer.currentTime;
+
+            // Find current word based on time
+            const newWordIndex = textData.findIndex(item =>
+                currentTime >= item.startTime && currentTime <= item.endTime
+            );
+
+
+            if (newWordIndex !== -1 && newWordIndex !== currentWordIndex) {
+                // Remove current highlighting
+                document.querySelectorAll('.text-word').forEach(w =>
+                    w.classList.remove('current-word')
+                );
+
+                // Add highlighting to current word
+                const currentWordElement = document.querySelector(`[data-index="${newWordIndex}"]`);
+                if (currentWordElement) {
+                    currentWordElement.classList.add('current-word');
+
+                    // Scroll into view if needed
+                    currentWordElement.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+
+                currentWordIndex = newWordIndex;
+                updateNavigationButtons();
+            }
+        }
+
+        function setupTextControls() {
+            const editToggle = document.getElementById('editToggle');
+            const saveChanges = document.getElementById('saveChanges');
+            const saveToWord = document.getElementById('saveToWord');
+            const exportSRT = document.getElementById('exportSRT');
+
+            editToggle.addEventListener('click', function() {
+                toggleEditMode();
+            });
+
+            saveChanges.addEventListener('click', function() {
+                saveTextChanges();
+            });
+
+            saveToWord.addEventListener('click', function() {
+                saveToWordFile();
+            });
+
+            exportSRT.addEventListener('click', function() {
+                exportSRTFile();
+            });
+
+            // Calibration controls
+            const calibrateSync = document.getElementById('calibrateSync');
+            const finishCalibration = document.getElementById('finishCalibration');
+            const clearCalibration = document.getElementById('clearCalibration');
+
+            calibrateSync.addEventListener('click', function() {
+                startCalibration();
+            });
+
+            finishCalibration.addEventListener('click', function() {
+                finishCalibrationProcess();
+            });
+
+            clearCalibration.addEventListener('click', function() {
+                clearCalibrationPoints();
+            });
+        }
+
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const editToggle = document.getElementById('editToggle');
+            const saveChanges = document.getElementById('saveChanges');
+
+            if (isEditMode) {
+                editToggle.textContent = '❌ בטל עריכה';
+                editToggle.classList.add('active');
+                saveChanges.style.display = 'inline-block';
+                enableTextEditing();
+                showStatus('🖊️ מצב עריכה מופעל. לחץ על מילה לעריכה', 'info');
+            } else {
+                editToggle.textContent = '✏️ עריכה';
+                editToggle.classList.remove('active');
+                saveChanges.style.display = 'none';
+                disableTextEditing();
+                showStatus('📖 מצב קריאה מופעל', 'info');
+            }
+        }
+
+        function enableTextEditing() {
+            document.querySelectorAll('.text-word').forEach(word => {
+                word.classList.add('editable');
+                word.contentEditable = true;
+
+                word.addEventListener('blur', function() {
+                    const index = parseInt(this.dataset.index);
+                    textData[index].word = this.textContent.trim();
+                    this.classList.remove('editable');
+                });
+
+                word.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+                    }
+                });
+            });
+        }
+
+        function disableTextEditing() {
+            document.querySelectorAll('.text-word').forEach(word => {
+                word.classList.remove('editable');
+                word.contentEditable = false;
+            });
+        }
+
+        function setupNavigation() {
+            const prevWord = document.getElementById('prevWord');
+            const nextWord = document.getElementById('nextWord');
+            const markError = document.getElementById('markError');
+
+            prevWord.addEventListener('click', function() {
+                if (currentWordIndex > 0) {
+                    jumpToTime(textData[currentWordIndex - 1].startTime, currentWordIndex - 1);
+                }
+            });
+
+            nextWord.addEventListener('click', function() {
+                if (currentWordIndex < textData.length - 1) {
+                    jumpToTime(textData[currentWordIndex + 1].startTime, currentWordIndex + 1);
+                }
+            });
+
+            markError.addEventListener('click', function() {
+                const currentWord = document.querySelector(`[data-index="${currentWordIndex}"]`);
+                if (currentWord) {
+                    currentWord.classList.toggle('error-highlight');
+                    showStatus('🚨 מילה סומנה כשגיאה', 'info');
+                }
+            });
+        }
+
+        function updateNavigationButtons() {
+            const prevWord = document.getElementById('prevWord');
+            const nextWord = document.getElementById('nextWord');
+            const markError = document.getElementById('markError');
+
+            if (textData.length > 0) {
+                prevWord.disabled = currentWordIndex <= 0;
+                nextWord.disabled = currentWordIndex >= textData.length - 1;
+                markError.disabled = false;
+            }
+        }
+
+        function saveTextChanges() {
+            const updatedText = textData.map(item => item.word).join(' ');
+            const blob = new Blob([updatedText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `edited_${textFile.name.split('.')[0]}.txt`;
+            a.click();
+
+            URL.revokeObjectURL(url);
+            showStatus('💾 הקובץ המעודכן נשמר!', 'success');
+        }
+
+        function saveToWordFile() {
+            if (!originalDocxPath) {
+                showStatus('❌ לא ניתן לשמור - קובץ Word מקורי לא זמין', 'error');
+                return;
+            }
+
+            const updatedText = textData.map(item => item.word).join(' ');
+
+            showStatus('💾 שומר לקובץ Word...', 'info');
+
+            fetch('/api/save-docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filePath: originalDocxPath,
+                    updatedText: updatedText
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('✅ קובץ Word נשמר בהצלחה!', 'success');
+                } else {
+                    showStatus('❌ שגיאה בשמירת קובץ Word', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving to Word:', error);
+                showStatus('❌ שגיאה בשמירת קובץ Word', 'error');
+            });
+        }
+
+        function exportSRTFile() {
+            showStatus('🎬 יוצר קובץ כתוביות...', 'info');
+
+            fetch('/api/export-srt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    textData: textData,
+                    fileName: textFile.name.split('.')[0]
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('Failed to create SRT');
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${textFile.name.split('.')[0]}.srt`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showStatus('✅ קובץ כתוביות SRT נוצר!', 'success');
+            })
+            .catch(error => {
+                console.error('Error creating SRT:', error);
+                showStatus('❌ שגיאה ביצירת קובץ כתוביות', 'error');
+            });
+        }
+
+        // Calibration functions
+        function startCalibration() {
+            calibrationMode = true;
+            syncPoints = [];
+
+            document.getElementById('calibrationInstructions').style.display = 'block';
+            document.getElementById('calibrateSync').style.background = '#DC2626';
+            document.getElementById('calibrateSync').textContent = '⏸️ מצב כיול פעיל';
+
+            showStatus('🎯 מצב כיול פעיל! השמע את האודיו ולחץ על מילים ברגע שאתה שומע אותן', 'info');
+
+            // Change cursor to indicate calibration mode
+            document.body.style.cursor = 'crosshair';
+        }
+
+        function addCalibrationPoint(wordIndex, audioTime) {
+            const word = textData[wordIndex];
+            if (!word) return;
+
+            syncPoints.push({
+                wordIndex: wordIndex,
+                audioTime: audioTime,
+                word: word.word
+            });
+
+            // Visual feedback
+            const wordElement = document.querySelector(`[data-index="${wordIndex}"]`);
+            if (wordElement) {
+                wordElement.style.background = '#4CAF50';
+                wordElement.style.color = 'white';
+            }
+
+            console.log(`Calibration point added: Word "${word.word}" at ${audioTime.toFixed(2)}s`);
+            showStatus(`✅ נקודה ${syncPoints.length}: "${word.word}" ב-${audioTime.toFixed(1)}s`, 'success');
+        }
+
+        function finishCalibrationProcess() {
+            if (syncPoints.length < 2) {
+                showStatus('❌ נדרשות לפחות 2 נקודות כיול', 'error');
+                return;
+            }
+
+            calibrationMode = false;
+            document.getElementById('calibrationInstructions').style.display = 'none';
+            document.getElementById('calibrateSync').style.background = 'var(--primary-color)';
+            document.getElementById('calibrateSync').textContent = '🎯 כיול סינכרון';
+            document.body.style.cursor = 'default';
+
+            // Recalculate all timings based on calibration points
+            recalculateWithCalibration();
+
+            showStatus(`🎉 כיול הסתיים! ${syncPoints.length} נקודות נשמרו`, 'success');
+        }
+
+        function clearCalibrationPoints() {
+            syncPoints = [];
+
+            // Clear visual feedback
+            document.querySelectorAll('.text-word').forEach(word => {
+                word.style.background = '';
+                word.style.color = '';
+            });
+
+            showStatus('🗑️ נקודות הכיול נוקו', 'info');
+        }
+
+        function recalculateWithCalibration() {
+            if (syncPoints.length < 2) return;
+
+            console.log('Recalculating timing with', syncPoints.length, 'calibration points');
+
+            // Sort sync points by word index
+            syncPoints.sort((a, b) => a.wordIndex - b.wordIndex);
+
+            // Recalculate timing for all words using interpolation
+            for (let i = 0; i < textData.length; i++) {
+                textData[i].startTime = interpolateTime(i);
+                textData[i].endTime = interpolateTime(i + 1);
+            }
+
+            // Re-render with new timings
+            renderTextDisplay();
+
+            console.log('Timing recalculated based on calibration points');
+        }
+
+        function interpolateTime(wordIndex) {
+            if (syncPoints.length < 2) return wordIndex * 0.5; // fallback
+
+            // Find the two closest sync points to interpolate between
+            let beforePoint = null;
+            let afterPoint = null;
+
+            for (let i = 0; i < syncPoints.length; i++) {
+                if (syncPoints[i].wordIndex <= wordIndex) {
+                    beforePoint = syncPoints[i];
+                }
+                if (syncPoints[i].wordIndex > wordIndex && !afterPoint) {
+                    afterPoint = syncPoints[i];
+                    break;
+                }
+            }
+
+            if (!beforePoint && !afterPoint) {
+                return wordIndex * 0.5; // fallback
+            }
+
+            if (!beforePoint) {
+                // Before first sync point - extrapolate backwards
+                const nextPoint = syncPoints[1] || afterPoint;
+                const timePerWord = (nextPoint.audioTime - afterPoint.audioTime) / (nextPoint.wordIndex - afterPoint.wordIndex);
+                return afterPoint.audioTime - ((afterPoint.wordIndex - wordIndex) * timePerWord);
+            }
+
+            if (!afterPoint) {
+                // After last sync point - extrapolate forwards
+                const prevPoint = syncPoints[syncPoints.length - 2] || beforePoint;
+                const timePerWord = (beforePoint.audioTime - prevPoint.audioTime) / (beforePoint.wordIndex - prevPoint.wordIndex);
+                return beforePoint.audioTime + ((wordIndex - beforePoint.wordIndex) * timePerWord);
+            }
+
+            // Interpolate between two sync points
+            const ratio = (wordIndex - beforePoint.wordIndex) / (afterPoint.wordIndex - beforePoint.wordIndex);
+            return beforePoint.audioTime + (ratio * (afterPoint.audioTime - beforePoint.audioTime));
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function showStatus(message, type) {
+            const statusContainer = document.getElementById('statusMessages');
+            const statusEl = document.createElement('div');
+            statusEl.className = `status-message status-${type}`;
+            statusEl.textContent = message;
+
+            statusContainer.appendChild(statusEl);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                statusEl.remove();
+            }, 5000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (!audioPlayer.src) return;
+
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    if (audioPlayer.paused) {
+                        audioPlayer.play();
+                    } else {
+                        audioPlayer.pause();
+                    }
+                    break;
+                case 'ArrowLeft':
+                    if (e.ctrlKey && currentWordIndex > 0) {
+                        e.preventDefault();
+                        jumpToTime(textData[currentWordIndex - 1].startTime, currentWordIndex - 1);
+                    }
+                    break;
+                case 'ArrowRight':
+                    if (e.ctrlKey && currentWordIndex < textData.length - 1) {
+                        e.preventDefault();
+                        jumpToTime(textData[currentWordIndex + 1].startTime, currentWordIndex + 1);
+                    }
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
