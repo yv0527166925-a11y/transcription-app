@@ -57,27 +57,29 @@ class TranzilaService {
       sum: amount.toString(),
       currency: '1', // ILS
 
-      // Customer details - מיני חנות של טרנזילה
+      // Customer details - נסה כמה שדות שונים
       email: userEmail,
-      contact: userName || userEmail.split('@')[0], // השם יופיע פה
+      contact: userName || userEmail.split('@')[0],
 
-      // Order details - נכלול את השם בהערות גם
-      remarks: userName ?
-        `${packageInfo.name} - ${packageInfo.minutes} דקות - עבור: ${userName}` :
-        `${packageInfo.name} - ${packageInfo.minutes} דקות`,
+      // נסה שדות נוספים שעשויים לעבוד
+      fname: userName ? userName.split(' ')[0] : userEmail.split('@')[0], // שם פרטי
+      lname: userName ? userName.split(' ').slice(1).join(' ') : '', // שם משפחה
+      fullname: userName || userEmail.split('@')[0], // שם מלא
 
-      // Custom tracking - נעביר שם גם דרך custom field
+      // Custom tracking
       custom1: packageType,
       custom2: packageInfo.minutes.toString(),
-      custom3: userName || userEmail.split('@')[0] // השם פה במקום orderId
+      custom3: userName || userEmail.split('@')[0]
     };
 
     console.log(`💳 Payment URL params:`, {
       email: params.email,
       contact: params.contact,
+      fname: params.fname,
+      lname: params.lname,
+      fullname: params.fullname,
       custom3: params.custom3,
-      remarks: params.remarks,
-      userName: userName,
+      originalUserName: userName,
       amount: params.sum
     });
 
@@ -107,6 +109,9 @@ class TranzilaService {
       console.log('🔍 Looking for user data in callback:', {
         email: callbackData.email,
         contact: callbackData.contact,
+        fname: callbackData.fname,
+        lname: callbackData.lname,
+        fullname: callbackData.fullname,
         custom1: callbackData.custom1,
         custom2: callbackData.custom2,
         custom3: callbackData.custom3
