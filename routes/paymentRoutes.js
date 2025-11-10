@@ -7,9 +7,10 @@ const path = require('path');
 // יצירת instance של שירות טרנזילה
 const tranzilaService = new TranzilaService();
 
-// נתיבי קבצים
-const usersFilePath = path.join(__dirname, '../users_data.json');
-const transactionsFilePath = path.join(__dirname, '../transactions_data.json');
+// נתיבי קבצים - משתמש באותה הגדרה כמו בשרת הראשי
+const PERSISTENT_PATH = process.env.NODE_ENV === 'production' ? '/mnt/data' : path.join(__dirname, '..');
+const usersFilePath = path.join(PERSISTENT_PATH, 'users_data.json');
+const transactionsFilePath = path.join(PERSISTENT_PATH, 'transactions_data.json');
 
 // פונקציות עזר לעבודה עם JSON
 function readUsersData() {

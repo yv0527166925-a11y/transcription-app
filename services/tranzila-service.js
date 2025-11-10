@@ -58,7 +58,6 @@ class TranzilaService {
       currency: '1', // ILS
 
       // Customer details
-      contact: userEmail,
       email: userEmail,
 
       // Order details
@@ -94,13 +93,14 @@ class TranzilaService {
 
       // במיני חנות, הנתונים מגיעים בשדות שונים
       console.log('🔍 Looking for user email in callback data:', {
-        contact: callbackData.contact,
         email: callbackData.email,
-        custom1: callbackData.custom1
+        custom1: callbackData.custom1,
+        custom2: callbackData.custom2,
+        custom3: callbackData.custom3
       });
 
-      // נבדוק בכמה מקומות אפשריים
-      const userEmail = callbackData.contact || callbackData.email || callbackData.custom1;
+      // נחפש את האימייל בשדות הרלוונטיים (לא contact כי זה שם)
+      const userEmail = callbackData.email || callbackData.custom1;
 
       if (!userEmail) {
         console.error('❌ No user email found in callback data!');
