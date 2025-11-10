@@ -3049,7 +3049,7 @@
                 const contactInput = document.createElement('input');
                 contactInput.type = 'hidden';
                 contactInput.name = 'contact';
-                contactInput.value = currentUser.email;
+                contactInput.value = currentUser.name || currentUser.email.split('@')[0]; // שם המשתמש במקום מייל
                 form.appendChild(contactInput);
 
                 const emailInput = document.createElement('input');
@@ -3058,12 +3058,33 @@
                 emailInput.value = currentUser.email;
                 form.appendChild(emailInput);
 
+                // הוספת שדות שם נוספים
+                const userName = currentUser.name || currentUser.email.split('@')[0];
+
+                const fnameInput = document.createElement('input');
+                fnameInput.type = 'hidden';
+                fnameInput.name = 'fname';
+                fnameInput.value = userName.split(' ')[0] || userName;
+                form.appendChild(fnameInput);
+
+                const lnameInput = document.createElement('input');
+                lnameInput.type = 'hidden';
+                lnameInput.name = 'lname';
+                lnameInput.value = userName.split(' ').slice(1).join(' ') || '';
+                form.appendChild(lnameInput);
+
                 // הוספת custom fields כגיבוי (טרנזילה תחזיר אותם)
                 const custom1Input = document.createElement('input');
                 custom1Input.type = 'hidden';
                 custom1Input.name = 'custom1';
                 custom1Input.value = currentUser.email;
                 form.appendChild(custom1Input);
+
+                const custom3Input = document.createElement('input');
+                custom3Input.type = 'hidden';
+                custom3Input.name = 'custom3';
+                custom3Input.value = userName;
+                form.appendChild(custom3Input);
 
                 // הוספת קובץ הקריאה חזרה (callback)
                 const callbackInput = document.createElement('input');
@@ -3075,6 +3096,14 @@
                 document.body.appendChild(form);
 
                 console.log('💳 Redirecting to Tranzila mini-store');
+                console.log('💳 Form data being sent:', {
+                    email: currentUser.email,
+                    contact: currentUser.name || currentUser.email.split('@')[0],
+                    fname: userName.split(' ')[0] || userName,
+                    lname: userName.split(' ').slice(1).join(' ') || '',
+                    custom3: userName,
+                    currentUser: currentUser
+                });
                 form.submit();
 
             } catch (error) {
