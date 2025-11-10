@@ -57,32 +57,28 @@ class TranzilaService {
       sum: amount.toString(),
       currency: '1', // ILS
 
-      // Customer details - נסה שדות שונים של טרנזילה
+      // Customer details - מיני חנות של טרנזילה
       email: userEmail,
-      contact: userName || userEmail.split('@')[0], // אם אין שם, השתמש בחלק הראשון של המייל
-      myid: '', // תעודת זהות - לא חובה
+      contact: userName || userEmail.split('@')[0], // השם יופיע פה
 
-      // שדות נוספים לשם
-      name: userName || userEmail.split('@')[0],
-      customername: userName || userEmail.split('@')[0],
+      // Order details - נכלול את השם בהערות גם
+      remarks: userName ?
+        `${packageInfo.name} - ${packageInfo.minutes} דקות - עבור: ${userName}` :
+        `${packageInfo.name} - ${packageInfo.minutes} דקות`,
 
-      // Order details
-      remarks: `${packageInfo.name} - ${packageInfo.minutes} דקות`,
-
-      // Custom tracking
+      // Custom tracking - נעביר שם גם דרך custom field
       custom1: packageType,
       custom2: packageInfo.minutes.toString(),
-      custom3: orderId
+      custom3: userName || userEmail.split('@')[0] // השם פה במקום orderId
     };
 
     console.log(`💳 Payment URL params:`, {
       email: params.email,
       contact: params.contact,
-      name: params.name,
-      customername: params.customername,
+      custom3: params.custom3,
+      remarks: params.remarks,
       userName: userName,
-      amount: params.sum,
-      fullUrl: `${this.config.hostedPageUrl}?${Object.keys(params).map(key => `${key}=${encodeURIComponent(params[key])}`).join('&')}`
+      amount: params.sum
     });
 
     // Create query string
