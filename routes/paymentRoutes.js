@@ -211,18 +211,26 @@ router.post('/callback', async (req, res) => {
 });
 
 /**
- * GET /api/payment/success
- * דף הצלחה לאחר תשלום
+ * GET/POST /api/payment/success
+ * דף הצלחה לאחר תשלום - תומך בשני שיטות
  */
 router.get('/success', (req, res) => {
     res.redirect('/?payment=success');
 });
 
+router.post('/success', (req, res) => {
+    res.redirect('/?payment=success');
+});
+
 /**
- * GET /api/payment/error
- * דף שגיאה במקרה של כשל בתשלום
+ * GET/POST /api/payment/error
+ * דף שגיאה במקרה של כשל בתשלום - תומך בשני שיטות
  */
 router.get('/error', (req, res) => {
+    res.redirect('/?payment=error');
+});
+
+router.post('/error', (req, res) => {
     res.redirect('/?payment=error');
 });
 
