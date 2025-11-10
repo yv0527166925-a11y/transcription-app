@@ -57,9 +57,14 @@ class TranzilaService {
       sum: amount.toString(),
       currency: '1', // ILS
 
-      // Customer details
+      // Customer details - נסה שדות שונים של טרנזילה
       email: userEmail,
-      contact: userName || '',
+      contact: userName || userEmail.split('@')[0], // אם אין שם, השתמש בחלק הראשון של המייל
+      myid: '', // תעודת זהות - לא חובה
+
+      // שדות נוספים לשם
+      name: userName || userEmail.split('@')[0],
+      customername: userName || userEmail.split('@')[0],
 
       // Order details
       remarks: `${packageInfo.name} - ${packageInfo.minutes} דקות`,
@@ -73,8 +78,11 @@ class TranzilaService {
     console.log(`💳 Payment URL params:`, {
       email: params.email,
       contact: params.contact,
+      name: params.name,
+      customername: params.customername,
       userName: userName,
-      amount: params.sum
+      amount: params.sum,
+      fullUrl: `${this.config.hostedPageUrl}?${Object.keys(params).map(key => `${key}=${encodeURIComponent(params[key])}`).join('&')}`
     });
 
     // Create query string
