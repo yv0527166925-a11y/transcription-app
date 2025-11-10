@@ -3469,6 +3469,28 @@ app.get('/api/admin/users', (req, res) => {
   }
 });
 
+// Internal endpoint to reload users data from disk
+app.post('/api/internal/reload-users', (req, res) => {
+  try {
+    console.log('🔄 Reloading users data from disk...');
+    const oldCount = users.length;
+    users = loadUsersData();
+    console.log(`✅ Users data reloaded: ${oldCount} → ${users.length} users`);
+
+    res.json({
+      success: true,
+      message: 'Users data reloaded',
+      userCount: users.length
+    });
+  } catch (error) {
+    console.error('❌ Error reloading users data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reload users data'
+    });
+  }
+});
+
 // Get specific user's transcription history (for admin)
 app.get('/api/users/:email/history', (req, res) => {
   try {

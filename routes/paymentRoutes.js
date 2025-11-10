@@ -3,6 +3,7 @@ const router = express.Router();
 const TranzilaService = require('../services/tranzila-service');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 
 // יצירת instance של שירות טרנזילה
 const tranzilaService = new TranzilaService();
@@ -200,6 +201,20 @@ router.post('/callback', async (req, res) => {
         });
 
         console.log(`✅ Payment processed successfully: ${userEmail} +${minutes} minutes (Transaction: ${confirmationCode})`);
+
+        // עדכון המערכת הראשית - הודעה לשרת הראשי לרענן את הנתונים בזיכרון
+        try {
+            const serverUrl = process.env.BASE_URL || 'http://localhost:3000';
+            await axios.post(`${serverUrl}/api/internal/reload-users`, {
+                userEmail,
+                minutes,
+                source: 'payment-callback'
+            });
+            console.log('✅ Main server users data reloaded');
+        } catch (reloadError) {
+            console.error('⚠️ Failed to reload main server users data:', reloadError.message);
+            // לא נכשיל את התשלום בגלל זה - זה רק sync issue
+        }
 
         // חובה לענות OK לטרנזילה
         res.send('OK');
