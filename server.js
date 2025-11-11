@@ -2999,7 +2999,23 @@ app.post('/api/register', async (req, res) => {
 // Email verification endpoint
 app.post('/api/verify-email', (req, res) => {
   try {
-    const { email, verificationCode } = req.body;
+    let { email, verificationCode } = req.body;
+
+    // Clean RTL characters from email (same as registration)
+    if (email) {
+      console.log('📧 Email debug - original:', JSON.stringify(email));
+      console.log('📧 Email debug - length:', email.length);
+      console.log('📧 Email debug - charCodes:', Array.from(email).map(c => c.charCodeAt(0)));
+
+      const originalEmail = email;
+      email = email.replace(/[\u200E\u200F\u202A\u202B\u202C\u202D\u202E]/g, '').trim();
+
+      if (originalEmail !== email) {
+        console.log('🚨 Email corruption detected and AGGRESSIVELY fixed:');
+        console.log('   Original:', JSON.stringify(originalEmail));
+        console.log('   Fixed:   ', JSON.stringify(email));
+      }
+    }
 
     // Rate limiting: 5 verification attempts per email per 15 minutes
     if (isRateLimited('verification', email, 5, 15)) {
