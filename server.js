@@ -2983,7 +2983,6 @@ app.post('/api/register', async (req, res) => {
     saveUsersData(); // Save after adding new user
     console.log('✅ User registered successfully (pending verification):', newUser.email);
     console.log('📋 Total users now:', users.length);
-    console.log('📧 All emails in system:', users.map(u => u.email));
 
     res.json({
       success: true,
@@ -3030,9 +3029,6 @@ app.post('/api/verify-email', (req, res) => {
       return res.json({ success: false, error: 'אימייל וקוד אימות נדרשים' });
     }
 
-    console.log('🔍 Looking for user:', email);
-    console.log('👥 Total users in verification:', users.length);
-    console.log('📧 All emails during verification:', users.map(u => u.email));
 
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
@@ -3056,17 +3052,23 @@ app.post('/api/verify-email', (req, res) => {
       return res.json({ success: false, error: 'קוד האימות פג תוקף. אנא הירשם מחדש.' });
     }
 
-    // Mark as verified
+    // Mark as verified FIRST (most important step)
     user.emailVerified = true;
     delete user.verificationCode;
     delete user.verificationExpires;
-    saveUsersData();
+    saveUsersData(); // Save verification status first
 
     console.log('✅ Email verified successfully for:', email);
 
+    // Only after verification is safely saved, add welcome bonus
+    user.remainingMinutes += 30; // Add 30 free minutes after verification
+    saveUsersData(); // Save minutes separately
+
+    console.log('🎁 Added 30 welcome minutes. New balance:', user.remainingMinutes);
+
     res.json({
       success: true,
-      message: 'המייל אומת בהצלחה! כעת תוכל להתחבר.',
+      message: 'המייל אומת בהצלחה! קיבלת 30 דקות חינם. כעת תוכל להתחבר.',
       user: { ...user, password: undefined }
     });
   } catch (error) {
