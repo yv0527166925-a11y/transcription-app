@@ -133,6 +133,13 @@
             }
         }
 
+        .payment-notice-center {
+            text-align: center !important;
+        }
+        .payment-notice-center * {
+            text-align: center !important;
+        }
+
         .container {
             background: var(--bg-primary);
             max-width: 1200px;
@@ -1466,8 +1473,14 @@
 
             <!-- Payment Tab -->
             <div id="paymentTab" class="tab-content">
-                <h3>רכישת דקות תמלול</h3>
 
+
+               <div class="payment-notice-center" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                    <p style="font-size: 16px; color: #856404; margin: 0; text-align: center;">
+                        <strong>⚠️ חשוב!</strong><br>
+                        בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!
+                    </p>
+                </div>
 
                <div class="payment-info" style="text-align: center; margin: 20px auto; width: 100%;">
                     <p style="font-size: 18px; color: #333; margin: 20px 0; text-align: center;">
