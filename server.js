@@ -2983,6 +2983,7 @@ app.post('/api/register', async (req, res) => {
     saveUsersData(); // Save after adding new user
     console.log('✅ User registered successfully (pending verification):', newUser.email);
     console.log('📋 Total users now:', users.length);
+    console.log('📧 All emails in system:', users.map(u => u.email));
 
     res.json({
       success: true,
@@ -3012,6 +3013,10 @@ app.post('/api/verify-email', (req, res) => {
     if (!email || !verificationCode) {
       return res.json({ success: false, error: 'אימייל וקוד אימות נדרשים' });
     }
+
+    console.log('🔍 Looking for user:', email);
+    console.log('👥 Total users in verification:', users.length);
+    console.log('📧 All emails during verification:', users.map(u => u.email));
 
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
