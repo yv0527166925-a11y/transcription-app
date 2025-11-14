@@ -2936,6 +2936,8 @@
         function startPollingProgressTracking(transcriptionId) {
             console.log(`🔄 Starting fallback polling progress tracking for: ${transcriptionId}`);
 
+            let lastProgress = 0; // Track last progress to know if we completed
+
             const realProgressCheck = setInterval(async () => {
                 try {
                     // Skip if no valid transcription ID
@@ -2953,6 +2955,7 @@
 
                         if (progressData.success && progressData.progress) {
                             console.log(`📈 Polling progress update: ${progressData.progress.percentage}% - ${progressData.progress.stage}`);
+                            lastProgress = progressData.progress.percentage; // Track progress
                             updateProgress(progressData.progress.percentage);
 
                             // Update status
@@ -2982,20 +2985,27 @@
                             }
                         }
                     } else if (progressResponse.status === 404) {
-                        // 404 means transcription is completed and cleaned up
-                        console.log(`✅ Transcription completed (404 - cleaned up), stopping polling`);
-                        clearInterval(realProgressCheck);
+                        console.log(`🔍 Got 404 - last progress was: ${lastProgress}%`);
 
-                        // Show completion
-                        setTimeout(() => {
-                            showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
-                            document.getElementById('progressBar').style.display = 'none';
+                        if (lastProgress >= 95) {
+                            // 404 after 95%+ means transcription is completed and cleaned up
+                            console.log(`✅ Transcription completed (404 after ${lastProgress}%), stopping polling`);
+                            clearInterval(realProgressCheck);
 
-                            // Reset submit button
-                            const submitBtn = document.getElementById('submitBtn');
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = 'התחל תמלול';
-                        }, 500);
+                            // Show completion
+                            setTimeout(() => {
+                                showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
+                                document.getElementById('progressBar').style.display = 'none';
+
+                                // Reset submit button
+                                const submitBtn = document.getElementById('submitBtn');
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'התחל תמלול';
+                            }, 500);
+                        } else {
+                            // 404 before 95% might be temporary - continue polling
+                            console.log(`⚠️ Got 404 but only at ${lastProgress}%, continuing polling (might be temporary)`);
+                        }
                     } else {
                         console.log(`❌ Polling progress response not ok: ${progressResponse.status}`);
                     }
@@ -3031,20 +3041,20 @@
             submitBtn.textContent = '⏳ מעבד...';
             document.getElementById('progressBar').style.display = 'block';
 
-            
+            // Start with immediate progress indication
+            updateProgress(5);
             showStatus(`
                 <div class="spinner"></div>
-                <strong>מעבד ${selectedFiles.length} קבצים עם Gemini 2.5 Pro...</strong><br>
-                <small>⏱️ זמן כולל: ${totalMinutes} דקות | 🎯 דיוק גבוה: 98% עברית רגילה, 95% הגייה ישיבתית</small><br>
-                <small>📧 התוצאות יישלחו למייל ${currentUser.email}</small>
+                <strong>מעלה קבצים לשרת...</strong><br>
+                <small>📤 ${selectedFiles.length} קבצים | ⏱️ ${totalMinutes} דקות</small>
             `, 'processing');
 
-            let progress = 0;
+            let progress = 5; // Start from 5%
             const progressInterval = setInterval(() => {
-                progress += Math.random() * 3;
-                if (progress > 85) progress = 85;
+                progress += Math.random() * 1.5; // Slower increment
+                if (progress > 12) progress = 12; // Cap at 12% until server responds
                 updateProgress(progress);
-            }, 2000);
+            }, 1500);
 
             try {
                 // Prepare data for both regular files and Google Drive files
@@ -3080,6 +3090,13 @@
                 }
 
                 console.log(`📁 Processing ${selectedFiles.length} total files: ${selectedFiles.filter(f => !f.isGoogleDriveFile).length} uploaded + ${driveFiles.length} from Drive`);
+
+                // Update to show we're sending to server
+                showStatus(`
+                    <div class="spinner"></div>
+                    <strong>שולח קבצים לעיבוד...</strong><br>
+                    <small>🚀 מעבד קבצים</small>
+                `, 'processing');
 
                 const response = await fetch(`${API_BASE}/transcribe`, {
                     method: 'POST',
