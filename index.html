@@ -2981,6 +2981,21 @@
                                 }, 500);
                             }
                         }
+                    } else if (progressResponse.status === 404) {
+                        // 404 means transcription is completed and cleaned up
+                        console.log(`✅ Transcription completed (404 - cleaned up), stopping polling`);
+                        clearInterval(realProgressCheck);
+
+                        // Show completion
+                        setTimeout(() => {
+                            showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
+                            document.getElementById('progressBar').style.display = 'none';
+
+                            // Reset submit button
+                            const submitBtn = document.getElementById('submitBtn');
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = 'התחל תמלול';
+                        }, 500);
                     } else {
                         console.log(`❌ Polling progress response not ok: ${progressResponse.status}`);
                     }
