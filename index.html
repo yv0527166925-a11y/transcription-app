@@ -2894,8 +2894,23 @@
                         // Check if completed
                         if (data.progress >= 100) {
                             console.log('✅ Transcription completed via SSE!');
-                            eventSource.close();
-                            currentEventSource = null;
+
+                            // Show completion status without spinner
+                            setTimeout(() => {
+                                showStatus(`✅ <strong>${data.stage}</strong>`, 'success');
+                                document.getElementById('progressBar').style.display = 'none';
+
+                                // Reset submit button
+                                const submitBtn = document.getElementById('submitBtn');
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'התחל תמלול';
+                            }, 500);
+
+                            // Close SSE connection after showing completion
+                            setTimeout(() => {
+                                eventSource.close();
+                                currentEventSource = null;
+                            }, 1000);
                         }
                     }
                 } catch (e) {
@@ -2953,6 +2968,17 @@
                             if (progressData.progress.percentage >= 100) {
                                 console.log(`✅ Polling progress completed, stopping checks`);
                                 clearInterval(realProgressCheck);
+
+                                // Show completion status without spinner
+                                setTimeout(() => {
+                                    showStatus(`✅ <strong>${progressData.progress.stage}</strong>`, 'success');
+                                    document.getElementById('progressBar').style.display = 'none';
+
+                                    // Reset submit button
+                                    const submitBtn = document.getElementById('submitBtn');
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'התחל תמלול';
+                                }, 500);
                             }
                         }
                     } else {
