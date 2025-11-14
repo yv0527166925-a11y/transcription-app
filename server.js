@@ -2551,12 +2551,23 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
+
+      // Wait a moment to ensure 100% progress is sent, then cleanup
+      setTimeout(() => {
+        activeTranscriptions.delete(transcriptionId);
+        console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId} after completion`);
+      }, 2000);
+
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
+      // Cleanup on failure
+      activeTranscriptions.delete(transcriptionId);
     }
-    
+
   } catch (error) {
     console.error('Async transcription batch error:', error);
+    // Cleanup on error
+    activeTranscriptions.delete(transcriptionId);
 
     // If error is due to insufficient minutes, clean up files and don't deduct
     if (error.message && error.message.includes('Insufficient minutes')) {
@@ -2572,10 +2583,6 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         }
       });
     }
-  } finally {
-    // Clean up transcription tracking
-    activeTranscriptions.delete(transcriptionId);
-    console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId}`);
   }
 }
 
