@@ -3326,58 +3326,72 @@ app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req
     // Send initial progress immediately
     updateTranscriptionProgress(transcriptionId, 5, 'מחשב אורך קבצים...');
 
-   // Calculate total estimated minutes ACCURATELY
-    let totalDurationSeconds = 0;
-    for (const file of req.files) {
-        try {
-            // Use the accurate function from line 212
-            const duration = await getAudioDuration(file.path); 
-            totalDurationSeconds += duration;
-        } catch (error) {
-            console.error(`Could not get duration for ${file.filename}, falling back to size estimate.`, error);
-            // Fallback for safety
-            totalDurationSeconds += (file.size / (1024 * 1024 * 2)) * 60;
-        }
-    }
-
-    // Convert total seconds to minutes and round up
-    const accurateMinutes = Math.ceil(totalDurationSeconds / 60);
-
-    console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.remainingMinutes}`);
-
-    if (accurateMinutes > user.remainingMinutes) {
-        console.log('❌ Insufficient minutes, deleting uploaded files.');
-        // Clean up progress tracking and files
-        activeTranscriptions.delete(transcriptionId);
-        for (const file of req.files) {
-            try {
-                fs.unlinkSync(file.path);
-            } catch (e) {
-                console.warn(`Could not delete file ${file.path} after failed check.`)
-            }
-        }
-        return res.status(400).json({
-            success: false,
-            error: `אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.remainingMinutes}`
-        });
-    }
-
-    // Update progress after duration calculation
-    updateTranscriptionProgress(transcriptionId, 8, 'מתכונן לעיבוד...');
-
-    // Start enhanced async processing with the ACCURATE minutes
-    processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId, customInstructions);
-
-    console.log('✅ Enhanced transcription started successfully with accurate minute count.');
+    // Send response immediately to start SSE connection, continue processing async
+    console.log('✅ Enhanced transcription starting with immediate response.');
     res.json({
         success: true,
         message: ffmpegAvailable ?
             'התמלול המתקדם התחיל - קבצים גדולים יתחלקו למקטעים אוטומטית' :
             'התמלול התחיל - ללא חלוקה למקטעים (FFmpeg לא זמין)',
-        estimatedMinutes: accurateMinutes, // Return the accurate count to the client
+        estimatedMinutes: null, // Will be calculated async
         chunkingEnabled: ffmpegAvailable,
-        transcriptionId: transcriptionId // Return transcription ID for cancellation
+        transcriptionId: transcriptionId // Return transcription ID immediately
     });
+
+    // Continue processing async without blocking response
+    (async () => {
+        try {
+            // Calculate total estimated minutes ACCURATELY
+            let totalDurationSeconds = 0;
+            for (let i = 0; i < req.files.length; i++) {
+                const file = req.files[i];
+                // Update progress during duration calculation
+                const progressPercent = 5 + Math.round((i / req.files.length) * 3); // 5% to 8%
+                updateTranscriptionProgress(transcriptionId, progressPercent, `בודק אורך קובץ ${i + 1} מתוך ${req.files.length}...`);
+
+                try {
+                    // Use the accurate function from line 212
+                    const duration = await getAudioDuration(file.path);
+                    totalDurationSeconds += duration;
+                } catch (error) {
+                    console.error(`Could not get duration for ${file.filename}, falling back to size estimate.`, error);
+                    // Fallback for safety
+                    totalDurationSeconds += (file.size / (1024 * 1024 * 2)) * 60;
+                }
+            }
+
+            // Convert total seconds to minutes and round up
+            const accurateMinutes = Math.ceil(totalDurationSeconds / 60);
+
+            console.log(`⏱️ Accurate minutes calculated: ${accurateMinutes}, User balance: ${user.remainingMinutes}`);
+
+            if (accurateMinutes > user.remainingMinutes) {
+                console.log('❌ Insufficient minutes, deleting uploaded files.');
+                // Clean up progress tracking and files
+                activeTranscriptions.delete(transcriptionId);
+                updateTranscriptionProgress(transcriptionId, 0, `שגיאה: אין מספיק דקות בחשבון. נדרש: ${accurateMinutes}, זמין: ${user.remainingMinutes}`);
+                for (const file of req.files) {
+                    try {
+                        fs.unlinkSync(file.path);
+                    } catch (e) {
+                        console.warn(`Could not delete file ${file.path} after failed check.`);
+                    }
+                }
+                return;
+            }
+
+            // Update progress after duration calculation
+            updateTranscriptionProgress(transcriptionId, 8, 'מתכונן לעיבוד...');
+
+            // Start enhanced async processing with the ACCURATE minutes
+            processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId, customInstructions);
+
+        } catch (error) {
+            console.error('Error in async transcription processing:', error);
+            activeTranscriptions.delete(transcriptionId);
+            updateTranscriptionProgress(transcriptionId, 0, `שגיאה: ${error.message}`);
+        }
+    })();
   } catch (error) {
     console.error('Enhanced transcription error:', error);
     res.status(500).json({ success: false, error: error.message });
