@@ -2835,12 +2835,36 @@
                 currentEventSource.close();
             }
 
+            // Test if SSE is supported
+            if (!window.EventSource) {
+                console.log('❌ EventSource not supported, using polling fallback');
+                startPollingProgressTracking(transcriptionId);
+                return;
+            }
+
             const eventSource = new EventSource(`${API_BASE}/transcription-progress/stream/${transcriptionId}`);
             currentEventSource = eventSource;
 
+            // Timeout fallback - if no connection in 5 seconds, use polling
+            const connectionTimeout = setTimeout(() => {
+                console.log('⏰ SSE connection timeout - falling back to polling');
+                eventSource.close();
+                currentEventSource = null;
+                startPollingProgressTracking(transcriptionId);
+            }, 5000);
+
             eventSource.onopen = function() {
                 console.log('📡 SSE connection opened successfully');
+                console.log('📡 SSE readyState:', eventSource.readyState);
+                clearTimeout(connectionTimeout);
             };
+
+            // Check connection status after 2 seconds
+            setTimeout(() => {
+                console.log('🔍 SSE Status check after 2s:');
+                console.log('🔍 ReadyState:', eventSource.readyState, '(0=connecting, 1=open, 2=closed)');
+                console.log('🔍 URL:', eventSource.url);
+            }, 2000);
 
             eventSource.onmessage = function(event) {
                 try {
@@ -2883,6 +2907,7 @@
                 console.error('❌ SSE error details:', error);
                 console.error('❌ SSE readyState:', eventSource.readyState);
                 console.error('❌ SSE URL was:', eventSource.url);
+                clearTimeout(connectionTimeout);
                 eventSource.close();
                 currentEventSource = null;
 
