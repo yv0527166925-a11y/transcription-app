@@ -2310,21 +2310,28 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     return;
   }
 
-  // Register transcription for cancellation tracking with progress info
-  activeTranscriptions.set(transcriptionId, {
-    userEmail,
-    files: files.map(f => f.path), // Store file paths for cleanup
-    cancelled: false,
-    startTime: new Date(),
-    progress: 0,
-    stage: 'מתחיל תהליך התמלול...',
-    currentFile: '',
-    filesProcessed: 0,
-    totalFiles: files.length, // 🔥 NEW: Track total files
-    isCompleted: false
-  });
-
-  console.log(`📝 Registered transcription ${transcriptionId} for cancellation tracking`);
+  // Update existing transcription tracking instead of creating new
+  const existingTracking = activeTranscriptions.get(transcriptionId);
+  if (existingTracking) {
+    // Update existing tracking with more details
+    existingTracking.stage = 'מתחיל תהליך התמלול...';
+    console.log(`📝 Updated existing transcription tracking for ${transcriptionId}`);
+  } else {
+    // Fallback: Register transcription for cancellation tracking with progress info
+    activeTranscriptions.set(transcriptionId, {
+      userEmail,
+      files: files.map(f => f.path), // Store file paths for cleanup
+      cancelled: false,
+      startTime: new Date(),
+      progress: 0,
+      stage: 'מתחיל תהליך התמלול...',
+      currentFile: '',
+      filesProcessed: 0,
+      totalFiles: files.length, // 🔥 NEW: Track total files
+      isCompleted: false
+    });
+    console.log(`📝 Registered transcription ${transcriptionId} for cancellation tracking`);
+  }
 
   // Check for cancellation before deducting minutes
   if (activeTranscriptions.get(transcriptionId)?.cancelled) {
@@ -2353,7 +2360,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     // Minutes have been deducted, transcription is considered "started"
     activeTranscriptions.get(transcriptionId).minutesDeducted = true;
 
-    updateTranscriptionProgress(transcriptionId, 10, 'מתכונן לעיבוד הקבצים...');
+    updateTranscriptionProgress(transcriptionId, 15, 'מתכונן לעיבוד הקבצים...');
     const transcriptions = [];
     const failedTranscriptions = [];
 
@@ -3299,6 +3306,26 @@ app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req
     console.log('📧 Email:', email);
     console.log('⏱️ User minutes remaining:', user.remainingMinutes);
 
+    // Generate unique transcription ID for early progress tracking
+    const transcriptionId = `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Initialize progress tracking immediately
+    activeTranscriptions.set(transcriptionId, {
+        userEmail: email,
+        files: req.files.map(f => f.path),
+        cancelled: false,
+        startTime: new Date(),
+        progress: 5,
+        stage: 'מחשב אורך קבצים...',
+        currentFile: '',
+        filesProcessed: 0,
+        totalFiles: req.files.length,
+        isCompleted: false
+    });
+
+    // Send initial progress immediately
+    updateTranscriptionProgress(transcriptionId, 5, 'מחשב אורך קבצים...');
+
    // Calculate total estimated minutes ACCURATELY
     let totalDurationSeconds = 0;
     for (const file of req.files) {
@@ -3320,7 +3347,8 @@ app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req
 
     if (accurateMinutes > user.remainingMinutes) {
         console.log('❌ Insufficient minutes, deleting uploaded files.');
-        // Clean up files immediately if not enough minutes
+        // Clean up progress tracking and files
+        activeTranscriptions.delete(transcriptionId);
         for (const file of req.files) {
             try {
                 fs.unlinkSync(file.path);
@@ -3334,8 +3362,8 @@ app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req
         });
     }
 
-    // Generate unique transcription ID for cancellation tracking
-    const transcriptionId = `trans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Update progress after duration calculation
+    updateTranscriptionProgress(transcriptionId, 8, 'מתכונן לעיבוד...');
 
     // Start enhanced async processing with the ACCURATE minutes
     processTranscriptionAsync(req.files, email, language, accurateMinutes, transcriptionId, customInstructions);
