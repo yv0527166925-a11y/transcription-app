@@ -8,8 +8,12 @@ const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
+const EventEmitter = require('events'); // 🔥 NEW: For SSE progress updates
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
+
+// 🔥 NEW: Event emitter for progress updates
+const progressEmitter = new EventEmitter();
 
 // פונקציה להסרת חזרות של ביטויים/משפטים שחוזרים 5+ פעמים
 function removeExtremeRepetitions(text) {
@@ -2261,6 +2265,19 @@ function updateTranscriptionProgress(transcriptionId, progress, stage, currentFi
     transcriptionData.progress = progress;
     transcriptionData.stage = stage;
     transcriptionData.currentFile = currentFile;
+
+    // 🔥 NEW: Send real-time progress update via SSE
+    progressEmitter.emit('progress', {
+      transcriptionId,
+      type: 'progress',
+      progress,
+      stage,
+      currentFile,
+      filesProcessed: transcriptionData.filesProcessed || 0,
+      totalFiles: transcriptionData.totalFiles || 0,
+      timestamp: new Date().toISOString()
+    });
+
     console.log(`📊 Progress ${transcriptionId}: ${progress}% - ${stage}`);
   }
 }
@@ -2300,7 +2317,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     stage: 'מתחיל תהליך התמלול...',
     currentFile: '',
     filesProcessed: 0,
-    totalFiles: files.length,
+    totalFiles: files.length, // 🔥 NEW: Track total files
     isCompleted: false
   });
 
@@ -3439,6 +3456,53 @@ app.get('/api/transcription-progress/:transcriptionId', (req, res) => {
       error: 'שגיאה בבדיקת התקדמות התמלול'
     });
   }
+});
+
+// 🔥 NEW: Server-Sent Events endpoint for real-time progress updates
+app.get('/api/transcription-progress/stream/:transcriptionId', (req, res) => {
+  const { transcriptionId } = req.params;
+  console.log(`🔄 Starting SSE stream for transcriptionId: '${transcriptionId}'`);
+
+  // Set up SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Cache-Control'
+  });
+
+  // Send initial connection confirmation
+  res.write(`data: ${JSON.stringify({
+    type: 'connected',
+    transcriptionId,
+    timestamp: new Date().toISOString()
+  })}\n\n`);
+
+  // Listen for progress updates for this specific transcription
+  const progressListener = (data) => {
+    if (data.transcriptionId === transcriptionId) {
+      console.log(`📡 Sending SSE update for ${transcriptionId}:`, data);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    }
+  };
+
+  progressEmitter.on('progress', progressListener);
+
+  // Keep alive ping every 30 seconds
+  const keepAlive = setInterval(() => {
+    res.write(': keep-alive\n\n');
+  }, 30000);
+
+  // Handle client disconnect
+  const cleanup = () => {
+    progressEmitter.removeListener('progress', progressListener);
+    clearInterval(keepAlive);
+    console.log(`🔌 Client disconnected from SSE stream: ${transcriptionId}`);
+  };
+
+  req.on('close', cleanup);
+  req.on('aborted', cleanup);
 });
 
 // 🔧 NEW: Admin API endpoints

@@ -2823,6 +2823,119 @@
             document.getElementById('progressFill').style.width = percent + '%';
         }
 
+        // 🔥 NEW: Real-time progress tracking with Server-Sent Events
+        let currentEventSource = null;
+
+        function startRealTimeProgressTracking(transcriptionId) {
+            console.log(`🔄 Starting real-time SSE progress tracking for: ${transcriptionId}`);
+
+            // Close existing connection if any
+            if (currentEventSource) {
+                currentEventSource.close();
+            }
+
+            const eventSource = new EventSource(`${API_BASE}/transcription-progress/stream/${transcriptionId}`);
+            currentEventSource = eventSource;
+
+            eventSource.onopen = function() {
+                console.log('📡 SSE connection opened successfully');
+            };
+
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log('📊 Real-time SSE progress received:', data);
+
+                    if (data.type === 'connected') {
+                        console.log('✅ SSE connection confirmed for:', data.transcriptionId);
+                        return;
+                    }
+
+                    if (data.type === 'progress') {
+                        // Update progress bar
+                        updateProgress(data.progress);
+
+                        // Update status text with detailed info
+                        let statusText = `<div class="spinner"></div>${data.stage}`;
+                        if (data.currentFile) {
+                            statusText += `<br><small>🎵 ${data.currentFile}</small>`;
+                        }
+                        if (data.filesProcessed !== undefined && data.totalFiles > 1) {
+                            statusText += `<br><small>📊 קובץ ${data.filesProcessed + 1} מתוך ${data.totalFiles}</small>`;
+                        }
+
+                        showStatus(statusText, 'processing');
+
+                        // Check if completed
+                        if (data.progress >= 100) {
+                            console.log('✅ Transcription completed via SSE!');
+                            eventSource.close();
+                            currentEventSource = null;
+                        }
+                    }
+                } catch (e) {
+                    console.error('❌ Error parsing SSE data:', e);
+                }
+            };
+
+            eventSource.onerror = function(error) {
+                console.error('❌ SSE error:', error);
+                eventSource.close();
+                currentEventSource = null;
+
+                // Fall back to polling method
+                console.log('🔄 SSE failed, falling back to polling method');
+                startPollingProgressTracking(transcriptionId);
+            };
+        }
+
+        // 🔄 Fallback: Polling-based progress tracking
+        function startPollingProgressTracking(transcriptionId) {
+            console.log(`🔄 Starting fallback polling progress tracking for: ${transcriptionId}`);
+
+            const realProgressCheck = setInterval(async () => {
+                try {
+                    // Skip if no valid transcription ID
+                    if (!transcriptionId || transcriptionId === 'null') {
+                        console.log(`⏸️ No valid transcription ID: '${transcriptionId}', stopping progress check`);
+                        clearInterval(realProgressCheck);
+                        return;
+                    }
+
+                    console.log(`🔍 Polling progress for transcription: ${transcriptionId}`);
+                    const progressResponse = await fetch(`${API_BASE}/transcription-progress/${transcriptionId}`);
+
+                    if (progressResponse.ok) {
+                        const progressData = await progressResponse.json();
+
+                        if (progressData.success && progressData.progress) {
+                            console.log(`📈 Polling progress update: ${progressData.progress.percentage}% - ${progressData.progress.stage}`);
+                            updateProgress(progressData.progress.percentage);
+
+                            // Update status
+                            let statusText = `<div class="spinner"></div>${progressData.progress.stage}`;
+                            if (progressData.progress.currentFile) {
+                                statusText += `<br><small>🎵 ${progressData.progress.currentFile}</small>`;
+                            }
+                            if (progressData.progress.filesProcessed !== undefined && progressData.progress.totalFiles > 1) {
+                                statusText += `<br><small>📊 קובץ ${progressData.progress.filesProcessed + 1} מתוך ${progressData.progress.totalFiles}</small>`;
+                            }
+                            showStatus(statusText, 'processing');
+
+                            if (progressData.progress.percentage >= 100) {
+                                console.log(`✅ Polling progress completed, stopping checks`);
+                                clearInterval(realProgressCheck);
+                            }
+                        }
+                    } else {
+                        console.log(`❌ Polling progress response not ok: ${progressResponse.status}`);
+                    }
+                } catch (e) {
+                    console.log(`❌ Polling progress check error:`, e);
+                }
+            }, 3000); // Check every 3 seconds
+        }
+
         // Form submission with real processing
         document.getElementById('transcriptionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -2841,6 +2954,9 @@
             const language = document.getElementById('language').value;
             const customInstructions = document.getElementById('customInstructions').value.trim();
             const submitBtn = document.getElementById('submitBtn');
+
+            // Clean up any existing progress tracking
+            cleanupProgressTracking();
 
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳ מעבד...';
@@ -2918,61 +3034,14 @@
                 const data = await response.json();
                 console.log(`📦 Server response data:`, data);
 
-                // Store transcription ID for potential cancellation
+                // Store transcription ID and start real-time progress tracking
                 if (data.success && data.transcriptionId) {
                     currentTranscriptionId = data.transcriptionId;
                     console.log(`✅ Stored transcriptionId: ${currentTranscriptionId}`);
 
-                    // Stop fake progress and start real progress checking
+                    // Stop fake progress and start real-time SSE tracking
                     clearInterval(progressInterval);
-
-                    const realProgressCheck = setInterval(async () => {
-                        try {
-                            // Skip if no valid transcription ID
-                            if (!currentTranscriptionId || currentTranscriptionId === 'null') {
-                                console.log(`⏸️ No valid transcription ID: '${currentTranscriptionId}', stopping progress check`);
-                                clearInterval(realProgressCheck);
-                                return;
-                            }
-
-                            console.log(`🔍 Checking progress for transcription: ${currentTranscriptionId}`);
-                            const progressResponse = await fetch(`${API_BASE}/transcription-progress/${currentTranscriptionId}`);
-                            console.log(`📡 Progress response status: ${progressResponse.status}`);
-
-                            // Log the full URL for debugging
-                            console.log(`🌐 Full URL: ${API_BASE}/transcription-progress/${currentTranscriptionId}`);
-
-                            if (progressResponse.ok) {
-                                const progressData = await progressResponse.json();
-                                console.log(`📊 Progress data received:`, progressData);
-
-                                if (progressData.success && progressData.progress) {
-                                    console.log(`📈 Updating progress to: ${progressData.progress.percentage}% - ${progressData.progress.stage}`);
-                                    updateProgress(progressData.progress.percentage);
-
-                                    if (progressData.progress.percentage >= 100) {
-                                        console.log(`✅ Progress completed, stopping checks`);
-                                        clearInterval(realProgressCheck);
-                                    }
-                                } else {
-                                    console.log(`⚠️ No progress data in response`);
-                                }
-                            } else {
-                                console.log(`❌ Progress response not ok: ${progressResponse.status}`);
-                            }
-                        } catch (e) {
-                            console.log(`❌ Progress check error:`, e);
-                            // If progress check fails, restart fake progress
-                            if (!progressInterval) {
-                                console.log(`🔄 Falling back to fake progress`);
-                                progressInterval = setInterval(() => {
-                                    progress += Math.random() * 2;
-                                    if (progress > 85) progress = 85;
-                                    updateProgress(progress);
-                                }, 3000);
-                            }
-                        }
-                    }, 3000);
+                    startRealTimeProgressTracking(currentTranscriptionId);
                 }
 
                 if (data.success) {
@@ -3671,6 +3740,24 @@
                 closeAccessibilityModal();
             }
         });
+
+        // 🔥 NEW: Clean up SSE connections when page unloads
+        window.addEventListener('beforeunload', function() {
+            if (currentEventSource) {
+                console.log('🔌 Cleaning up SSE connection on page unload');
+                currentEventSource.close();
+                currentEventSource = null;
+            }
+        });
+
+        // 🔥 NEW: Clean up SSE connections when starting new transcription
+        function cleanupProgressTracking() {
+            if (currentEventSource) {
+                console.log('🔌 Cleaning up existing SSE connection');
+                currentEventSource.close();
+                currentEventSource = null;
+            }
+        }
     </script>
 
 
