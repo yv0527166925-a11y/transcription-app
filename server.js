@@ -2551,7 +2551,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       // Mark transcription as completed with 100% progress
-      updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה! התוצאות נשלחו לאימייל');
+      updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
       activeTranscriptions.get(transcriptionId).isCompleted = true;
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
