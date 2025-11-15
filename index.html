@@ -1496,6 +1496,10 @@
             </div>
         </div>
 
+        <div class="info-banner" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);">
+            <h3 style="margin: 0; font-size: 1.2em;">📧 אין צורך להמתין עד סוף העיבוד. התמלול יישלח לאימייל ויהיה זמין להורדה בעמוד ההיסטוריה.</h3>
+        </div>
+
        <div class="features">
             <h3>🌟 מה מיוחד בשירות שלנו?</h3>
             <ul>
@@ -3162,7 +3166,8 @@
             } catch (error) {
                 clearInterval(progressInterval);
                 showStatus(`❌ <strong>שגיאה:</strong> ${error.message}<br><small>אנא נסה שוב או צור קשר לתמיכה</small>`, 'error');
-            } finally {
+
+                // Only reset UI on error
                 submitBtn.disabled = false;
                 submitBtn.textContent = '🚀 התחל תמלול מלא';
                 setTimeout(() => {
