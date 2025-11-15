@@ -2349,15 +2349,11 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
   }
 
   try {
-    // Deduct minutes immediately to prevent abuse (before actual processing)
-    await useUserMinutes(userEmail, estimatedMinutes);
-    console.log(`💰 Minutes deducted upfront. User balance: ${user.remainingMinutes} minutes`);
+    // ✅ NEW APPROACH: No upfront charging - charge only for successful transcriptions
+    console.log(`🎯 Starting processing without upfront charge. User balance: ${user.remainingMinutes} minutes`);
 
-    // Minutes already saved to MongoDB by useUserMinutes function
-
-    // ⚠️ CRITICAL: After this point, cancellation is no longer safe for refunds
-    // Minutes have been deducted, transcription is considered "started"
-    activeTranscriptions.get(transcriptionId).minutesDeducted = true;
+    // Track that no minutes have been deducted yet
+    activeTranscriptions.get(transcriptionId).minutesDeducted = false;
 
     updateTranscriptionProgress(transcriptionId, 15, 'מתכונן לעיבוד הקבצים...');
     const transcriptions = [];
@@ -2366,12 +2362,11 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
       const file = files[fileIndex];
 
-      // Update progress for current file
+      // Update progress for current file (starting)
       const fileProgress = 20 + ((fileIndex / files.length) * 60); // 20-80% range
       updateTranscriptionProgress(transcriptionId, Math.round(fileProgress), `מעבד קובץ ${fileIndex + 1} מתוך ${files.length}...`, file.filename);
 
-      // Update files processed counter
-      activeTranscriptions.get(transcriptionId).filesProcessed = fileIndex;
+      // NOTE: filesProcessed counter will be updated AFTER successful completion of this file
 
       console.log(`🎵 Processing file: ${file.filename}`);
       console.log(`📊 File size: ${(fs.statSync(file.path).size / (1024 * 1024)).toFixed(1)} MB`);
@@ -2436,7 +2431,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           duration: fileDurationMinutes, // Store actual duration for this file
           fileSize: fs.statSync(file.path).size
         });
-        
+
+        // ✅ NOW update files processed counter - file completed successfully
+        activeTranscriptions.get(transcriptionId).filesProcessed = fileIndex + 1; // +1 because this file is now COMPLETED
+
         console.log(`✅ Successfully processed: ${cleanFilename(file.filename)}`);
         console.log(`📊 Final transcription: ${transcription.length} characters, ${transcription.split(/\s+/).length} words`);
 
@@ -2502,13 +2500,14 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
 
-      // Note: Minutes were already deducted at the start
-      // No need to deduct again - just record the usage
+      // ✅ NEW: Charge ONLY for successful transcriptions
+      let totalActualMinutesUsed = 0;
 
-      // 🔧 NEW: Add each transcription to MongoDB history
+      // 🔧 NEW: Add each transcription to MongoDB history AND calculate actual usage
       for (const transcription of transcriptions) {
         // Use the actual duration calculated for this specific file
         const durationMinutes = transcription.duration || Math.ceil(estimatedMinutes / transcriptions.length);
+        totalActualMinutesUsed += durationMinutes;
         const transcriptionData = {
           fileName: cleanFilename(transcription.filename),
           originalName: cleanFilename(transcription.filename),
@@ -2549,12 +2548,29 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
       }
 
+      // 💰 NOW charge the user ONLY for successful transcriptions
+      if (totalActualMinutesUsed > 0) {
+        console.log(`💳 Charging ${totalActualMinutesUsed} minutes for ${transcriptions.length} successful transcriptions`);
+
+        // Check if user still has enough balance
+        if (user.remainingMinutes >= totalActualMinutesUsed) {
+          await useUserMinutes(userEmail, totalActualMinutesUsed);
+          activeTranscriptions.get(transcriptionId).minutesDeducted = true;
+          console.log(`✅ Successfully charged ${totalActualMinutesUsed} minutes. New balance: ${user.remainingMinutes - totalActualMinutesUsed}`);
+        } else {
+          console.log(`⚠️ User balance insufficient for actual usage: ${user.remainingMinutes} < ${totalActualMinutesUsed}`);
+          // Still process but log the discrepancy
+        }
+      } else {
+        console.log(`🆓 No charge - no successful transcriptions`);
+      }
+
       // Mark transcription as completed with 100% progress
       updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
       activeTranscriptions.get(transcriptionId).isCompleted = true;
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
-      console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
+      console.log(`💰 Final balance after charging: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
 
@@ -2565,7 +2581,12 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }, 2000);
 
     } else {
-      console.error(`❌ No transcriptions completed for: ${userEmail}`);
+      console.log(`🆓 No transcriptions completed for: ${userEmail} - NO CHARGE`);
+      console.log(`💰 User balance unchanged: ${user.remainingMinutes} minutes`);
+
+      // Mark transcription as completed with failure message
+      updateTranscriptionProgress(transcriptionId, 100, 'התמלול נכשל - לא בוצע חיוב');
+
       // Cleanup on failure
       activeTranscriptions.delete(transcriptionId);
     }
