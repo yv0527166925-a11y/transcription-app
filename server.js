@@ -1454,16 +1454,15 @@ async function realGeminiTranscriptionWithDuration(filePath, filename, language,
     console.log(`🎵 Processing: ${cleanFilename(filename)}`);
     console.log(`📊 File size: ${fileSizeMB.toFixed(1)} MB, Duration: ${durationMinutes.toFixed(1)} minutes`);
 
-    // Decide transcription strategy
+    // Decide transcription strategy - ALWAYS use FFmpeg if available
     const ffmpegAvailable = checkFFmpegAvailability();
-    const shouldChunk = ffmpegAvailable && (fileSizeMB > 25 || durationMinutes > 15);
 
-    if (!shouldChunk) {
-      console.log(`📝 Using direct transcription (small file or FFmpeg unavailable)`);
+    if (!ffmpegAvailable) {
+      console.log(`📝 Using direct transcription (FFmpeg unavailable)`);
       return await directGeminiTranscription(filePath, filename, language, customInstructions);
     }
 
-    console.log(`🔪 Using chunked transcription (large file detected)`);
+    console.log(`🔪 Using chunked transcription (FFmpeg processing for all files)`);
     return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions);
 
   } catch (error) {
@@ -3331,7 +3330,7 @@ app.post('/api/transcribe', upload.array('files'), handleMulterError, async (req
     res.json({
         success: true,
         message: ffmpegAvailable ?
-            'התמלול המתקדם התחיל - קבצים גדולים יתחלקו למקטעים אוטומטית' :
+            'התמלול המתקדם התחיל - כל הקבצים יתעבדו דרך FFmpeg למקסימום איכות' :
             'התמלול התחיל - ללא חלוקה למקטעים (FFmpeg לא זמין)',
         estimatedMinutes: null, // Will be calculated async
         chunkingEnabled: ffmpegAvailable,
