@@ -4587,6 +4587,12 @@ const server = app.listen(PORT, () => {
   console.log('📧 Email monitoring disabled - not using email transcription service');
 });
 
+// Configure server timeouts for large file uploads
+server.timeout = 10 * 60 * 1000; // 10 minutes timeout for large file uploads
+server.keepAliveTimeout = 65000; // Keep-alive timeout
+server.headersTimeout = 66000; // Headers timeout
+console.log('⏰ Server timeouts configured: 10 min upload, 65s keep-alive');
+
 
 
 
