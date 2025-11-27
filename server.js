@@ -884,10 +884,10 @@ ${text}
 
     // Retry mechanism with timeout
     let result;
-    for (let attempt = 1; attempt <= 5; attempt++) {
-      console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/5...`);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/2...`);
       try {
-        console.log(`🔄 Attempt ${attempt}/5 for smart division...`);
+        console.log(`🔄 Attempt ${attempt}/2 for smart division...`);
 
         // Create timeout promise
         const timeoutPromise = new Promise((_, reject) =>
@@ -917,8 +917,8 @@ ${text}
         console.log(`🔍 DEBUG: Caught error on attempt ${attempt}, checking retry logic...`);
         console.error(`❌ Attempt ${attempt} failed:`, attemptError.message);
 
-        if (attempt === 5) {
-          console.log(`🔍 DEBUG: This was the final attempt (${attempt}/5), throwing error...`);
+        if (attempt === 2) {
+          console.log(`🔍 DEBUG: This was the final attempt (${attempt}/2), throwing error...`);
           throw attemptError; // Final attempt failed, throw error
         }
 
@@ -1138,10 +1138,10 @@ ${text}
 
   // Retry mechanism
   let result;
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/5...`);
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/2...`);
     try {
-      console.log(`🔄 Attempt ${attempt}/5 for chunk smart division...`);
+      console.log(`🔄 Attempt ${attempt}/2 for chunk smart division...`);
       console.log(`🔍 DEBUG: About to call model.generateContent...`);
 
       const timeoutPromise = new Promise((_, reject) =>
@@ -1163,7 +1163,7 @@ ${text}
 
     } catch (attemptError) {
       console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
-      if (attempt === 5) throw attemptError;
+      if (attempt === 2) throw attemptError;
 
       // Longer delays for better rate limiting: 15s, 30s, 50s, 60s, 70s
       const waitTimes = [15000, 30000, 50000, 60000, 70000];
@@ -1603,7 +1603,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     
     // Transcribe each chunk with retry mechanism
     const transcriptions = [];
-    const maxRetries = 5;
+    const maxRetries = 2;
 
     for (let i = 0; i < chunksData.chunks.length; i++) {
       const chunk = chunksData.chunks[i];
