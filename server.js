@@ -2561,6 +2561,8 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
 
+      updateTranscriptionProgress(transcriptionId, 97, 'מעדכן היסטוריית תמלולים...');
+
       // Note: Minutes were already deducted at the start
       // No need to deduct again - just record the usage
 
@@ -2608,6 +2610,11 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
       }
 
+      updateTranscriptionProgress(transcriptionId, 99, 'מסיים עיבוד...');
+
+      // Small delay to ensure all processes are complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       // Mark transcription as completed with 100% progress
       updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
       activeTranscriptions.get(transcriptionId).isCompleted = true;
@@ -2617,22 +2624,28 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
 
-      // Wait a moment to ensure 100% progress is sent, then cleanup
+      // Wait a longer moment to ensure 100% progress is sent and processed by client, then cleanup
       setTimeout(() => {
         activeTranscriptions.delete(transcriptionId);
         console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId} after completion`);
-      }, 2000);
+      }, 5000);
 
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
+      updateTranscriptionProgress(transcriptionId, 0, 'התמלול נכשל - לא הושלמו תמלולים');
       // Cleanup on failure
-      activeTranscriptions.delete(transcriptionId);
+      setTimeout(() => {
+        activeTranscriptions.delete(transcriptionId);
+      }, 3000);
     }
 
   } catch (error) {
     console.error('Async transcription batch error:', error);
+    updateTranscriptionProgress(transcriptionId, 0, `שגיאה: ${error.message}`);
     // Cleanup on error
-    activeTranscriptions.delete(transcriptionId);
+    setTimeout(() => {
+      activeTranscriptions.delete(transcriptionId);
+    }, 3000);
 
     // If error is due to insufficient minutes, clean up files and don't deduct
     if (error.message && error.message.includes('Insufficient minutes')) {
