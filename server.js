@@ -1446,7 +1446,7 @@ async function realGeminiTranscription(filePath, filename, language, customInstr
 }
 
 // Enhanced version that accepts pre-calculated duration to avoid multiple getAudioDuration calls
-async function realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration) {
+async function realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration, transcriptionId = null, fileIndex = 0, totalFiles = 1) {
   try {
     const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
     const durationMinutes = duration / 60;
@@ -1459,11 +1459,11 @@ async function realGeminiTranscriptionWithDuration(filePath, filename, language,
 
     if (!ffmpegAvailable) {
       console.log(`📝 Using direct transcription (FFmpeg unavailable)`);
-      return await directGeminiTranscription(filePath, filename, language, customInstructions);
+      return await directGeminiTranscription(filePath, filename, language, customInstructions, transcriptionId, fileIndex, totalFiles);
     }
 
     console.log(`🔪 Using chunked transcription (FFmpeg processing for all files)`);
-    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions);
+    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId, fileIndex, totalFiles);
 
   } catch (error) {
     console.error('🔥 Transcription error:', error);
@@ -1472,8 +1472,19 @@ async function realGeminiTranscriptionWithDuration(filePath, filename, language,
 }
 
 // Direct transcription (original method)
-async function directGeminiTranscription(filePath, filename, language, customInstructions) {
+async function directGeminiTranscription(filePath, filename, language, customInstructions, transcriptionId = null, fileIndex = 0, totalFiles = 1) {
   try {
+    // Send progress update for direct transcription start
+    if (transcriptionId) {
+      const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+      updateTranscriptionProgress(
+        transcriptionId,
+        Math.round(baseProgress),
+        `מתחיל תמלול ישיר עבור ${filename}`,
+        filename
+      );
+    }
+
     const model = genAI.getGenerativeModel({
       model: "gemini-3-pro-preview",
       generationConfig: {
@@ -1568,12 +1579,35 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
     console.log(`✅ Direct transcription completed: ${transcription.length} characters`);
 
+    // Send progress update for paragraph division
+    if (transcriptionId) {
+      const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+      const paragraphProgress = baseProgress + (0.7 * (60 / totalFiles)); // 70% through file processing
+      updateTranscriptionProgress(
+        transcriptionId,
+        Math.round(paragraphProgress),
+        `מחלק לפסקאות עבור ${filename}`,
+        filename
+      );
+    }
+
     // שלב 2: חלוקה חכמה לפסקאות בגמיני
     console.log(`🔍 Starting smart paragraph division for all languages, length=${transcription.length}`);
     console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
     await new Promise(resolve => setTimeout(resolve, 3000));
     console.log(`🎯 Starting smart paragraph division with Gemini...`);
     transcription = await smartParagraphDivision(transcription);
+
+    // Send progress update for completion
+    if (transcriptionId) {
+      const baseProgress = 20 + (((fileIndex + 1) / totalFiles) * 60);
+      updateTranscriptionProgress(
+        transcriptionId,
+        Math.round(baseProgress),
+        `הושלם תמלול עבור ${filename}`,
+        filename
+      );
+    }
 
     return transcription;
     
@@ -1584,7 +1618,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 }
 
 // Chunked transcription for large files
-async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions) {
+async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId = null, fileIndex = 0, totalFiles = 1) {
   let chunksData;
   
   try {
@@ -1612,6 +1646,19 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
       console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length}`);
 
+      // Send progress update for each chunk
+      if (transcriptionId) {
+        // Calculate progress within the file: 20% base + 60% for file processing
+        const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+        const chunkProgress = baseProgress + ((i / chunksData.chunks.length) * (60 / totalFiles));
+        updateTranscriptionProgress(
+          transcriptionId,
+          Math.round(chunkProgress),
+          `מעבד חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+          filename
+        );
+      }
+
       while (retryCount <= maxRetries && !chunkTranscription) {
         try {
           if (retryCount > 0) {
@@ -1634,6 +1681,18 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           transcriptions.push(chunkTranscription);
           console.log(`✅ Chunk ${i + 1} completed successfully`);
+
+          // Send progress update for chunk completion
+          if (transcriptionId) {
+            const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+            const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+            updateTranscriptionProgress(
+              transcriptionId,
+              Math.round(completedProgress),
+              `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+              filename
+            );
+          }
 
           // Delay between chunks to avoid rate limiting
           if (i < chunksData.chunks.length - 1) {
@@ -2391,7 +2450,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
         // Use the enhanced transcription method that handles large files with chunking
         // Pass the duration we already calculated to avoid duplicate getAudioDuration calls
-        const transcription = await realGeminiTranscriptionWithDuration(file.path, file.filename, language, customInstructions, fileDuration);
+        const transcription = await realGeminiTranscriptionWithDuration(file.path, file.filename, language, customInstructions, fileDuration, transcriptionId, fileIndex, files.length);
 
         console.log(`🔍 Transcription validation:`);
         console.log(`   Type: ${typeof transcription}`);
@@ -4382,10 +4441,10 @@ async function processEmailTranscription(user, emailData, senderEmail) {
         try {
           if (durationMinutes <= 15) {
             // Direct transcription for short files
-            realTranscription = await directGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew');
+            realTranscription = await directGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', null, null, 0, 1);
           } else {
             // Chunked transcription for longer files
-            realTranscription = await chunkedGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', durationMinutes, null);
+            realTranscription = await chunkedGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', durationMinutes, null, null, 0, 1);
           }
         } catch (transcriptionError) {
           console.error(`📧 Transcription failed for ${attachment.filename}:`, transcriptionError);
