@@ -1441,7 +1441,7 @@
                     </div>
 
                     <button type="submit" class="btn" id="submitBtn" disabled>
-                        🚀 התחל תמלול
+                        התחל תמלול
                     </button>
 
                     <div class="progress-bar" id="progressBar">
@@ -2772,7 +2772,7 @@
 
             // Enable submit button (we'll check balance during transcription)
             document.getElementById('submitBtn').disabled = false;
-            document.getElementById('submitBtn').textContent = '🚀 התחל תמלול';
+            document.getElementById('submitBtn').textContent = 'התחל תמלול';
         }
 
         function formatFileSize(bytes) {
@@ -2857,13 +2857,13 @@
             const eventSource = new EventSource(`${API_BASE}/transcription-progress/stream/${transcriptionId}`);
             currentEventSource = eventSource;
 
-            // Timeout fallback - if no connection in 5 seconds, use polling
+            // Timeout fallback - if no connection in 10 seconds, use polling
             const connectionTimeout = setTimeout(() => {
                 console.log('⏰ SSE connection timeout - falling back to polling');
                 eventSource.close();
                 currentEventSource = null;
                 startPollingProgressTracking(transcriptionId);
-            }, 5000);
+            }, 10000);
 
             eventSource.onopen = function() {
                 console.log('📡 SSE connection opened successfully');
@@ -2903,13 +2903,16 @@
 
                         showStatus(statusText, 'processing');
 
-                        // Check if completed
-                        if (data.progress >= 100) {
+                        // Check if completed - only consider truly completed (100% or completion stage text)
+                        if (data.progress >= 100 || data.stage.includes('הושלם') || data.stage.includes('completed')) {
                             console.log('✅ Transcription completed via SSE!');
+
+                            // Show actual progress, don't force to 100%
+                            updateProgress(data.progress);
 
                             // Show completion status without spinner
                             setTimeout(() => {
-                                showStatus(`✅ <strong>${data.stage}</strong>`, 'success');
+                                showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
                                 document.getElementById('progressBar').style.display = 'none';
 
                                 // Reset submit button
@@ -2920,7 +2923,9 @@
 
                             // Close SSE connection after showing completion
                             setTimeout(() => {
-                                eventSource.close();
+                                if (eventSource && eventSource.readyState !== EventSource.CLOSED) {
+                                    eventSource.close();
+                                }
                                 currentEventSource = null;
                             }, 1000);
                         }
@@ -2999,8 +3004,8 @@
                     } else if (progressResponse.status === 404) {
                         console.log(`🔍 Got 404 - last progress was: ${lastProgress}%`);
 
-                        if (lastProgress >= 95) {
-                            // 404 after 95%+ means transcription is completed and cleaned up
+                        if (lastProgress >= 100) {
+                            // 404 after 100% means transcription is completed and cleaned up
                             console.log(`✅ Transcription completed (404 after ${lastProgress}%), stopping polling`);
                             clearInterval(realProgressCheck);
 
@@ -3015,7 +3020,7 @@
                                 submitBtn.textContent = 'התחל תמלול';
                             }, 500);
                         } else {
-                            // 404 before 95% might be temporary - continue polling
+                            // 404 before 100% might be temporary - continue polling
                             console.log(`⚠️ Got 404 but only at ${lastProgress}%, continuing polling (might be temporary)`);
                         }
                     } else {
@@ -3177,7 +3182,7 @@
 
                 // Only reset UI on error
                 submitBtn.disabled = false;
-                submitBtn.textContent = '🚀 התחל תמלול מלא';
+                submitBtn.textContent = 'התחל תמלול מלא';
                 setTimeout(() => {
                     document.getElementById('progressBar').style.display = 'none';
                     updateProgress(0);
