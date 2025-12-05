@@ -747,8 +747,8 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) using ${modelName}...`);
 
-    // Determine timeout based on retry count: 180s for first attempt, 240s for second attempt, 40s for third attempt
-    const timeoutSeconds = retryCount === 0 ? 180 : (retryCount === 1 ? 240 : 40);
+    // Determine timeout based on retry count: 180s for first attempt, 120s for second attempt, 40s for third attempt
+    const timeoutSeconds = retryCount === 0 ? 180 : (retryCount === 1 ? 120 : 40);
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     const transcriptionPromise = model.generateContent([
@@ -842,8 +842,8 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    // Determine timeout based on retry count: 180s for first attempt, 240s for second attempt, 40s for third attempt
-    const timeoutSeconds = retryCount === 0 ? 180 : (retryCount === 1 ? 240 : 40);
+    // Determine timeout based on retry count: 180s for first attempt, 120s for second attempt, 40s for third attempt
+    const timeoutSeconds = retryCount === 0 ? 180 : (retryCount === 1 ? 120 : 40);
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     // Add timeout wrapper
