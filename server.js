@@ -678,7 +678,126 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions) {
+// Function with fallback for final retry
+async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
+  const startTime = Date.now();
+
+  // First try Gemini 3 Pro
+  try {
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, retryCount);
+    console.log(`✅ Gemini 3 Pro transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    return transcription;
+  } catch (error) {
+    console.log(`⚠️ Gemini 3 Pro failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Flash fallback:`, error.message);
+
+    // Fallback to Gemini 2.5 Flash
+    try {
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, retryCount);
+      console.log(`✅ Gemini 2.5 Flash fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      return transcription;
+    } catch (flashError) {
+      console.error(`❌ Gemini 2.5 Flash fallback also failed for chunk ${chunkIndex + 1}:`, flashError.message);
+      throw new Error(`Both Gemini 3 Pro and 2.5 Flash failed for chunk ${chunkIndex + 1}: ${flashError.message}`);
+    }
+  }
+}
+
+// Helper function to transcribe with a specific model
+async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, modelName, startTime, retryCount = 0) {
+  try {
+    const model = genAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: modelName === "gemini-2.5-flash" ? 8192 : 32768
+      }
+    });
+
+    const audioData = fs.readFileSync(chunkPath);
+    const base64Audio = audioData.toString('base64');
+
+    // Enhanced prompt for chunk transcription with context
+    let contextPrompt = '';
+    if (chunkIndex === 0) {
+      contextPrompt = '🎯 זהו החלק הראשון של הקובץ - התחל מההתחלה המוחלטת.';
+    } else if (chunkIndex === totalChunks - 1) {
+      contextPrompt = '🎯 זהו החלק האחרון של הקובץ - המשך עד הסוף המוחלט.';
+    } else {
+      contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
+    }
+
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+
+🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
+אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
+
+${contextPrompt}
+
+קובץ אודיו (חלק ${chunkIndex + 1}/${totalChunks}) - מודל: ${modelName}
+
+🚨 הוראות קריטיות:
+1. תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט
+2. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
+3. התחל ישירות עם התוכן המתומלל
+4. סיים ישירות עם התוכן - אל תוסיף סיכום
+5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
+
+תתחיל עכשיו עם התמלול:`;
+
+    const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
+    console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) using ${modelName}...`);
+
+    // Determine timeout based on retry count: 180s for first attempt, 240s for second attempt
+    const timeoutSeconds = retryCount === 0 ? 180 : 240;
+    console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
+
+    const transcriptionPromise = model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'audio/wav',
+          data: base64Audio
+        }
+      },
+      prompt
+    ]);
+
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Transcription timeout after ${timeoutSeconds} seconds with ${modelName} (retry ${retryCount + 1})`)), timeoutSeconds * 1000)
+    );
+
+    const result = await Promise.race([transcriptionPromise, timeoutPromise]);
+
+    const response = await result.response;
+    let transcription = response.text();
+
+    // 🔥 NEW: הסר חזרות קיצוניות מהמודל
+    transcription = removeExtremeRepetitions(transcription);
+
+    // Validate transcription
+    if (!transcription || transcription.trim().length < 10) {
+      throw new Error(`Invalid transcription: too short (${transcription ? transcription.length : 0} characters)`);
+    }
+
+    // Clean the transcription
+    transcription = transcription
+      .replace(/\r\n/g, '\n')
+      .replace(/^\s*תמלול[:\s]*/i, '') // Remove "תמלול:" prefix
+      .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ Chunk ${chunkIndex + 1} transcribed with ${modelName}: ${transcription.length} characters in ${duration}s`);
+    return transcription;
+
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`❌ Error transcribing chunk ${chunkIndex + 1} with ${modelName} after ${duration}s:`, error.message);
+    throw error;
+  }
+}
+
+async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
     const model = genAI.getGenerativeModel({
@@ -723,7 +842,11 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    // Add timeout wrapper - 4 minutes for 4-minute chunks
+    // Determine timeout based on retry count: 180s for first attempt, 240s for second attempt
+    const timeoutSeconds = retryCount === 0 ? 180 : 240;
+    console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
+
+    // Add timeout wrapper
     const transcriptionPromise = model.generateContent([
       {
         inlineData: {
@@ -735,7 +858,7 @@ ${contextPrompt}
     ]);
 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Transcription timeout after 4 minutes')), 4 * 60 * 1000)
+      setTimeout(() => reject(new Error(`Transcription timeout after ${timeoutSeconds} seconds (retry ${retryCount + 1})`)), timeoutSeconds * 1000)
     );
 
     const result = await Promise.race([transcriptionPromise, timeoutPromise]);
@@ -1054,12 +1177,12 @@ async function smartParagraphDivisionWithFlashFallback(text) {
     console.log(`✅ Gemini Pro processed chunk successfully (${processedText.length} chars)`);
     return processedText;
   } catch (error) {
-    console.log(`⚠️ Gemini Pro failed, trying Flash 2.0 fallback:`, error.message);
+    console.log(`⚠️ Gemini Pro failed, trying Flash 2.5 fallback:`, error.message);
 
-    // Fallback to Flash 2.0
+    // Fallback to Flash 2.5
     try {
       const flashModel = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.5-flash",
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 500000
@@ -1092,13 +1215,13 @@ ${text}
       let dividedText = response.text();
 
       if (dividedText && dividedText.length > text.length * 0.8) {
-        console.log(`✅ Flash 2.0 fallback successful (${dividedText.length} chars)`);
+        console.log(`✅ Flash 2.5 fallback successful (${dividedText.length} chars)`);
         return dividedText;
       } else {
         throw new Error('Flash output too short or empty');
       }
     } catch (flashError) {
-      console.error(`❌ Flash 2.0 fallback also failed:`, flashError.message);
+      console.error(`❌ Flash 2.5 fallback also failed:`, flashError.message);
       console.log(`⚠️ Returning original text for this chunk`);
       return text;
     }
@@ -1670,14 +1793,28 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
 
-          chunkTranscription = await transcribeAudioChunk(
-            chunk.path,
-            i,
-            chunksData.chunks.length,
-            filename,
-            language,
-            customInstructions
-          );
+          // Use fallback only on the last retry
+          if (retryCount === maxRetries) {
+            chunkTranscription = await transcribeAudioChunkWithFlashFallback(
+              chunk.path,
+              i,
+              chunksData.chunks.length,
+              filename,
+              language,
+              customInstructions,
+              retryCount
+            );
+          } else {
+            chunkTranscription = await transcribeAudioChunk(
+              chunk.path,
+              i,
+              chunksData.chunks.length,
+              filename,
+              language,
+              customInstructions,
+              retryCount
+            );
+          }
 
           transcriptions.push(chunkTranscription);
           console.log(`✅ Chunk ${i + 1} completed successfully`);
