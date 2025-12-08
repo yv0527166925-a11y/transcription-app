@@ -1877,7 +1877,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           if (retryCount > maxRetries) {
             console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
-            transcriptions.push(`[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`);
+            return `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
           } else {
             // Wait before retry
             console.log(`⏳ Waiting before retry for chunk ${i + 1}...`);
