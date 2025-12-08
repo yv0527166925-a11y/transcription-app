@@ -16,21 +16,92 @@ require('dotenv').config();
 // 🔥 NEW: Event emitter for progress updates
 const progressEmitter = new EventEmitter();
 
-// 🔥 NEW: Transcription queue with concurrency limit (2 simultaneous transcriptions)
-const transcribeQueue = new PQueue({ concurrency: 2 });
+// 🔥 NEW: Per-User Queue System - each user gets their own queue
+const userQueues = new Map(); // email -> PQueue instance
+const maxGlobalConcurrency = 2; // Server protection: max 2 concurrent transcriptions globally
+const maxUserConcurrency = 5; // Each user can have up to 5 tasks in their queue
+let currentGlobalActive = 0; // Track global active transcriptions
 
-// Queue monitoring logs
-transcribeQueue.on('add', () => {
-  console.log(`🔄 Queue: ${transcribeQueue.size} waiting, ${transcribeQueue.pending} active`);
-});
+// Global task wrapper that enforces the 2-task global limit
+async function executeWithGlobalThrottling(task, userEmail) {
+  // Wait until global slot available
+  while (currentGlobalActive >= maxGlobalConcurrency) {
+    console.log(`🚧 Global throttling: ${currentGlobalActive}/${maxGlobalConcurrency} active. User ${userEmail} waiting...`);
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+  }
 
-transcribeQueue.on('active', () => {
-  console.log(`⚡ Queue: Starting new transcription (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
-});
+  currentGlobalActive++;
+  console.log(`🚀 User ${userEmail}: Starting task (Global: ${currentGlobalActive}/${maxGlobalConcurrency})`);
 
-transcribeQueue.on('completed', () => {
-  console.log(`✅ Queue: Transcription completed (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
-});
+  try {
+    const result = await task();
+    return result;
+  } finally {
+    currentGlobalActive--;
+    console.log(`✅ User ${userEmail}: Finished task (Global: ${currentGlobalActive}/${maxGlobalConcurrency})`);
+  }
+}
+
+// Function to get or create a queue for a user
+function getUserQueue(userEmail) {
+  if (!userQueues.has(userEmail)) {
+    const userQueue = new PQueue({
+      concurrency: 1, // Each user processes 1 task at a time through global throttling
+      interval: 100, // Small delay between tasks
+      intervalCap: 1
+    });
+
+    // Add user queue monitoring
+    userQueue.on('add', () => {
+      console.log(`🔄 User ${userEmail} Queue: ${userQueue.size} waiting, ${userQueue.pending} active`);
+      logGlobalQueueStatus();
+    });
+
+    userQueue.on('active', () => {
+      console.log(`⚡ User ${userEmail}: Task active in user queue (${userQueue.pending} active, ${userQueue.size} waiting)`);
+    });
+
+    userQueue.on('completed', () => {
+      console.log(`✅ User ${userEmail}: Task completed in user queue (${userQueue.pending} active, ${userQueue.size} waiting)`);
+    });
+
+    // Cleanup empty queues after 5 minutes of inactivity
+    userQueue.on('idle', () => {
+      setTimeout(() => {
+        if (userQueue.size === 0 && userQueue.pending === 0) {
+          userQueues.delete(userEmail);
+          console.log(`🧹 Cleaned up idle queue for user: ${userEmail}`);
+        }
+      }, 300000); // 5 minutes
+    });
+
+    userQueues.set(userEmail, userQueue);
+    console.log(`✨ Created new queue for user: ${userEmail}`);
+  }
+
+  return userQueues.get(userEmail);
+}
+
+// Global queue status logging
+function logGlobalQueueStatus() {
+  const totalWaiting = Array.from(userQueues.values()).reduce((sum, queue) => sum + queue.size, 0);
+  const totalPending = Array.from(userQueues.values()).reduce((sum, queue) => sum + queue.pending, 0);
+  console.log(`🌍 Global Status: ${currentGlobalActive}/${maxGlobalConcurrency} active, ${totalPending} user-pending, ${totalWaiting} user-waiting across ${userQueues.size} users`);
+}
+
+// Cleanup function for inactive user queues
+setInterval(() => {
+  const inactiveUsers = [];
+  for (const [email, queue] of userQueues.entries()) {
+    if (queue.size === 0 && queue.pending === 0) {
+      inactiveUsers.push(email);
+    }
+  }
+  inactiveUsers.forEach(email => {
+    userQueues.delete(email);
+    console.log(`🧹 Cleaned up inactive queue for user: ${email}`);
+  });
+}, 600000); // Cleanup every 10 minutes
 
 // פונקציה להסרת חזרות של ביטויים/משפטים שחוזרים 5+ פעמים
 function removeExtremeRepetitions(text) {
@@ -1673,7 +1744,7 @@ async function realGeminiTranscription(filePath, filename, language, customInstr
 }
 
 // Enhanced version that accepts pre-calculated duration to avoid multiple getAudioDuration calls
-async function realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration, transcriptionId = null, fileIndex = 0, totalFiles = 1) {
+async function realGeminiTranscriptionWithDuration(filePath, filename, language, customInstructions, duration, transcriptionId = null, fileIndex = 0, totalFiles = 1, userEmail = null) {
   try {
     const fileSizeMB = fs.statSync(filePath).size / (1024 * 1024);
     const durationMinutes = duration / 60;
@@ -1690,7 +1761,7 @@ async function realGeminiTranscriptionWithDuration(filePath, filename, language,
     }
 
     console.log(`🔪 Using chunked transcription (FFmpeg processing for all files)`);
-    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId, fileIndex, totalFiles);
+    return await chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId, fileIndex, totalFiles, userEmail);
 
   } catch (error) {
     console.error('🔥 Transcription error:', error);
@@ -1845,7 +1916,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 }
 
 // Chunked transcription for large files
-async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId = null, fileIndex = 0, totalFiles = 1) {
+async function chunkedGeminiTranscription(filePath, filename, language, durationMinutes, customInstructions, transcriptionId = null, fileIndex = 0, totalFiles = 1, userEmail = null) {
   let chunksData;
   
   try {
@@ -1895,30 +1966,35 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
 
+          // Get user queue for this transcription
+          const userQueue = getUserQueue(userEmail || 'anonymous');
+
           // Use fallback only on the last retry
           if (retryCount === maxRetries) {
-            chunkTranscription = await transcribeQueue.add(() =>
-              transcribeAudioChunkWithFlashFallback(
-                chunk.path,
-                i,
-                chunksData.chunks.length,
-                filename,
-                language,
-                customInstructions,
-                retryCount
-              )
+            chunkTranscription = await userQueue.add(() =>
+              executeWithGlobalThrottling(() =>
+                transcribeAudioChunkWithFlashFallback(
+                  chunk.path,
+                  i,
+                  chunksData.chunks.length,
+                  filename,
+                  language,
+                  customInstructions,
+                  retryCount
+                ), userEmail || 'anonymous')
             );
           } else {
-            chunkTranscription = await transcribeQueue.add(() =>
-              transcribeAudioChunk(
-                chunk.path,
-                i,
+            chunkTranscription = await userQueue.add(() =>
+              executeWithGlobalThrottling(() =>
+                transcribeAudioChunk(
+                  chunk.path,
+                  i,
                 chunksData.chunks.length,
                 filename,
                 language,
                 customInstructions,
                 retryCount
-              )
+                ), userEmail || 'anonymous')
             );
           }
 
@@ -2693,7 +2769,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
         // Use the enhanced transcription method that handles large files with chunking
         // Pass the duration we already calculated to avoid duplicate getAudioDuration calls
-        const transcription = await realGeminiTranscriptionWithDuration(file.path, file.filename, language, customInstructions, fileDuration, transcriptionId, fileIndex, files.length);
+        const transcription = await realGeminiTranscriptionWithDuration(file.path, file.filename, language, customInstructions, fileDuration, transcriptionId, fileIndex, files.length, userEmail);
 
         console.log(`🔍 Transcription validation:`);
         console.log(`   Type: ${typeof transcription}`);
@@ -4704,7 +4780,7 @@ async function processEmailTranscription(user, emailData, senderEmail) {
             realTranscription = await directGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', null, null, 0, 1);
           } else {
             // Chunked transcription for longer files
-            realTranscription = await chunkedGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', durationMinutes, null, null, 0, 1);
+            realTranscription = await chunkedGeminiTranscription(tempFilePath, attachment.filename, 'Hebrew', durationMinutes, null, null, 0, 1, user.email);
           }
         } catch (transcriptionError) {
           console.error(`📧 Transcription failed for ${attachment.filename}:`, transcriptionError);
