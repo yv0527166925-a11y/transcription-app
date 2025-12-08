@@ -705,16 +705,16 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
     console.log(`✅ Gemini 3 Pro Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error) {
-    console.log(`⚠️ Gemini 3 Pro Preview failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Flash fallback:`, error.message);
+    console.log(`⚠️ Gemini 3 Pro Preview failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Pro fallback:`, error.message);
 
-    // Fallback to Gemini 2.5 Flash
+    // Fallback to Gemini 2.5 Pro
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, retryCount);
-      console.log(`✅ Gemini 2.5 Flash fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, retryCount);
+      console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
       return transcription;
-    } catch (flashError) {
-      console.error(`❌ Gemini 2.5 Flash fallback also failed for chunk ${chunkIndex + 1}:`, flashError.message);
-      throw new Error(`Both Gemini 3 Pro Preview and 2.5 Flash failed for chunk ${chunkIndex + 1}: ${flashError.message}`);
+    } catch (proError) {
+      console.error(`❌ Gemini 2.5 Pro fallback also failed for chunk ${chunkIndex + 1}:`, proError.message);
+      throw new Error(`Both Gemini 3 Pro Preview and 2.5 Pro failed for chunk ${chunkIndex + 1}: ${proError.message}`);
     }
   }
 }
@@ -726,7 +726,7 @@ async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename,
       model: modelName,
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: modelName === "gemini-2.5-flash" ? 8192 : 32768
+        maxOutputTokens: modelName === "gemini-2.5-pro" ? 32768 : 32768
       }
     });
 
@@ -1200,12 +1200,12 @@ async function smartParagraphDivisionWithFlashFallback(text) {
     console.log(`✅ Gemini Pro processed chunk successfully (${processedText.length} chars)`);
     return processedText;
   } catch (error) {
-    console.log(`⚠️ Gemini Pro failed, trying Flash 2.5 fallback:`, error.message);
+    console.log(`⚠️ Gemini Pro failed, trying Gemini 2.5 Pro fallback:`, error.message);
 
-    // Fallback to Flash 2.5
+    // Fallback to Gemini 2.5 Pro
     try {
-      const flashModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+      const proModel = genAI.getGenerativeModel({
+        model: "gemini-2.5-pro",
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 500000
@@ -1239,18 +1239,18 @@ ${text}
 
 תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
 
-      const result = await flashModel.generateContent(prompt);
+      const result = await proModel.generateContent(prompt);
       const response = await result.response;
       let dividedText = response.text();
 
       if (dividedText && dividedText.length > text.length * 0.8) {
-        console.log(`✅ Flash 2.5 fallback successful (${dividedText.length} chars)`);
+        console.log(`✅ Gemini 2.5 Pro fallback successful (${dividedText.length} chars)`);
         return dividedText;
       } else {
-        throw new Error('Flash output too short or empty');
+        throw new Error('Gemini 2.5 Pro output too short or empty');
       }
-    } catch (flashError) {
-      console.error(`❌ Flash 2.5 fallback also failed:`, flashError.message);
+    } catch (proError) {
+      console.error(`❌ Gemini 2.5 Pro fallback also failed:`, proError.message);
       console.log(`⚠️ Returning original text for this chunk`);
       return text;
     }
