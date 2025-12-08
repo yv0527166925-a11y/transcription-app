@@ -9,11 +9,28 @@ const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 const EventEmitter = require('events'); // 🔥 NEW: For SSE progress updates
+const PQueue = require('p-queue'); // 🔥 NEW: For concurrent transcription
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
 
 // 🔥 NEW: Event emitter for progress updates
 const progressEmitter = new EventEmitter();
+
+// 🔥 NEW: Transcription queue with concurrency limit (2 simultaneous transcriptions)
+const transcribeQueue = new PQueue({ concurrency: 2 });
+
+// Queue monitoring logs
+transcribeQueue.on('add', () => {
+  console.log(`🔄 Queue: ${transcribeQueue.size} waiting, ${transcribeQueue.pending} active`);
+});
+
+transcribeQueue.on('next', () => {
+  console.log(`⚡ Queue: Starting new transcription (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
+});
+
+transcribeQueue.on('completed', () => {
+  console.log(`✅ Queue: Transcription completed (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
+});
 
 // פונקציה להסרת חזרות של ביטויים/משפטים שחוזרים 5+ פעמים
 function removeExtremeRepetitions(text) {
@@ -1785,7 +1802,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       let retryCount = 0;
       let chunkTranscription = null;
 
-      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length}`);
+      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
 
       // Send progress update for each chunk
       if (transcriptionId) {
@@ -1813,24 +1830,28 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           // Use fallback only on the last retry
           if (retryCount === maxRetries) {
-            chunkTranscription = await transcribeAudioChunkWithFlashFallback(
-              chunk.path,
-              i,
-              chunksData.chunks.length,
-              filename,
-              language,
-              customInstructions,
-              retryCount
+            chunkTranscription = await transcribeQueue.add(() =>
+              transcribeAudioChunkWithFlashFallback(
+                chunk.path,
+                i,
+                chunksData.chunks.length,
+                filename,
+                language,
+                customInstructions,
+                retryCount
+              )
             );
           } else {
-            chunkTranscription = await transcribeAudioChunk(
-              chunk.path,
-              i,
-              chunksData.chunks.length,
-              filename,
-              language,
-              customInstructions,
-              retryCount
+            chunkTranscription = await transcribeQueue.add(() =>
+              transcribeAudioChunk(
+                chunk.path,
+                i,
+                chunksData.chunks.length,
+                filename,
+                language,
+                customInstructions,
+                retryCount
+              )
             );
           }
 
