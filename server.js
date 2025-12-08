@@ -1853,7 +1853,6 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             );
           }
 
-          transcriptions.push(chunkTranscription);
           console.log(`✅ Chunk ${i + 1} completed successfully`);
 
           // Send progress update for chunk completion
