@@ -1793,11 +1793,10 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       throw new Error('No chunks were created');
     }
     
-    // Transcribe each chunk with retry mechanism
-    const transcriptions = [];
-    const maxRetries = 2;
-
-    for (let i = 0; i < chunksData.chunks.length; i++) {
+    // 🔥 Process all chunks in parallel using Promise.all
+    const transcriptions = await Promise.all(
+      chunksData.chunks.map(async (chunk, i) => {
+        const maxRetries = 2;
       const chunk = chunksData.chunks[i];
       let retryCount = 0;
       let chunkTranscription = null;
@@ -1888,9 +1887,12 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       }
 
       // Status update
-      console.log(`📊 Progress: ${i + 1}/${chunksData.chunks.length} chunks processed (${Math.round((i + 1) / chunksData.chunks.length * 100)}%)`);
-    }
-    
+        return chunkTranscription;
+      })
+    );
+
+    console.log(`🎉 All ${chunksData.chunks.length} chunks processed in parallel!`);
+
     // Check for failed chunks in the transcription
     const failedChunks = transcriptions.filter(chunk =>
       chunk.includes('[שגיאה בתמלול קטע') ||
