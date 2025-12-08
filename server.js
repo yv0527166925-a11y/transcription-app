@@ -9,7 +9,7 @@ const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 const EventEmitter = require('events'); // 🔥 NEW: For SSE progress updates
-const PQueue = require('p-queue'); // 🔥 NEW: For concurrent transcription
+const PQueue = require('p-queue').default; // 🔥 NEW: For concurrent transcription
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
 
@@ -24,7 +24,7 @@ transcribeQueue.on('add', () => {
   console.log(`🔄 Queue: ${transcribeQueue.size} waiting, ${transcribeQueue.pending} active`);
 });
 
-transcribeQueue.on('next', () => {
+transcribeQueue.on('active', () => {
   console.log(`⚡ Queue: Starting new transcription (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
 });
 
