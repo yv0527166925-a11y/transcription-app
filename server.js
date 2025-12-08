@@ -2860,18 +2860,22 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
       // Mark transcription as completed with 100% progress
       updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
-      activeTranscriptions.get(transcriptionId).isCompleted = true;
+      const transcriptionData = activeTranscriptions.get(transcriptionId);
+      if (transcriptionData) {
+        transcriptionData.isCompleted = true;
+        transcriptionData.completedAt = new Date().toISOString();
+      }
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
 
-      // Wait a longer moment to ensure 100% progress is sent and processed by client, then cleanup
+      // Wait longer to ensure 100% progress is sent and processed by client, then cleanup
       setTimeout(() => {
         activeTranscriptions.delete(transcriptionId);
         console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId} after completion`);
-      }, 5000);
+      }, 15000); // Increased from 5s to 15s to prevent race condition with client polling
 
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
@@ -2879,7 +2883,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       // Cleanup on failure
       setTimeout(() => {
         activeTranscriptions.delete(transcriptionId);
-      }, 3000);
+      }, 10000); // Increased from 3s to 10s
     }
 
   } catch (error) {
@@ -2888,7 +2892,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     // Cleanup on error
     setTimeout(() => {
       activeTranscriptions.delete(transcriptionId);
-    }, 3000);
+    }, 10000); // Increased from 3s to 10s
 
     // If error is due to insufficient minutes, clean up files and don't deduct
     if (error.message && error.message.includes('Insufficient minutes')) {

@@ -3004,12 +3004,13 @@
                     } else if (progressResponse.status === 404) {
                         console.log(`🔍 Got 404 - last progress was: ${lastProgress}%`);
 
-                        if (lastProgress >= 100) {
-                            // 404 after 100% means transcription is completed and cleaned up
+                        if (lastProgress >= 100 || lastProgress >= 99) {
+                            // 404 after 99%+ means transcription is completed and cleaned up
                             console.log(`✅ Transcription completed (404 after ${lastProgress}%), stopping polling`);
                             clearInterval(realProgressCheck);
 
-                            // Show completion
+                            // Show completion with 100% to ensure visual completion
+                            updateProgress(100);
                             setTimeout(() => {
                                 showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
                                 document.getElementById('progressBar').style.display = 'none';
@@ -3020,7 +3021,7 @@
                                 submitBtn.textContent = 'התחל תמלול';
                             }, 500);
                         } else {
-                            // 404 before 100% might be temporary - continue polling
+                            // 404 before 99% might be temporary - continue polling
                             console.log(`⚠️ Got 404 but only at ${lastProgress}%, continuing polling (might be temporary)`);
                         }
                     } else {
