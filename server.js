@@ -9,11 +9,28 @@ const cors = require('cors');
 const { spawn } = require('child_process'); // 🔥 NEW: For FFmpeg
 const JSZip = require('jszip'); // 🔥 NEW: For Word templates
 const EventEmitter = require('events'); // 🔥 NEW: For SSE progress updates
+const PQueue = require('p-queue').default; // 🔥 NEW: For concurrent transcription
 // const Imap = require('imap'); // Disabled - not using email transcription service
 require('dotenv').config();
 
 // 🔥 NEW: Event emitter for progress updates
 const progressEmitter = new EventEmitter();
+
+// 🔥 NEW: Transcription queue with concurrency limit (2 simultaneous transcriptions)
+const transcribeQueue = new PQueue({ concurrency: 2 });
+
+// Queue monitoring logs
+transcribeQueue.on('add', () => {
+  console.log(`🔄 Queue: ${transcribeQueue.size} waiting, ${transcribeQueue.pending} active`);
+});
+
+transcribeQueue.on('active', () => {
+  console.log(`⚡ Queue: Starting new transcription (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
+});
+
+transcribeQueue.on('completed', () => {
+  console.log(`✅ Queue: Transcription completed (${transcribeQueue.pending} active, ${transcribeQueue.size} waiting)`);
+});
 
 // פונקציה להסרת חזרות של ביטויים/משפטים שחוזרים 5+ פעמים
 function removeExtremeRepetitions(text) {
@@ -685,10 +702,10 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
   // First try Gemini 3 Pro
   try {
     const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, retryCount);
-    console.log(`✅ Gemini 3 Pro transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    console.log(`✅ Gemini 2.5 Pro transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error) {
-    console.log(`⚠️ Gemini 3 Pro failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Flash fallback:`, error.message);
+    console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Flash fallback:`, error.message);
 
     // Fallback to Gemini 2.5 Flash
     try {
@@ -1776,16 +1793,14 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       throw new Error('No chunks were created');
     }
     
-    // Transcribe each chunk with retry mechanism
-    const transcriptions = [];
-    const maxRetries = 2;
-
-    for (let i = 0; i < chunksData.chunks.length; i++) {
-      const chunk = chunksData.chunks[i];
+    // 🔥 Process all chunks in parallel using Promise.all
+    const transcriptions = await Promise.all(
+      chunksData.chunks.map(async (chunk, i) => {
+        const maxRetries = 2;
       let retryCount = 0;
       let chunkTranscription = null;
 
-      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length}`);
+      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
 
       // Send progress update for each chunk
       if (transcriptionId) {
@@ -1813,28 +1828,31 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           // Use fallback only on the last retry
           if (retryCount === maxRetries) {
-            chunkTranscription = await transcribeAudioChunkWithFlashFallback(
-              chunk.path,
-              i,
-              chunksData.chunks.length,
-              filename,
-              language,
-              customInstructions,
-              retryCount
+            chunkTranscription = await transcribeQueue.add(() =>
+              transcribeAudioChunkWithFlashFallback(
+                chunk.path,
+                i,
+                chunksData.chunks.length,
+                filename,
+                language,
+                customInstructions,
+                retryCount
+              )
             );
           } else {
-            chunkTranscription = await transcribeAudioChunk(
-              chunk.path,
-              i,
-              chunksData.chunks.length,
-              filename,
-              language,
-              customInstructions,
-              retryCount
+            chunkTranscription = await transcribeQueue.add(() =>
+              transcribeAudioChunk(
+                chunk.path,
+                i,
+                chunksData.chunks.length,
+                filename,
+                language,
+                customInstructions,
+                retryCount
+              )
             );
           }
 
-          transcriptions.push(chunkTranscription);
           console.log(`✅ Chunk ${i + 1} completed successfully`);
 
           // Send progress update for chunk completion
@@ -1849,10 +1867,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             );
           }
 
-          // Delay between chunks to avoid rate limiting
-          if (i < chunksData.chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
+          // NO DELAY - let queue handle concurrency
+          // Removed: await new Promise(resolve => setTimeout(resolve, 3000));
 
         } catch (chunkError) {
           retryCount++;
@@ -1860,7 +1876,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
           if (retryCount > maxRetries) {
             console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
-            transcriptions.push(`[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`);
+            return `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
           } else {
             // Wait before retry
             console.log(`⏳ Waiting before retry for chunk ${i + 1}...`);
@@ -1869,9 +1885,12 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       }
 
       // Status update
-      console.log(`📊 Progress: ${i + 1}/${chunksData.chunks.length} chunks processed (${Math.round((i + 1) / chunksData.chunks.length * 100)}%)`);
-    }
-    
+        return chunkTranscription;
+      })
+    );
+
+    console.log(`🎉 All ${chunksData.chunks.length} chunks processed in parallel!`);
+
     // Check for failed chunks in the transcription
     const failedChunks = transcriptions.filter(chunk =>
       chunk.includes('[שגיאה בתמלול קטע') ||
