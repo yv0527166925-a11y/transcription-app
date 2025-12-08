@@ -1870,10 +1870,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             );
           }
 
-          // Delay between chunks to avoid rate limiting
-          if (i < chunksData.chunks.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-          }
+          // NO DELAY - let queue handle concurrency
+          // Removed: await new Promise(resolve => setTimeout(resolve, 3000));
 
         } catch (chunkError) {
           retryCount++;
