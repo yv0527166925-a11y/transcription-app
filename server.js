@@ -1797,7 +1797,6 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     const transcriptions = await Promise.all(
       chunksData.chunks.map(async (chunk, i) => {
         const maxRetries = 2;
-      const chunk = chunksData.chunks[i];
       let retryCount = 0;
       let chunkTranscription = null;
 
