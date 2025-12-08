@@ -695,26 +695,44 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for final retry
+// Function with fallback for final retry - 4 stages: 3Pro(x2), 2.5Pro, 2.5Flash
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First try Gemini 3 Pro
+  // First attempt: Gemini 3 Pro Preview
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, retryCount);
-    console.log(`✅ Gemini 3 Pro Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 0);
+    console.log(`✅ Gemini 3 Pro Preview (attempt 1) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
-  } catch (error) {
-    console.log(`⚠️ Gemini 3 Pro Preview failed for chunk ${chunkIndex + 1}, trying Gemini 2.5 Pro fallback:`, error.message);
+  } catch (error1) {
+    console.log(`⚠️ Gemini 3 Pro Preview (attempt 1) failed for chunk ${chunkIndex + 1}:`, error1.message);
 
-    // Fallback to Gemini 2.5 Pro
+    // Second attempt: Gemini 3 Pro Preview again
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, retryCount);
-      console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 1);
+      console.log(`✅ Gemini 3 Pro Preview (attempt 2) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
       return transcription;
-    } catch (proError) {
-      console.error(`❌ Gemini 2.5 Pro fallback also failed for chunk ${chunkIndex + 1}:`, proError.message);
-      throw new Error(`Both Gemini 3 Pro Preview and 2.5 Pro failed for chunk ${chunkIndex + 1}: ${proError.message}`);
+    } catch (error2) {
+      console.log(`⚠️ Gemini 3 Pro Preview (attempt 2) failed for chunk ${chunkIndex + 1}:`, error2.message);
+
+      // Third attempt: Gemini 2.5 Pro
+      try {
+        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 2);
+        console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+        return transcription;
+      } catch (proError) {
+        console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}, trying final Gemini 2.5 Flash fallback:`, proError.message);
+
+        // Fourth attempt: Final fallback to Gemini 2.5 Flash
+        try {
+          const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, 3);
+          console.log(`✅ Gemini 2.5 Flash final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+          return transcription;
+        } catch (flashError) {
+          console.error(`❌ All 4 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
+          throw new Error(`All 4 attempts failed for chunk ${chunkIndex + 1}: Gemini 3 Pro Preview (x2), 2.5 Pro, and 2.5 Flash all failed`);
+        }
+      }
     }
   }
 }
@@ -764,8 +782,8 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) using ${modelName}...`);
 
-    // Determine timeout based on retry count: 90s for first attempt, 90s for second attempt, 40s for third attempt
-    const timeoutSeconds = retryCount === 0 ? 90 : (retryCount === 1 ? 90 : 40);
+    // Determine timeout based on retry count: 90s (1st), 90s (2nd), 60s (3rd), 60s (4th)
+    const timeoutSeconds = retryCount <= 1 ? 90 : 60;
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     const transcriptionPromise = model.generateContent([
@@ -859,8 +877,8 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    // Determine timeout based on retry count: 90s for first attempt, 90s for second attempt, 40s for third attempt
-    const timeoutSeconds = retryCount === 0 ? 90 : (retryCount === 1 ? 90 : 40);
+    // Determine timeout based on retry count: 90s (1st), 90s (2nd), 60s (3rd), 60s (4th)
+    const timeoutSeconds = retryCount <= 1 ? 90 : 60;
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     // Add timeout wrapper
@@ -1250,9 +1268,60 @@ ${text}
         throw new Error('Gemini 2.5 Pro output too short or empty');
       }
     } catch (proError) {
-      console.error(`❌ Gemini 2.5 Pro fallback also failed:`, proError.message);
-      console.log(`⚠️ Returning original text for this chunk`);
-      return text;
+      console.log(`⚠️ Gemini 2.5 Pro fallback failed, trying Gemini 2.5 Flash fallback:`, proError.message);
+
+      // Final fallback to Gemini 2.5 Flash
+      try {
+        const flashModel = genAI.getGenerativeModel({
+          model: "gemini-2.5-flash",
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 500000
+          }
+        });
+
+        const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+- **שפר מירכאות** - ודא שכל ציטוט (פסוק, מאמר חז"ל, אמרה) ודו שיח ישיר עטוף במירכאות ("...") באופן מדויק ונכון תחבירית
+- **חיבור משפטים שבורים** – חבר יחד משפטים שבורים שנשמעים כהמשך ישיר זה לזה, גם אף הדובר עצמו אמר אותם בצורה מקוטעת, אך בלי לשנות ניסוח, בלי להוסיף ובלי ללטש סגנון.
+- **איחוד חזרות מיותרות של הדובר** – איחוד או הסרת חזרות רצופות של מילים או ביטויים שהדובר אמר ברצף ללא הוספת משמעות (כמו "קשה, קשה", "לא יודעים... לא יודעים"), אך רק כאשר ברור שמדובר בחזרה רטורית או טכנית שאינה מוסיפה תוכן.
+- **יישור רצף דיבור לא עקבי** – כאשר קיימות עצירות לא טבעיות בתמלול (כמו "...", ריבוי נקודות, מקפים מרובים או הפסקות טכניות), המודל רשאי להחליק את הרצף למשפט תקין, ללא כל שינוי בניסוח וללא עריכה סגנונית.
+- **פיצול פסקאות ארוכות לפי רעיון משנה** – אם פסקה ארוכה מדי (מעל 6–7 שורות) ויש בה מעבר רעיוני נוסף—even אם אינו מסומן במעבר מפורש—חלק אותה לפסקה חדשה בהתאם לרעיונות, אך בלי לשנות ניסוח, לנסח מחדש או להוסיף תוכן.
+- **החלקת חיבור בין משפטים סמוכים** – כאשר שני משפטים קצרים עומדים ברצף ומשלימים זה את זה מבחינה משמעותית, ניתן לחברם למשפט אחד זורם, כל עוד אין שינוי בניסוח והמשמעות נשמרת במלואה.
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשכתב, אל תסגנן ואל תחליף מילים במילים אחרות.
+- מותר לבצע רק את התיקונים הטכניים שהוגדרו למעלה (חיבור שבירות, איחוד חזרות, יישור רצף, פיצול פסקאות וכד').
+- אל תוסיף או תסיר תוכן חדש שאינו מופיע בטקסט.
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+        const result = await flashModel.generateContent(prompt);
+        const response = await result.response;
+        let dividedText = response.text();
+
+        if (dividedText && dividedText.length > text.length * 0.8) {
+          console.log(`✅ Gemini 2.5 Flash fallback successful (${dividedText.length} chars)`);
+          return dividedText;
+        } else {
+          throw new Error('Gemini 2.5 Flash output too short or empty');
+        }
+      } catch (flashError) {
+        console.error(`❌ All paragraph division models failed:`, flashError.message);
+        console.log(`⚠️ Returning original text for this chunk`);
+        return text;
+      }
     }
   }
 }
