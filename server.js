@@ -18,11 +18,11 @@ const progressEmitter = new EventEmitter();
 
 // 🔥 NEW: Per-User Queue System - each user gets their own queue
 const userQueues = new Map(); // email -> PQueue instance
-const maxGlobalConcurrency = 2; // Server protection: max 2 concurrent transcriptions globally
+const maxGlobalConcurrency = 4; // Server protection: max 4 concurrent transcriptions globally
 const maxUserConcurrency = 5; // Each user can have up to 5 tasks in their queue
 let currentGlobalActive = 0; // Track global active transcriptions
 
-// Global task wrapper that enforces the 2-task global limit
+// Global task wrapper that enforces the 4-task global limit
 async function executeWithGlobalThrottling(task, userEmail) {
   // Wait until global slot available
   while (currentGlobalActive >= maxGlobalConcurrency) {
@@ -46,7 +46,7 @@ async function executeWithGlobalThrottling(task, userEmail) {
 function getUserQueue(userEmail) {
   if (!userQueues.has(userEmail)) {
     const userQueue = new PQueue({
-      concurrency: 1, // Each user processes 1 task at a time through global throttling
+      concurrency: maxGlobalConcurrency, // User can use all global slots if alone
       interval: 100, // Small delay between tasks
       intervalCap: 1
     });
