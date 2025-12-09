@@ -773,6 +773,9 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
   // First attempt: Gemini 3 Pro Preview
   try {
     const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 0);
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 1)');
+    }
     console.log(`✅ Gemini 3 Pro Preview (attempt 1) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error1) {
@@ -781,6 +784,9 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
     // Second attempt: Gemini 3 Pro Preview again
     try {
       const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 1);
+      if (!transcription || transcription.trim().length === 0) {
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 2)');
+      }
       console.log(`✅ Gemini 3 Pro Preview (attempt 2) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
       return transcription;
     } catch (error2) {
@@ -789,6 +795,9 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
       // Third attempt: Gemini 2.5 Pro
       try {
         const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 2);
+        if (!transcription || transcription.trim().length === 0) {
+          throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro');
+        }
         console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
         return transcription;
       } catch (proError) {
@@ -797,6 +806,9 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
         // Fourth attempt: Final fallback to Gemini 2.5 Flash
         try {
           const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, 3);
+          if (!transcription || transcription.trim().length === 0) {
+            throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Flash (final attempt)');
+          }
           console.log(`✅ Gemini 2.5 Flash final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
           return transcription;
         } catch (flashError) {
@@ -892,8 +904,14 @@ ${contextPrompt}
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
+    // 🔧 FIX: Additional validation before returning
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error(`🚨 CRITICAL: Transcription returned empty after processing with ${modelName}`);
+    }
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ Chunk ${chunkIndex + 1} transcribed with ${modelName}: ${transcription.length} characters in ${duration}s`);
+    console.log(`📄 Chunk ${chunkIndex + 1} content preview: "${transcription.substring(0, 100)}..."`);
     return transcription;
 
   } catch (error) {
@@ -1001,22 +1019,51 @@ ${contextPrompt}
 
 async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`🔗 Merging ${chunks.length} transcription chunks...`);
+
+  // 🔧 FIX: Enhanced validation for merge inputs
+  console.log(`📊 Merge input validation:`);
+  chunks.forEach((chunk, index) => {
+    if (!chunk) {
+      console.error(`🚨 MERGE ERROR: Chunk ${index} is null/undefined!`);
+    } else if (typeof chunk !== 'string') {
+      console.error(`🚨 MERGE ERROR: Chunk ${index} is not a string: ${typeof chunk}`);
+    } else {
+      console.log(`✅ Chunk ${index}: ${chunk.length} chars`);
+    }
+  });
+
+  // Filter out null/undefined/empty chunks
+  const validChunks = chunks.filter(chunk => chunk && typeof chunk === 'string' && chunk.trim().length > 0);
+
+  if (validChunks.length !== chunks.length) {
+    console.warn(`⚠️ MERGE WARNING: Filtered ${chunks.length - validChunks.length} invalid chunks. Using ${validChunks.length} valid chunks.`);
+  }
+
+  if (validChunks.length === 0) {
+    console.error(`🚨 MERGE CRITICAL: No valid chunks to merge!`);
+    return '';
+  }
+
+  if (validChunks.length === 1) {
+    console.log(`📝 Single chunk merge: ${validChunks[0].length} chars`);
+    return validChunks[0];
+  }
+
+  let merged = validChunks[0];
+  console.log(`🏗️ Starting merge with first chunk: ${merged.length} chars`);
   
-  if (chunks.length === 0) return '';
-  if (chunks.length === 1) return chunks[0];
-  
-  let merged = chunks[0];
-  
-  for (let i = 1; i < chunks.length; i++) {
-    const currentChunk = chunks[i];
+  for (let i = 1; i < validChunks.length; i++) {
+    const currentChunk = validChunks[i];
+    console.log(`🔄 Merging chunk ${i + 1}/${validChunks.length}: ${currentChunk.length} chars`);
     
     // Try to detect overlap by looking at the end of previous chunk and start of current
     const prevEnd = merged.slice(-100).trim(); // Last 100 chars
     const currentStart = currentChunk.slice(0, 100).trim(); // First 100 chars
     
     // Simple overlap detection - look for common words
-    const prevWords = prevEnd.split(/\s+/).slice(-5); // Last 5 words
-    const currentWords = currentStart.split(/\s+/).slice(0, 10); // First 10 words
+    // 🔧 FIX: Filter out empty strings from word arrays
+    const prevWords = prevEnd.split(/\s+/).filter(w => w.length > 0).slice(-5); // Last 5 words
+    const currentWords = currentStart.split(/\s+/).filter(w => w.length > 0).slice(0, 10); // First 10 words
     
     let overlapFound = false;
     let overlapIndex = -1;
@@ -1039,7 +1086,9 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
       // Remove overlapping part from current chunk
       const wordsToSkip = overlapIndex + 1;
       const remainingWords = currentWords.slice(wordsToSkip);
-      const cleanedCurrent = remainingWords.join(' ') + currentChunk.slice(100);
+      // 🔧 FIX: Safe slice - handle chunks shorter than 100 characters
+      const remainingContent = currentChunk.length > 100 ? currentChunk.slice(100) : '';
+      const cleanedCurrent = remainingWords.join(' ') + remainingContent;
       merged += '\n\n' + cleanedCurrent.trim();
       console.log(`🔗 Merged with overlap removal (skipped ${wordsToSkip} words)`);
     } else {
@@ -1062,7 +1111,20 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
   await new Promise(resolve => setTimeout(resolve, 3000));
   console.log(`🎯 Starting smart paragraph division with Gemini...`);
-  merged = await smartParagraphDivision(merged);
+
+  // 🔧 FIX: Protect against smart paragraph division failure
+  try {
+    const improvedText = await smartParagraphDivision(merged);
+    if (improvedText && improvedText.trim().length > 0) {
+      merged = improvedText;
+      console.log(`✅ Smart paragraph division completed successfully: ${merged.length} chars`);
+    } else {
+      console.warn(`⚠️ Smart paragraph division returned empty result, using original merge`);
+    }
+  } catch (error) {
+    console.warn(`⚠️ Smart paragraph division failed, using raw merge:`, error.message);
+    // Continue with merged text without smart paragraph division
+  }
 
   // Python will handle all text processing - no Node.js processing needed
   console.log(`📝 Sending processed transcription to Python...`);
@@ -1933,114 +1995,206 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       throw new Error('No chunks were created');
     }
     
-    // 🔥 Process all chunks in parallel using Promise.all
+    // 🔥 Process all chunks in parallel using Promise.all with improved error handling
     const transcriptions = await Promise.all(
       chunksData.chunks.map(async (chunk, i) => {
         const maxRetries = 2;
-      let retryCount = 0;
-      let chunkTranscription = null;
+        let retryCount = 0;
+        let chunkTranscription = null;
 
-      console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
+        console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
 
-      // Send progress update for each chunk
-      if (transcriptionId) {
-        // Calculate progress within the file: 20% base + 60% for file processing
-        const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-        const chunkProgress = baseProgress + ((i / chunksData.chunks.length) * (60 / totalFiles));
-        updateTranscriptionProgress(
-          transcriptionId,
-          Math.round(chunkProgress),
-          `מעבד חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
-          filename
-        );
-      }
+        // Send progress update for each chunk
+        if (transcriptionId) {
+          // Calculate progress within the file: 20% base + 60% for file processing
+          const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+          const chunkProgress = baseProgress + ((i / chunksData.chunks.length) * (60 / totalFiles));
+          updateTranscriptionProgress(
+            transcriptionId,
+            Math.round(chunkProgress),
+            `מעבד חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+            filename
+          );
+        }
 
-      while (retryCount <= maxRetries && !chunkTranscription) {
-        try {
-          if (retryCount > 0) {
-            console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
-            // Exponential backoff: 5s, 15s, 30s, 45s, 60s
-            const backoffDelays = [5000, 15000, 30000, 45000, 60000];
-            const backoffDelay = backoffDelays[retryCount - 1] || 60000;
-            console.log(`⏳ Waiting ${backoffDelay/1000}s before retry...`);
-            await new Promise(resolve => setTimeout(resolve, backoffDelay));
-          }
+        while (retryCount <= maxRetries && !chunkTranscription) {
+          try {
+            if (retryCount > 0) {
+              console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
+              // Exponential backoff: 5s, 15s, 30s, 45s, 60s
+              const backoffDelays = [5000, 15000, 30000, 45000, 60000];
+              const backoffDelay = backoffDelays[retryCount - 1] || 60000;
+              console.log(`⏳ Waiting ${backoffDelay/1000}s before retry...`);
+              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+            }
 
-          // Get user queue for this transcription
-          const userQueue = getUserQueue(userEmail || 'anonymous');
+            // Get user queue for this transcription
+            const userQueue = getUserQueue(userEmail || 'anonymous');
 
-          // Use fallback only on the last retry
-          if (retryCount === maxRetries) {
-            chunkTranscription = await userQueue.add(() =>
-              executeWithGlobalThrottling(() =>
-                transcribeAudioChunkWithFlashFallback(
-                  chunk.path,
-                  i,
-                  chunksData.chunks.length,
-                  filename,
-                  language,
-                  customInstructions,
-                  retryCount
-                ), userEmail || 'anonymous')
-            );
-          } else {
-            chunkTranscription = await userQueue.add(() =>
-              executeWithGlobalThrottling(() =>
-                transcribeAudioChunk(
-                  chunk.path,
-                  i,
-                chunksData.chunks.length,
-                filename,
-                language,
-                customInstructions,
-                retryCount
-                ), userEmail || 'anonymous')
-            );
-          }
+            // Use fallback only on the last retry
+            if (retryCount === maxRetries) {
+              chunkTranscription = await userQueue.add(() =>
+                executeWithGlobalThrottling(() =>
+                  transcribeAudioChunkWithFlashFallback(
+                    chunk.path,
+                    i,
+                    chunksData.chunks.length,
+                    filename,
+                    language,
+                    customInstructions,
+                    retryCount
+                  ), userEmail || 'anonymous')
+              );
+            } else {
+              chunkTranscription = await userQueue.add(() =>
+                executeWithGlobalThrottling(() =>
+                  transcribeAudioChunk(
+                    chunk.path,
+                    i,
+                    chunksData.chunks.length,
+                    filename,
+                    language,
+                    customInstructions,
+                    retryCount
+                  ), userEmail || 'anonymous')
+              );
+            }
 
-          console.log(`✅ Chunk ${i + 1} completed successfully`);
+            // 🔧 FIX: Validate that transcription actually succeeded
+            if (chunkTranscription && chunkTranscription.trim().length > 0) {
+              console.log(`✅ Chunk ${i + 1} completed successfully with ${chunkTranscription.length} characters`);
 
-          // Send progress update for chunk completion
-          if (transcriptionId) {
-            const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-            const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
-            updateTranscriptionProgress(
-              transcriptionId,
-              Math.round(completedProgress),
-              `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
-              filename
-            );
-          }
+              // Send progress update for chunk completion
+              if (transcriptionId) {
+                const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                updateTranscriptionProgress(
+                  transcriptionId,
+                  Math.round(completedProgress),
+                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                  filename
+                );
+              }
+              break; // Success - exit retry loop
+            } else {
+              // 🔧 FIX: Empty transcription is treated as failure
+              console.warn(`⚠️ Chunk ${i + 1} returned empty transcription, treating as failure`);
+              chunkTranscription = null;
+              throw new Error('Empty transcription result');
+            }
 
-          // NO DELAY - let queue handle concurrency
-          // Removed: await new Promise(resolve => setTimeout(resolve, 3000));
+          } catch (chunkError) {
+            retryCount++;
+            console.error(`❌ Failed to transcribe chunk ${i + 1} (attempt ${retryCount}):`, chunkError.message);
 
-        } catch (chunkError) {
-          retryCount++;
-          console.error(`❌ Failed to transcribe chunk ${i + 1} (attempt ${retryCount}):`, chunkError.message);
-
-          if (retryCount > maxRetries) {
-            console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
-            return `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
-          } else {
-            // Wait before retry
-            console.log(`⏳ Waiting before retry for chunk ${i + 1}...`);
+            if (retryCount > maxRetries) {
+              console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
+              chunkTranscription = `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
+              break; // Exit retry loop with error message
+            } else {
+              // Wait before retry
+              console.log(`⏳ Waiting before retry for chunk ${i + 1}...`);
+              chunkTranscription = null; // Reset for next attempt
+            }
           }
         }
-      }
 
-      // Status update
+        // 🔧 FIX: Ensure we always return something
+        if (!chunkTranscription) {
+          console.error(`🚨 CRITICAL: Chunk ${i + 1} finished processing but no result available!`);
+          chunkTranscription = `[שגיאה קריטית בתמלול קטע ${i + 1} - אבד תוכן]`;
+        }
+
+        console.log(`📋 Chunk ${i + 1} final result: ${chunkTranscription.substring(0, 100)}...`);
         return chunkTranscription;
       })
     );
 
     console.log(`🎉 All ${chunksData.chunks.length} chunks processed in parallel!`);
 
+    // 🔧 CRITICAL FIX: Wait for all queued tasks to complete
+    console.log(`⏳ Waiting for all user queues to finish...`);
+    const activeQueues = Array.from(userQueues.values());
+    await Promise.all(activeQueues.map(queue => queue.onIdle()));
+    console.log(`✅ All queues are now idle - proceeding with merge`);
+
+    // 🛡️ FINAL INTEGRITY CHECK – prevents missing chunks
+    console.log('🛡️ Running final integrity validation...');
+
+    const expectedChunks = chunksData.chunks.length;
+
+    // 1. Check that all indices exist
+    for (let i = 0; i < expectedChunks; i++) {
+      if (!transcriptions[i]) {
+        console.error(`🚨 Missing transcription for chunk ${i + 1}! Re-running this chunk...`);
+        const userQueue = getUserQueue(userEmail || 'anonymous');
+        transcriptions[i] = await userQueue.add(() =>
+          executeWithGlobalThrottling(() =>
+            transcribeAudioChunk(
+              chunksData.chunks[i].path,
+              i,
+              expectedChunks,
+              filename,
+              language,
+              customInstructions,
+              0
+            ), userEmail || 'anonymous')
+        );
+      }
+    }
+
+    // 2. Check for empty chunks
+    for (let i = 0; i < expectedChunks; i++) {
+      if (transcriptions[i] && transcriptions[i].trim().length < 20) {
+        console.error(`🚨 Chunk ${i + 1} is suspiciously short (${transcriptions[i].length} chars). Re-running chunk...`);
+        const userQueue = getUserQueue(userEmail || 'anonymous');
+        transcriptions[i] = await userQueue.add(() =>
+          executeWithGlobalThrottling(() =>
+            transcribeAudioChunk(
+              chunksData.chunks[i].path,
+              i,
+              expectedChunks,
+              filename,
+              language,
+              customInstructions,
+              0
+            ), userEmail || 'anonymous')
+        );
+      }
+    }
+
+    // 3. Length sanity check (prevents silent data loss)
+    const totalLength = transcriptions.reduce((sum, t) => sum + (t ? t.length : 0), 0);
+    if (totalLength < expectedChunks * 200) {
+      console.warn(`⚠️ Final merged transcription is unusually short (${totalLength} chars for ${expectedChunks} chunks). Manual check recommended.`);
+    }
+
+    console.log(`✅ Integrity check complete — all ${expectedChunks} chunks validated. Total length: ${totalLength} chars`);
+
+    // 🔧 FIX: Enhanced validation and logging for chunk results
+    console.log('📊 Chunk results validation:');
+    transcriptions.forEach((chunk, index) => {
+      if (!chunk) {
+        console.error(`🚨 CRITICAL: Chunk ${index + 1} is null/undefined!`);
+      } else if (chunk.trim().length === 0) {
+        console.error(`🚨 CRITICAL: Chunk ${index + 1} is empty!`);
+      } else if (chunk.includes('[שגיאה')) {
+        console.warn(`⚠️ Chunk ${index + 1} contains error message: ${chunk.substring(0, 100)}...`);
+      } else {
+        console.log(`✅ Chunk ${index + 1}: ${chunk.length} chars - ${chunk.substring(0, 50)}...`);
+      }
+    });
+
     // Check for failed chunks in the transcription
     const failedChunks = transcriptions.filter(chunk =>
-      chunk.includes('[שגיאה בתמלול קטע') ||
-      chunk.includes('נכשל אחרי')
+      !chunk || chunk.includes('[שגיאה בתמלול קטע') ||
+      chunk.includes('נכשל אחרי') ||
+      chunk.includes('אבד תוכן')
     );
+
+    // 🔧 FIX: Log detailed chunk information before merging
+    console.log(`📈 Pre-merge summary: ${transcriptions.length} total chunks, ${failedChunks.length} failed chunks`);
+    console.log(`📊 Chunk sizes: [${transcriptions.map(c => c ? c.length : 0).join(', ')}]`);
 
     // Merge all transcriptions
     const finalTranscription = await mergeTranscriptionChunks(transcriptions, language);
