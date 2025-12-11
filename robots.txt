@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://transcription-app-2uci.onrender.com/sitemap.xml
