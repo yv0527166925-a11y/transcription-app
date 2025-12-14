@@ -2800,6 +2800,11 @@ let activeTranscriptions = new Map(); // Map of transcriptionId -> { userEmail, 
 function updateTranscriptionProgress(transcriptionId, progress, stage, currentFile = '') {
   const transcriptionData = activeTranscriptions.get(transcriptionId);
   if (transcriptionData) {
+    // ⛔ Guard: מנע עדכון אחרי שהתמלול הושלם (finalize)
+    if (transcriptionData.isCompleted) {
+      console.log(`⛔ Ignoring progress update for completed transcription ${transcriptionId}: ${progress}% - ${stage}`);
+      return;
+    }
     transcriptionData.progress = progress;
     transcriptionData.stage = stage;
     transcriptionData.currentFile = currentFile;
@@ -2821,6 +2826,64 @@ function updateTranscriptionProgress(transcriptionId, progress, stage, currentFi
 
     console.log(`📊 Progress ${transcriptionId}: ${progress}% - ${stage}`);
   }
+}
+
+// ✅ פונקציית finalize חד-פעמית להשלמת התמלול
+function finalizeTranscriptionCompletion(transcriptionId) {
+  const transcriptionData = activeTranscriptions.get(transcriptionId);
+  if (!transcriptionData) {
+    console.log(`⚠️ לא נמצא transcription ${transcriptionId} לfinalize`);
+    return false;
+  }
+
+  // אם כבר הושלם - לא לעשות כלום
+  if (transcriptionData.isCompleted) {
+    console.log(`✅ התמלול ${transcriptionId} כבר מושלם`);
+    return true;
+  }
+
+  console.log(`🔥 FINALIZING התמלול ${transcriptionId} - נעילת סטטוס סופי`);
+
+  // נעילת הסטטוס הסופי
+  transcriptionData.progress = 100;
+  transcriptionData.stage = 'התמלול הושלם בהצלחה!';
+  transcriptionData.isCompleted = true;
+  transcriptionData.completedAt = new Date().toISOString();
+  transcriptionData.currentFile = '';
+
+  const totalFiles = transcriptionData.totalFiles ?? transcriptionData.total ?? 1;
+
+  const finalProgressData = {
+    transcriptionId,
+    type: 'progress',
+    progress: 100,
+    stage: 'התמלול הושלם בהצלחה!',
+    currentFile: '',
+    filesProcessed: totalFiles,
+    totalFiles: totalFiles,
+    timestamp: new Date().toISOString(),
+    isCompleted: true
+  };
+
+  // שידור סופי מיידי
+  console.log(`🔥 FINAL EMISSION for ${transcriptionId}:`, finalProgressData);
+  progressEmitter.emit('progress', finalProgressData);
+
+  // שידור נוסף אחרי עיכוב קצר (למקרה של race condition)
+  setTimeout(() => {
+    progressEmitter.emit('progress', finalProgressData);
+    console.log(`🔥 BACKUP FINAL EMISSION for ${transcriptionId}`);
+  }, 1000);
+
+  console.log(`✅ FINALIZED: התמלול ${transcriptionId} נעול על 100% - התמלול הושלם בהצלחה!`);
+
+  // ניקוי זיכרון אחרי 5 דקות (מונע זליגת זיכרון)
+  setTimeout(() => {
+    activeTranscriptions.delete(transcriptionId);
+    console.log(`🧹 Cleaned up completed transcription ${transcriptionId} from memory`);
+  }, 5 * 60 * 1000);
+
+  return true;
 }
 
 async function processTranscriptionAsync(files, userEmail, language, estimatedMinutes, transcriptionId, customInstructions = '') {
@@ -3090,29 +3153,15 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
       }
 
-      updateTranscriptionProgress(transcriptionId, 99, 'מסיים עיבוד...');
-
-      // Small delay to ensure all processes are complete
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mark transcription as completed with 100% progress
-      updateTranscriptionProgress(transcriptionId, 100, 'התמלול הושלם בהצלחה!');
-      const transcriptionData = activeTranscriptions.get(transcriptionId);
-      if (transcriptionData) {
-        transcriptionData.isCompleted = true;
-        transcriptionData.completedAt = new Date().toISOString();
-      }
+      // 🔥 FORCE FINAL COMPLETION - נעילת הסטטוס הסופי מיד אחרי המייל
+      finalizeTranscriptionCompletion(transcriptionId);
 
       console.log(`🎉 Transcription batch completed for: ${userEmail}`);
       console.log(`💰 Updated balance: ${user.remainingMinutes} minutes remaining`);
       console.log(`📊 Success rate: ${transcriptions.length}/${files.length} files`);
       console.log(`📚 History updated with ${transcriptions.length + failedTranscriptions.length} entries`);
 
-      // Wait longer to ensure 100% progress is sent and processed by client, then cleanup
-      setTimeout(() => {
-        activeTranscriptions.delete(transcriptionId);
-        console.log(`🧹 Cleaned up transcription tracking for ${transcriptionId} after completion`);
-      }, 15000); // Increased from 5s to 15s to prevent race condition with client polling
+      // ✅ ניקוי זיכרון מתבצע ב-finalizeTranscriptionCompletion אחרי 5 דקות
 
     } else {
       console.error(`❌ No transcriptions completed for: ${userEmail}`);
