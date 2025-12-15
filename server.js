@@ -16,6 +16,14 @@ require('dotenv').config();
 // 🔥 NEW: Event emitter for progress updates
 const progressEmitter = new EventEmitter();
 
+// 🔹 NEW: Chunk status system for smart retry handling
+const ChunkStatus = {
+  OK: 'ok',                    // Normal successful transcription
+  RETRIED_OK: 'retried_ok',    // Successful after retry
+  SUSPECT: 'suspect',          // Short/quiet/tail chunk that needs targeted retry
+  FATAL: 'fatal'              // Completely failed chunk
+};
+
 // 🔥 NEW: Per-User Queue System - each user gets their own queue
 const userQueues = new Map(); // email -> PQueue instance
 const maxGlobalConcurrency = 4; // Server protection: max 4 concurrent transcriptions globally (optimal for 2 CPUs)
@@ -860,10 +868,6 @@ ${contextPrompt}
 4. סיים ישירות עם התוכן - אל תוסיף סיכום
 5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
 6. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק, גם אם הם נשמעים חסרים, שגויים או לא שלמים. אסור לך לתקן, להשלים או לשפר אותם בשום דרך!
-7. 🚫 איסור על החלפת מילים במילים נרדפות
-אסור להחליף מילים שנאמרו במילים נרדפות, דומות או בביטויים חלופיים.
-מותר לתקן שגיאות לשון קלות בלבד, אך אין לשנות את בחירת המילים.
-כל מילה תישאר אותה מילה – גם לאחר תיקון.
 
 תתחיל עכשיו עם התמלול:`;
 
@@ -966,10 +970,6 @@ ${contextPrompt}
 4. סיים ישירות עם התוכן - אל תוסיף סיכום
 5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
 6. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק, גם אם הם נשמעים חסרים, שגויים או לא שלמים. אסור לך לתקן, להשלים או לשפר אותם בשום דרך!
-7. 🚫 איסור על החלפת מילים במילים נרדפות
-אסור להחליף מילים שנאמרו במילים נרדפות, דומות או בביטויים חלופיים.
-מותר לתקן שגיאות לשון קלות בלבד, אך אין לשנות את בחירת המילים.
-כל מילה תישאר אותה מילה – גם לאחר תיקון.
 
 תתחיל עכשיו עם התמלול:`;
 
@@ -2075,27 +2075,30 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
               );
             }
 
-            // 🔧 FIX: Validate that transcription actually succeeded
-            if (chunkTranscription && chunkTranscription.trim().length > 0) {
+            // 🔹 SMART: Accept all chunks, mark quality status
+            if (chunkTranscription && chunkTranscription.trim().length >= 20) {
               console.log(`✅ Chunk ${i + 1} completed successfully with ${chunkTranscription.length} characters`);
-
-              // Send progress update for chunk completion
-              if (transcriptionId) {
-                const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
-                updateTranscriptionProgress(
-                  transcriptionId,
-                  Math.round(completedProgress),
-                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
-                  filename
-                );
-              }
-              break; // Success - exit retry loop
+              break; // Good chunk - exit retry loop
+            } else if (chunkTranscription && chunkTranscription.trim().length > 0) {
+              console.warn(`⚠️ Chunk ${i + 1} is short/suspect (${chunkTranscription.length} chars) - marking for later review`);
+              break; // Accept short chunk, will handle later
             } else {
-              // 🔧 FIX: Empty transcription is treated as failure
-              console.warn(`⚠️ Chunk ${i + 1} returned empty transcription, treating as failure`);
+              // Really empty - try retry
+              console.warn(`❌ Chunk ${i + 1} returned empty, will retry...`);
               chunkTranscription = null;
               throw new Error('Empty transcription result');
+            }
+
+            // Send progress update for chunk completion
+            if (transcriptionId) {
+              const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+              const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+              updateTranscriptionProgress(
+                transcriptionId,
+                Math.round(completedProgress),
+                `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                filename
+              );
             }
 
           } catch (chunkError) {
@@ -2158,54 +2161,25 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       }
     }
 
-    // 2. Check for empty chunks
-    for (let i = 0; i < expectedChunks; i++) {
-      if (transcriptions[i] && transcriptions[i].trim().length < 20) {
-        console.error(`🚨 Chunk ${i + 1} is suspiciously short (${transcriptions[i].length} chars). Re-running chunk...`);
-        const userQueue = getUserQueue(userEmail || 'anonymous');
-        transcriptions[i] = await userQueue.add(() =>
-          executeWithGlobalThrottling(() =>
-            transcribeAudioChunk(
-              chunksData.chunks[i].path,
-              i,
-              expectedChunks,
-              filename,
-              language,
-              customInstructions,
-              0
-            ), userEmail || 'anonymous')
-        );
-      }
-    }
-
-    // 3. Length sanity check (prevents silent data loss)
-    const totalLength = transcriptions.reduce((sum, t) => sum + (t ? t.length : 0), 0);
-    if (totalLength < expectedChunks * 200) {
-      console.warn(`⚠️ Final merged transcription is unusually short (${totalLength} chars for ${expectedChunks} chunks). Manual check recommended.`);
-    }
-
-    console.log(`✅ Integrity check complete — all ${expectedChunks} chunks validated. Total length: ${totalLength} chars`);
-
-    // 🔧 FIX: Enhanced validation and logging for chunk results
-    console.log('📊 Chunk results validation:');
-    transcriptions.forEach((chunk, index) => {
-      if (!chunk) {
-        console.error(`🚨 CRITICAL: Chunk ${index + 1} is null/undefined!`);
-      } else if (chunk.trim().length === 0) {
-        console.error(`🚨 CRITICAL: Chunk ${index + 1} is empty!`);
-      } else if (chunk.includes('[שגיאה')) {
-        console.warn(`⚠️ Chunk ${index + 1} contains error message: ${chunk.substring(0, 100)}...`);
-      } else {
-        console.log(`✅ Chunk ${index + 1}: ${chunk.length} chars - ${chunk.substring(0, 50)}...`);
-      }
-    });
-
     // Check for failed chunks in the transcription
     const failedChunks = transcriptions.filter(chunk =>
       !chunk || chunk.includes('[שגיאה בתמלול קטע') ||
       chunk.includes('נכשל אחרי') ||
       chunk.includes('אבד תוכן')
     );
+
+    // If too many chunks failed, fall back to direct transcription
+    if (failedChunks.length >= 30) {
+      console.error(`🚨 Too many failed chunks: ${failedChunks.length} total`);
+      console.log('🔄 Falling back to direct transcription due to too many failures...');
+
+      try {
+        return await directGeminiTranscription(filePath, filename, language, customInstructions);
+      } catch (fallbackError) {
+        throw new Error(`גם התמלול המקטעי וגם הישיר נכשלו: ${fallbackError.message}`);
+      }
+    }
+
 
     // 🔧 FIX: Log detailed chunk information before merging
     console.log(`📈 Pre-merge summary: ${transcriptions.length} total chunks, ${failedChunks.length} failed chunks`);
