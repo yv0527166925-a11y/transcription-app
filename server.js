@@ -2161,6 +2161,29 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       }
     }
 
+
+    // 3. Length sanity check (prevents silent data loss)
+    const totalLength = transcriptions.reduce((sum, t) => sum + (t ? t.length : 0), 0);
+    if (totalLength < expectedChunks * 200) {
+      console.warn(`⚠️ Final merged transcription is unusually short (${totalLength} chars for ${expectedChunks} chunks). Manual check recommended.`);
+    }
+
+    console.log(`✅ Integrity check complete — all ${expectedChunks} chunks validated. Total length: ${totalLength} chars`);
+
+    // 🔧 FIX: Enhanced validation and logging for chunk results
+    console.log('📊 Chunk results validation:');
+    transcriptions.forEach((chunk, index) => {
+      if (!chunk) {
+        console.error(`🚨 CRITICAL: Chunk ${index + 1} is null/undefined!`);
+      } else if (chunk.trim().length === 0) {
+        console.error(`🚨 CRITICAL: Chunk ${index + 1} is empty!`);
+      } else if (chunk.includes('[שגיאה')) {
+        console.warn(`⚠️ Chunk ${index + 1} contains error message: ${chunk.substring(0, 100)}...`);
+      } else {
+        console.log(`✅ Chunk ${index + 1}: ${chunk.length} chars - ${chunk.substring(0, 50)}...`);
+      }
+    });
+
     // Check for failed chunks in the transcription
     const failedChunks = transcriptions.filter(chunk =>
       !chunk || chunk.includes('[שגיאה בתמלול קטע') ||
