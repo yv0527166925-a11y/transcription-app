@@ -3432,6 +3432,7 @@
                             <td>${user.joinDate || 'לא זמין'}</td>
                             <td>
                                 <button class="action-btn btn-success" onclick="addMinutesToUser('${user.email}', '${user.name}')">➕ הוסף דקות</button>
+                                <button class="action-btn btn-edit" onclick="resetUserPasswordPrompt('${user.email}')">🔑 החלף סיסמה</button>
                                 <button class="action-btn btn-edit" onclick="editUser('${user.email}')">✏️ ערוך</button>
                                 ${!user.isAdmin ? `<button class="action-btn btn-delete" onclick="deleteUser('${user.email}')">🗑️ מחק</button>` : ''}
                             </td>
@@ -3556,6 +3557,60 @@
                 }
             }
         }
+
+        // ========== Password Reset Functions ==========
+
+        // Prompt for password reset (from user table)
+        async function resetUserPasswordPrompt(userEmail) {
+            const newPassword = prompt(`הכנס סיסמה חדשה עבור ${userEmail}:\n(לפחות 8 תווים)`);
+
+            if (!newPassword) {
+                return; // משתמש ביטל
+            }
+
+            if (newPassword.length < 8) {
+                alert('הסיסמה חייבת להכיל לפחות 8 תווים');
+                return;
+            }
+
+            const confirmPassword = prompt('אשר את הסיסמה החדשה:');
+
+            if (newPassword !== confirmPassword) {
+                alert('הסיסמאות אינן תואמות');
+                return;
+            }
+
+            if (!confirm(`האם אתה בטוח שברצונך לשנות את הסיסמה של ${userEmail}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/reset-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        adminEmail: currentUser.email,
+                        userEmail: userEmail,
+                        newPassword: newPassword
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showStatus(`הסיסמה של ${userEmail} שונתה בהצלחה`, 'success');
+                    console.log('✅ Password reset successful:', data);
+                } else {
+                    showStatus(data.error || 'שגיאה בשינוי הסיסמה', 'error');
+                }
+            } catch (error) {
+                console.error('Password reset error:', error);
+                showStatus('שגיאה בתקשורת עם השרת', 'error');
+            }
+        }
+
 
         // ========== Google Drive Integration ==========
 

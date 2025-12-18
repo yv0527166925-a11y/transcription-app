@@ -3921,6 +3921,95 @@ app.post('/api/admin/delete-user', (req, res) => {
   }
 });
 
+// Admin route to reset user password
+app.post('/api/admin/reset-password', (req, res) => {
+  try {
+    console.log('🔑 Admin reset-password endpoint called');
+    console.log('🔑 Request body:', { ...req.body, newPassword: '[HIDDEN]' });
+
+    const { adminEmail, userEmail, newPassword } = req.body;
+
+    if (!adminEmail || !userEmail || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'אימייל אדמין, אימייל משתמש וסיסמה חדשה נדרשים'
+      });
+    }
+
+    // Password validation
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'הסיסמה חייבת להכיל לפחות 8 תווים'
+      });
+    }
+
+    // Verify admin permissions
+    const admin = users.find(u => u.email.toLowerCase() === adminEmail.toLowerCase());
+    if (!admin || !admin.isAdmin) {
+      console.log('❌ Unauthorized password reset attempt by:', adminEmail);
+      return res.status(403).json({
+        success: false,
+        error: 'הרשאות אדמין נדרשות'
+      });
+    }
+
+    // Find user to reset password
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    if (userIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: `משתמש לא נמצא: ${userEmail}`
+      });
+    }
+
+    const userToReset = users[userIndex];
+
+    // Update password
+    const oldPassword = userToReset.password;
+    userToReset.password = newPassword;
+
+    // Save changes
+    saveUsersData();
+
+    // Log the action (without showing actual passwords)
+    console.log(`🔑 Password reset successfully for: ${userEmail} by admin: ${adminEmail}`);
+    console.log(`🔑 Password changed from [${oldPassword.length} chars] to [${newPassword.length} chars]`);
+
+    // Add audit log entry to user's history if it exists
+    if (userToReset.history) {
+      userToReset.history.unshift({
+        action: 'password_reset_by_admin',
+        adminEmail: adminEmail,
+        timestamp: new Date().toISOString(),
+        date: new Date().toLocaleDateString('he-IL')
+      });
+
+      // Keep only last 50 history entries
+      if (userToReset.history.length > 50) {
+        userToReset.history = userToReset.history.slice(0, 50);
+      }
+
+      saveUsersData();
+    }
+
+    res.json({
+      success: true,
+      message: `הסיסמה של ${userEmail} שונתה בהצלחה`,
+      userEmail: userEmail,
+      resetBy: adminEmail,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בשינוי הסיסמה'
+    });
+  }
+});
+
 // Multer error handling middleware
 function handleMulterError(err, req, res, next) {
   if (err) {
@@ -4325,6 +4414,49 @@ app.post('/api/internal/reload-users', (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to reload users data'
+    });
+  }
+});
+
+// Get specific user's stats (for admin)
+app.get('/api/users/:email/stats', (req, res) => {
+  try {
+    const { email } = req.params;
+
+    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'משתמש לא נמצא'
+      });
+    }
+
+    // Calculate user statistics
+    const userHistory = user.transcriptionHistory || user.history || [];
+    const totalTranscriptions = userHistory.length;
+    const lastTranscription = userHistory.length > 0 ? userHistory[0]?.createdAt || userHistory[0]?.timestamp : null;
+
+    const stats = {
+      email: user.email,
+      minutesRemaining: user.remainingMinutes || user.minutesRemaining || 0,
+      totalMinutesUsed: user.totalMinutesUsed || user.totalTranscribed || 0,
+      totalTranscriptions: totalTranscriptions,
+      lastTranscription: lastTranscription,
+      createdAt: user.joinDate || user.createdAt,
+      lastLogin: user.lastLogin
+    };
+
+    res.json({
+      success: true,
+      stats: stats
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting user stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בקבלת נתוני המשתמש'
     });
   }
 });
