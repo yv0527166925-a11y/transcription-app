@@ -3619,24 +3619,22 @@ app.post('/api/auth/google', async (req, res) => {
 
 // Supabase configuration endpoint - provide frontend with Supabase config
 app.get('/api/supabase-config', (req, res) => {
-  try {
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-      return res.json({
-        success: false,
-        error: 'Supabase configuration not available'
-      });
-    }
+  const enabled = Boolean(
+    process.env.SUPABASE_URL &&
+    process.env.SUPABASE_ANON_KEY
+  );
 
+  if (enabled) {
     res.json({
       success: true,
+      enabled: true,
       url: process.env.SUPABASE_URL,
       anonKey: process.env.SUPABASE_ANON_KEY
     });
-  } catch (error) {
-    console.error('Supabase config error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'שגיאה בטעינת הגדרות Supabase'
+  } else {
+    res.json({
+      success: true,
+      enabled: false
     });
   }
 });
