@@ -1110,6 +1110,7 @@
     <!-- Google APIs -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
+    <script type="module" src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="container">
@@ -1146,6 +1147,21 @@
                         </div>
                         <button type="submit" class="btn">התחבר</button>
                     </form>
+
+                    <div style="text-align: center; margin: 20px 0;">
+                        <div style="border-top: 1px solid #e5e7eb; margin: 20px 0; position: relative;">
+                            <span style="background: white; padding: 0 15px; color: #6b7280; position: absolute; top: -10px; left: 50%; transform: translateX(-50%);">או</span>
+                        </div>
+                        <button id="googleLoginBtn" onclick="loginWithGoogle()" class="btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: #4285f4; border: none; margin-top: 10px;">
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M17.64 9.20454C17.64 8.56636 17.5827 7.95272 17.4764 7.36363H9V10.8436H13.8436C13.635 11.9709 13.0009 12.9232 12.0477 13.5614V15.8195H14.9564C16.6582 14.2527 17.64 11.9454 17.64 9.20454Z" fill="white"/>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M9 18C11.43 18 13.4673 17.1941 14.9564 15.8195L12.0477 13.5614C11.2423 14.1013 10.2109 14.4204 9 14.4204C6.65591 14.4204 4.67182 12.8372 3.96409 10.71H0.957275V13.0418C2.43818 15.9831 5.48182 18 9 18Z" fill="white"/>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M3.96409 10.71C3.78409 10.17 3.68182 9.59318 3.68182 9C3.68182 8.40682 3.78409 7.83 3.96409 7.29V4.95818H0.957273C0.347727 6.17318 0 7.54772 0 9C0 10.4523 0.347727 11.8268 0.957273 13.0418L3.96409 10.71Z" fill="white"/>
+                                <path fill-rule="evenodd" clip-rule="evenodd" d="M9 3.57955C10.3214 3.57955 11.5077 4.03364 12.4405 4.92545L15.0218 2.34409C13.4632 0.891818 11.4259 0 9 0C5.48182 0 2.43818 2.01682 0.957275 4.95818L3.96409 7.29C4.67182 5.16273 6.65591 3.57955 9 3.57955Z" fill="white"/>
+                            </svg>
+                            התחבר עם Google
+                        </button>
+                    </div>
                    <div class="text-center">
                         <button class="link-btn" onclick="switchTab('register')">אין לך חשבון? הירשם כאן</button>
                         <br><br>
@@ -1604,7 +1620,45 @@
     <script>
         // API Configuration
         const API_BASE = '/api';
-        
+
+        // Supabase Configuration - loaded dynamically from server
+        let SUPABASE_URL = null;
+        let SUPABASE_ANON_KEY = null;
+        let supabase = null;
+
+        // Load Supabase config from server and initialize
+        window.addEventListener('load', async () => {
+            try {
+                // Get Supabase config from server
+                const configResponse = await fetch('/api/supabase-config');
+                const config = await configResponse.json();
+
+                if (config.success) {
+                    SUPABASE_URL = config.url;
+                    SUPABASE_ANON_KEY = config.anonKey;
+
+                    if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                        console.log('✅ Supabase client initialized');
+
+                        // Check for auth state changes
+                        supabase.auth.onAuthStateChange((event, session) => {
+                            console.log('🔐 Auth state changed:', event, session?.user?.email);
+                            if (event === 'SIGNED_IN' && session?.user) {
+                                handleGoogleLoginSuccess(session.user);
+                            }
+                        });
+                    } else {
+                        console.log('⚠️ Supabase not available - Google login disabled');
+                    }
+                } else {
+                    console.log('⚠️ Supabase config not available - Google login disabled');
+                }
+            } catch (error) {
+                console.log('⚠️ Failed to load Supabase config - Google login disabled');
+            }
+        });
+
         // Global state
         let currentUser = null;
         let cookiesAccepted = false;
@@ -1811,6 +1865,71 @@
             loadAdminOverview();
             loadAdminUsers();
             loadAdminTranscriptions();
+        }
+
+        // Google Login Functions
+        async function loginWithGoogle() {
+            if (!supabase) {
+                showAuthStatus('שירות Google Login אינו זמין כעת', 'error');
+                return;
+            }
+
+            try {
+                updateDebugInfo('מתחבר עם Google...');
+                showAuthStatus('מועבר ל-Google להתחברות...', 'info');
+
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        redirectTo: window.location.origin
+                    }
+                });
+
+                if (error) {
+                    console.error('Google login error:', error);
+                    showAuthStatus('שגיאה בהתחברות עם Google: ' + error.message, 'error');
+                }
+            } catch (error) {
+                console.error('Google login failed:', error);
+                showAuthStatus('שגיאה בהתחברות עם Google', 'error');
+            }
+        }
+
+        // Handle successful Google login
+        async function handleGoogleLoginSuccess(googleUser) {
+            try {
+                updateDebugInfo('מעבד התחברות Google...');
+
+                // Check if user exists in our system or create new user
+                const response = await fetch(`${API_BASE}/auth/google`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: googleUser.email,
+                        name: googleUser.user_metadata?.full_name || googleUser.email.split('@')[0],
+                        googleId: googleUser.id,
+                        provider: 'google'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    currentUser = data.user;
+                    saveUserToStorage(currentUser);
+                    showUserDashboard();
+                    updateDebugInfo('✅ התחברות Google הצליחה!');
+                    showAuthStatus('התחברת בהצלחה עם Google!', 'success');
+                } else {
+                    throw new Error(data.error || 'שגיאה בהתחברות');
+                }
+            } catch (error) {
+                console.error('Google login processing failed:', error);
+                showAuthStatus('שגיאה בעיבוד התחברות Google', 'error');
+            }
         }
 
         // Authentication functions with better error handling

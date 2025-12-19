@@ -3530,6 +3530,117 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// Google Authentication endpoint
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { email, name, googleId, provider } = req.body;
+
+    console.log('🔐 Google authentication attempt:', { email, name, provider });
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is required'
+      });
+    }
+
+    // Load existing users
+    const usersData = loadUsersData();
+
+    // Check if user already exists
+    let existingUser = usersData.users.find(u => u.email === email);
+
+    if (existingUser) {
+      // Update existing user with Google info if needed
+      if (!existingUser.googleId && googleId) {
+        existingUser.googleId = googleId;
+        existingUser.provider = provider;
+        existingUser.lastLogin = new Date().toISOString();
+        saveUsersData(usersData);
+        console.log('✅ Updated existing user with Google info:', email);
+      } else {
+        // Just update last login
+        existingUser.lastLogin = new Date().toISOString();
+        saveUsersData(usersData);
+      }
+
+      // Return user info (same format as regular login)
+      res.json({
+        success: true,
+        user: {
+          email: existingUser.email,
+          name: existingUser.name,
+          isAdmin: existingUser.isAdmin || false,
+          availableMinutes: existingUser.availableMinutes || 0,
+          provider: existingUser.provider || 'google'
+        }
+      });
+    } else {
+      // Create new user with Google info
+      const newUser = {
+        email: email,
+        name: name || email.split('@')[0],
+        password: null, // Google users don't have password
+        googleId: googleId,
+        provider: provider || 'google',
+        isVerified: true, // Google users are pre-verified
+        verificationToken: null,
+        isAdmin: false,
+        availableMinutes: 10, // Welcome bonus
+        createdAt: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      };
+
+      usersData.users.push(newUser);
+      saveUsersData(usersData);
+
+      console.log('✅ Created new Google user:', email);
+
+      res.json({
+        success: true,
+        user: {
+          email: newUser.email,
+          name: newUser.name,
+          isAdmin: false,
+          availableMinutes: newUser.availableMinutes,
+          provider: newUser.provider
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Google authentication error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בעיבוד התחברות Google'
+    });
+  }
+});
+
+// Supabase configuration endpoint - provide frontend with Supabase config
+app.get('/api/supabase-config', (req, res) => {
+  try {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      return res.json({
+        success: false,
+        error: 'Supabase configuration not available'
+      });
+    }
+
+    res.json({
+      success: true,
+      url: process.env.SUPABASE_URL,
+      anonKey: process.env.SUPABASE_ANON_KEY
+    });
+  } catch (error) {
+    console.error('Supabase config error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'שגיאה בטעינת הגדרות Supabase'
+    });
+  }
+});
+
 // User sync endpoint - sync localStorage with server data
 app.post('/api/user-sync', (req, res) => {
   try {

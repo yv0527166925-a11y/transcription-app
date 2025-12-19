@@ -18,6 +18,7 @@
   "dependencies": {
     "@anthropic-ai/claude-code": "^1.0.113",
     "@google/generative-ai": "^0.19.0",
+    "@supabase/supabase-js": "^2.89.0",
     "adm-zip": "^0.5.16",
     "cors": "^2.8.5",
     "docx": "^8.5.0",
