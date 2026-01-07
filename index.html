@@ -182,17 +182,26 @@
 
         .nav-menu {
             display: flex;
-            gap: 30px;
             align-items: center;
         }
 
         .nav-link {
             text-decoration: none;
             color: var(--text-secondary);
+            margin-left: 20px;
             font-weight: 500;
             padding: 8px 16px;
             border-radius: var(--border-radius-sm);
             transition: all 0.3s ease;
+        }
+
+        .nav-link:first-child {
+            margin-left: 0;
+        }
+
+        /* More spacing before auth buttons */
+        .nav-signin {
+            margin-left: 35px !important;
         }
 
         .nav-link:hover {
