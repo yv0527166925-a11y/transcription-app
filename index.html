@@ -153,6 +153,126 @@
             padding: 0 20px;
         }
 
+        /* Top Navigation Styles */
+        .top-nav {
+            background: var(--bg-primary);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .nav-container {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 70px;
+        }
+
+        .nav-logo h2 {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            padding: 8px 16px;
+            border-radius: var(--border-radius-sm);
+            transition: all 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+            background: rgba(13, 148, 136, 0.1);
+        }
+
+        .nav-signin {
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color) !important;
+        }
+
+        .nav-signin:hover {
+            background: var(--primary-color);
+            color: white !important;
+        }
+
+        .nav-signup {
+            background: var(--primary-color);
+            color: white !important;
+            font-weight: 600;
+        }
+
+        .nav-signup:hover {
+            background: var(--primary-light);
+        }
+
+        /* Mobile Menu Toggle */
+        .mobile-menu-toggle {
+            display: none;
+            flex-direction: column;
+            background: none;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .mobile-menu-toggle span {
+            width: 25px;
+            height: 3px;
+            background: var(--text-primary);
+            margin: 3px 0;
+            transition: 0.3s;
+            border-radius: 2px;
+        }
+
+        /* Mobile Navigation */
+        @media (max-width: 768px) {
+            .nav-container {
+                justify-content: space-between;
+            }
+
+            .nav-menu {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: var(--bg-primary);
+                flex-direction: column;
+                padding: 20px;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                gap: 15px;
+            }
+
+            .nav-menu.mobile-open {
+                display: flex;
+            }
+
+            .mobile-menu-toggle {
+                display: flex;
+            }
+
+            .nav-link {
+                width: 100%;
+                text-align: center;
+                padding: 12px 20px;
+            }
+        }
+
         /* Hero Section */
         .hero-section {
             background: var(--bg-primary);
@@ -1349,6 +1469,27 @@
 <body>
     <!-- Main Container -->
     <div class="main-container">
+        <!-- Top Navigation Header -->
+        <header class="top-nav">
+            <div class="nav-container">
+                <div class="nav-logo">
+                    <!-- Logo removed -->
+                </div>
+                <nav class="nav-menu">
+                    <a href="#features" class="nav-link">הייחודיות שלנו</a>
+                    <a href="#testimonials" class="nav-link">משתמשים ממליצים</a>
+                    <a href="#authSection" class="nav-link nav-signin" onclick="scrollToAuth('login')">התחברות</a>
+                    <a href="#authSection" class="nav-link nav-signup" onclick="scrollToAuth('register')">הרשמה</a>
+                </nav>
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </header>
+
         <!-- Hero Section -->
         <section class="hero-section">
             <div class="content-wrapper">
@@ -1361,7 +1502,7 @@
         </section>
 
         <!-- Features Section -->
-        <section class="features-section">
+        <section id="features" class="features-section">
             <div class="content-wrapper">
                 <h2 class="section-title">שירות תמלול לשיעורים תורניים – מדויק בהיר ומוכן לעריכה</h2>
 
@@ -1419,10 +1560,9 @@
 
                 <!-- Login/Register Section -->
                 <div id="authSection">
-            <div class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab('login')">התחברות</button>
-                <button class="nav-tab" onclick="switchTab('register')">הרשמה</button>
-            </div>
+                    <div class="section-title" style="text-align: center; margin-bottom: 30px; margin-top: 60px;">
+                        <span id="authTitle">התחברות למערכת</span>
+                    </div>
 
             <div id="loginTab" class="tab-content active">
                 <div class="auth-container">
@@ -1510,7 +1650,7 @@
             </div>
 
             <!-- User Testimonials Section -->
-            <div class="testimonials-section">
+            <div id="testimonials" class="testimonials-section">
                 <h3 class="testimonials-title">📝 משתמשים ממליצים</h3>
                 <div class="testimonials-grid">
                     <div class="testimonial-card">
@@ -2074,6 +2214,49 @@
                 console.error('API Test failed:', error);
             }
         }
+
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const navMenu = document.querySelector('.nav-menu');
+            navMenu.classList.toggle('mobile-open');
+        }
+
+        // Function to scroll to auth section and switch tab
+        function scrollToAuth(tabName) {
+            // Close mobile menu if open
+            const navMenu = document.querySelector('.nav-menu');
+            if (navMenu.classList.contains('mobile-open')) {
+                navMenu.classList.remove('mobile-open');
+            }
+
+            // Switch to the correct tab
+            switchTab(tabName);
+
+            // Update title based on tab
+            const authTitle = document.getElementById('authTitle');
+            if (authTitle) {
+                authTitle.textContent = tabName === 'login' ? 'התחברות למערכת' : 'הרשמה למערכת';
+            }
+
+            // Scroll to auth section with smooth behavior
+            const authSection = document.getElementById('authSection');
+            if (authSection) {
+                authSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        // Close mobile menu when clicking on a link
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    const navMenu = document.querySelector('.nav-menu');
+                    if (navMenu.classList.contains('mobile-open')) {
+                        navMenu.classList.remove('mobile-open');
+                    }
+                });
+            });
+        });
 
         // Tab switching functions
         function switchTab(tabName) {
