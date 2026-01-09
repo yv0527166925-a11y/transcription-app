@@ -5522,10 +5522,10 @@ const server = app.listen(PORT, () => {
 });
 
 // Configure server timeouts for large file uploads
-server.timeout = 10 * 60 * 1000; // 10 minutes timeout for large file uploads
+server.timeout = 60 * 60 * 1000; // 60 minutes timeout for large file uploads
 server.keepAliveTimeout = 65000; // Keep-alive timeout
 server.headersTimeout = 66000; // Headers timeout
-console.log('⏰ Server timeouts configured: 10 min upload, 65s keep-alive');
+console.log('⏰ Server timeouts configured: 60 min upload, 65s keep-alive');
 
 
 
