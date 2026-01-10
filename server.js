@@ -852,7 +852,7 @@ async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename,
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
 
-    const prompt = `${(language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
 אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
@@ -955,7 +955,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
     
-    const prompt = `${(language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
