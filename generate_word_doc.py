@@ -29,7 +29,7 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         from zipfile import ZipFile
 
         # בדיקה אם השפה היא RTL - רק אז נשתמש בתבנית
-        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar', 'translate-he']
         is_rtl = language in rtl_languages
 
         print(f"🔍 Language check: '{language}' -> RTL={is_rtl}", file=sys.stderr)
@@ -85,7 +85,7 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         # קביעת כיוון טקסט לפי שפה
         # תמיכה בשמות מלאים וקודים קצרים
         print(f"🔍 DEBUG: Received language = '{language}'", file=sys.stderr)
-        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar', 'translate-he']
         is_rtl = language in rtl_languages
         alignment = 'right' if is_rtl else 'left'
         print(f"🔍 DEBUG: is_rtl = {is_rtl}, alignment = '{alignment}'", file=sys.stderr)
@@ -253,7 +253,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
         from docx.oxml import OxmlElement
 
         # בדיקה אם השפה RTL או LTR
-        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar']
+        rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar', 'translate-he']
         is_rtl = language in rtl_languages
 
         print(f"📝 Creating basic document: language={language}, RTL={is_rtl}", file=sys.stderr)
