@@ -901,9 +901,9 @@ ${contextPrompt}
     // 🔥 NEW: הסר חזרות קיצוניות מהמודל
     transcription = removeExtremeRepetitions(transcription);
 
-    // Validate transcription
-    if (!transcription || transcription.trim().length < 10) {
-      throw new Error(`Invalid transcription: too short (${transcription ? transcription.length : 0} characters)`);
+    // Validate transcription - only check if not empty (removed minimum length requirement)
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error(`Invalid transcription: empty (${transcription ? transcription.length : 0} characters)`);
     }
 
     // Clean the transcription
@@ -1005,9 +1005,9 @@ ${contextPrompt}
     // 🔥 NEW: הסר חזרות קיצוניות מהמודל
     transcription = removeExtremeRepetitions(transcription);
 
-    // Validate transcription
-    if (!transcription || transcription.trim().length < 10) {
-      throw new Error(`Invalid transcription: too short (${transcription ? transcription.length : 0} characters)`);
+    // Validate transcription - only check if not empty (removed minimum length requirement)
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error(`Invalid transcription: empty (${transcription ? transcription.length : 0} characters)`);
     }
 
     // Clean the transcription
@@ -3092,8 +3092,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           throw new Error(`תמלול לא תקין: סוג=${typeof transcription}, ערך=${transcription}`);
         }
 
-        if (transcription.trim().length < 50) {
-          throw new Error(`תמלול קצר מדי: "${transcription}"`);
+        // Remove minimum length requirement - now accepts any non-empty transcription
+        // (previously required 50+ characters, but client needs short files transcribed too)
+        if (transcription.trim().length === 0) {
+          throw new Error(`תמלול ריק: "${transcription}"`);
         }
 
         // Check if transcription looks like binary data or PDF (only check for actual PDF content)

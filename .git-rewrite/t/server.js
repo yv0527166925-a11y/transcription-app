@@ -901,8 +901,10 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
         // Use the enhanced transcription method that handles large files with chunking
         const transcription = await realGeminiTranscription(file.path, file.filename, language);
         
-        if (!transcription || transcription.trim().length < 50) {
-          throw new Error('תמלול ריק או קצר מדי');
+        // Remove minimum length requirement - now accepts any non-empty transcription
+        // (previously required 50+ characters, but client needs short files transcribed too)
+        if (!transcription || transcription.trim().length === 0) {
+          throw new Error('תמלול ריק');
         }
         
         const wordDoc = await createWordDocument(transcription, file.filename, estimatedMinutes);
