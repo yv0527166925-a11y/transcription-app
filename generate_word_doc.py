@@ -807,8 +807,9 @@ def main():
             print(json.dumps({"success": False, "error": error_msg}))
             sys.exit(1)
 
-        if len(transcription.strip()) < 10:
-            error_msg = f"Transcription too short: '{transcription}'"
+        # Allow short transcriptions - only reject completely empty ones
+        if len(transcription.strip()) == 0:
+            error_msg = f"Transcription is empty: '{transcription}'"
             print(f"ERROR: {error_msg}", file=sys.stderr)
             print(json.dumps({"success": False, "error": error_msg}))
             sys.exit(1)
