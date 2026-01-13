@@ -1898,8 +1898,9 @@
                         <label for="language">שפת התמלול:</label>
                         <select id="language">
                             <option value="he">עברית</option>
-                            <option value="yi">אידיש</option>
                             <option value="translate-he">תרגום לעברית</option>
+                            <option value="yi">אידיש</option>
+                            <option value="translate-yi">תרגום לאידיש</option>
                             <option value="en">אנגלית</option>
                             <option value="translate-en">תרגום לאנגלית</option>
                             <option value="fr">צרפתית</option>
@@ -3946,8 +3947,11 @@
         function getLanguageName(code) {
             const languages = {
                 'he': 'עברית',
+                'translate-he': 'תרגום לעברית',
                 'yi': 'אידיש',
+                'translate-yi': 'תרגום לאידיש',
                 'en': 'אנגלית',
+                'translate-en': 'תרגום לאנגלית',
                 'fr': 'צרפתית',
                 'es': 'ספרדית',
                 'ru': 'רוסית'
