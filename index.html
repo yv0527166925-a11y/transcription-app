@@ -1504,7 +1504,7 @@
             <div class="content-wrapper">
                 <h1 class="hero-title">🎯 תמלול חכם</h1>
                 <div class="hero-badge">
-                    <strong>מעל 25,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!</strong>
+                    <strong>מעל 30,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!</strong>
                 </div>
             </div>
         </section>
@@ -1832,7 +1832,7 @@
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
                         <div style="margin-top: 8px; font-size: 0.8em; color: #6b7280; background-color: #f3f4f6; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6;">
-                            📏 <strong>מגבלות:</strong> עד 500MB לקובץ בודד • ללא הגבלה על מספר קבצים
+                            📏 <strong>מגבלות:</strong> עד 1.2GB לקובץ בודד • ללא הגבלה על מספר קבצים
                         </div>
                         <div style="margin-top: 8px; font-size: 0.8em; color: #dc3545; background-color: #fff5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #dc3545;">
                             ⚠️ <strong>לתשומת לב:</strong> שם הקובץ צריך להיות עד 150 תווים וללא סימנים נוספים כגון גרשיים, פסיק, נקודה, סימן קריאה, סימן שאלה וכדומה
@@ -3112,8 +3112,8 @@
                 return;
             }
 
-            // Check for files that exceed the size limit (500MB)
-            const maxFileSize = 500 * 1024 * 1024; // 500MB in bytes
+            // Check for files that exceed the size limit (1.2GB)
+            const maxFileSize = 1.2 * 1024 * 1024 * 1024; // 1.2GB in bytes
             const oversizedFiles = validFiles.filter(file => file.size > maxFileSize);
 
             if (oversizedFiles.length > 0) {
@@ -3122,7 +3122,7 @@
                 ).join('<br>');
 
                 showStatus(
-                    `❌ <strong>קבצים גדולים מדי!</strong><br>המגבלה היא 500MB לקובץ<br><br>קבצים שחורגים:<br>${oversizedNames}`,
+                    `❌ <strong>קבצים גדולים מדי!</strong><br>המגבלה היא 1.2GB לקובץ<br><br>קבצים שחורגים:<br>${oversizedNames}`,
                     'error'
                 );
                 return;
@@ -3729,9 +3729,9 @@
                         // File too large - try to get the detailed error message
                         try {
                             const errorData = await response.json();
-                            throw new Error(errorData.error || 'הקובץ גדול מדי! המגבלה היא 500MB');
+                            throw new Error(errorData.error || 'הקובץ גדול מדי! המגבלה היא 1.2GB');
                         } catch {
-                            throw new Error('הקובץ גדול מדי! המגבלה היא 500MB. אנא בחר קובץ קטן יותר.');
+                            throw new Error('הקובץ גדול מדי! המגבלה היא 1.2GB. אנא בחר קובץ קטן יותר.');
                         }
                     }
                     throw new Error(`שגיאה בשרת (${response.status})`);
