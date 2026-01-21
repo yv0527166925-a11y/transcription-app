@@ -2849,15 +2849,15 @@ const attachments = transcriptions.map(trans => {
                 <div style="background: #fff; padding: 10px; border-radius: 6px; display: inline-block; border: 1px solid #ccc; position: relative;">
                   <div style="color: #333; font-size: 12px; margin-bottom: 5px; font-weight: bold;">אפשרויות הדבקה:</div>
                   <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
-                    <!-- האופציה השמאלית - מודגשת -->
-                    <div style="position: relative;">
-                      <div style="width: 24px; height: 24px; border: 2px solid #ff4444; border-radius: 4px; background: #f0f8ff; display: flex; align-items: center; justify-content: center; font-size: 10px;">📄</div>
-                      <div style="position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; background: #ff4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 8px; font-weight: bold;">!</div>
-                    </div>
-                    <!-- שלוש האופציות האחרות -->
+                    <!-- שלוש האופציות הראשונות -->
+                    <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📄</div>
                     <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📋</div>
                     <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📝</div>
-                    <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">✏️</div>
+                    <!-- האופציה השמאלית - מודגשת -->
+                    <div style="position: relative;">
+                      <div style="width: 24px; height: 24px; border: 2px solid #ff4444; border-radius: 4px; background: #f0f8ff; display: flex; align-items: center; justify-content: center; font-size: 10px;">✏️</div>
+                      <div style="position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; background: #ff4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 8px; font-weight: bold;">!</div>
+                    </div>
                   </div>
                   <div style="margin-top: 8px; color: #ff4444; font-size: 11px; font-weight: bold;">← בחר באופציה זו (הראשונה משמאל)</div>
                 </div>
