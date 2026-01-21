@@ -2843,7 +2843,7 @@ const attachments = transcriptions.map(trans => {
            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
               <h3 style="color: #1976d2; margin-bottom: 15px; font-size: 18px;">לעבודה נוחה עם הטקסט המתומלל:</h3>
               <p style="font-size: 15px; color: #1565c0; margin: 10px 0; margin-bottom: 15px;">
-                לעבודה נוחה עם הטקסט המתומלל, מומלץ לבחור את כל הטקסט מקובץ הוורד עם קונטרול +A, לפתוח קובץ וורד חדש ולהדביק בו את הטקסט, אך לא בהדבקה רגילה, אלא <strong>באופציה השמאלית</strong> באפשרויות ההדבקה:
+                מומלץ לבחור את כל הטקסט מקובץ הוורד עם קונטרול +A, לפתוח קובץ וורד חדש ולהדביק בו את הטקסט, אך לא בהדבקה רגילה, אלא <strong>באופציה השמאלית</strong> באפשרויות ההדבקה:
               </p>
               <div style="text-align: center; margin: 15px 0; position: relative; display: inline-block; width: 100%;">
                 <div style="background: #fff; padding: 10px; border-radius: 6px; display: inline-block; border: 1px solid #ccc; position: relative;">
