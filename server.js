@@ -2840,7 +2840,14 @@ const attachments = transcriptions.map(trans => {
             ${failureSection}
 
 
-           <div style="text-align: center; margin: 30px 0;">
+           <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
+              <h3 style="color: #1976d2; margin-bottom: 15px; font-size: 18px;">לעבודה נוחה עם הטקסט המתומלל:</h3>
+              <p style="font-size: 15px; color: #1565c0; margin: 10px 0;">
+                לעבודה נוחה עם הטקסט המתומלל, מומלץ לבחור את כל הטקסט מקובץ הוורד עם קונטרול +A, לפתוח קובץ וורד חדש ולהדביק בו את הטקסט, אך לא בהדבקה רגילה, אלא באופציה השמאלית באפשרויות ההדבקה.
+              </p>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
                 🎉 תמלול מלא ושלם - אפילו לקבצים של שעות!
               </p>
