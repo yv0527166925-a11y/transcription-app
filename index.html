@@ -1468,6 +1468,80 @@
             color: #666;
             border-left: 3px solid #ffc107;
         }
+
+        /* Language Selector Styles */
+        .language-selector {
+            position: fixed;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .lang-btn {
+            background: white;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .lang-btn:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .lang-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* LTR styles for English/French */
+        html[dir="ltr"] body {
+            direction: ltr;
+            text-align: left;
+        }
+
+        html[dir="ltr"] .testimonial-card {
+            text-align: left;
+        }
+
+        html[dir="ltr"] .nav-link {
+            margin-left: 0;
+            margin-right: 20px;
+        }
+
+        html[dir="ltr"] .nav-link:first-child {
+            margin-right: 0;
+        }
+
+        html[dir="ltr"] .nav-signin {
+            margin-right: 35px !important;
+            margin-left: 0 !important;
+        }
+
+        html[dir="ltr"] .language-selector {
+            left: auto;
+            right: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .language-selector {
+                top: auto;
+                bottom: 80px;
+                transform: none;
+            }
+        }
     </style>
 
     <!-- Google APIs -->
@@ -1476,6 +1550,13 @@
     <script type="module" src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
+    <!-- Language Selector -->
+    <div class="language-selector">
+        <button class="lang-btn active" onclick="setLanguage('he')" data-lang="he">עברית</button>
+        <button class="lang-btn" onclick="setLanguage('en')" data-lang="en">EN</button>
+        <button class="lang-btn" onclick="setLanguage('fr')" data-lang="fr">FR</button>
+    </div>
+
     <!-- Main Container -->
     <div class="main-container">
         <!-- Top Navigation Header -->
@@ -1485,10 +1566,10 @@
                     <!-- Logo removed -->
                 </div>
                 <nav class="nav-menu">
-                    <a href="#features" class="nav-link">הייחודיות שלנו</a>
-                    <a href="#testimonials" class="nav-link">משתמשים ממליצים</a>
-                    <a href="#authSection" class="nav-link nav-signin" onclick="scrollToAuth('login')">התחברות</a>
-                    <a href="#authSection" class="nav-link nav-signup" onclick="scrollToAuth('register')">הרשמה</a>
+                    <a href="#features" class="nav-link" data-i18n="nav_features">הייחודיות שלנו</a>
+                    <a href="#testimonials" class="nav-link" data-i18n="nav_testimonials">משתמשים ממליצים</a>
+                    <a href="#authSection" class="nav-link nav-signin" onclick="scrollToAuth('login')" data-i18n="nav_login">התחברות</a>
+                    <a href="#authSection" class="nav-link nav-signup" onclick="scrollToAuth('register')" data-i18n="nav_register">הרשמה</a>
                 </nav>
                 <!-- Mobile Menu Toggle -->
                 <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
@@ -1502,9 +1583,9 @@
         <!-- Hero Section -->
         <section class="hero-section">
             <div class="content-wrapper">
-                <h1 class="hero-title">🎯 תמלול חכם</h1>
+                <h1 class="hero-title" data-i18n="hero_title">🎯 תמלול חכם</h1>
                 <div class="hero-badge">
-                    <strong>מעל 30,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!</strong>
+                    <strong data-i18n="hero_badge">מעל 30,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!</strong>
                 </div>
             </div>
         </section>
@@ -1512,53 +1593,53 @@
         <!-- Features Section -->
         <section id="features" class="features-section">
             <div class="content-wrapper">
-                <h2 class="section-title">שירות תמלול לשיעורים תורניים – מדויק בהיר ומוכן לעריכה</h2>
+                <h2 class="section-title" data-i18n="features_title">שירות תמלול לשיעורים תורניים – מדויק בהיר ומוכן לעריכה</h2>
 
                 <div class="features-grid">
                     <div class="feature-card">
-                        <h3 class="feature-title">מותאם לשיעורים תורניים</h3>
-                        <p class="feature-description">
+                        <h3 class="feature-title" data-i18n="feature1_title">מותאם לשיעורים תורניים</h3>
+                        <p class="feature-description" data-i18n="feature1_desc">
                             שירות תמלול ייעודי לשיעורים תורניים, דרשות והרצאות הנמסרים בשפה ישיבתית.
                             המערכת מותאמת להקלטות הכוללות הגייה ישיבתית, לשון חז״ל ומונחים תורניים.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">נוחות ומקצועיות</h3>
-                        <p class="feature-description">
+                        <h3 class="feature-title" data-i18n="feature2_title">נוחות ומקצועיות</h3>
+                        <p class="feature-description" data-i18n="feature2_desc">
                             הקבצים מתומללים במהירות ונשלחים ישירות לתיבת הדוא״ל כקובץ וורד מסודר ומוכן לעבודה, ללא צורך בהמתנה באתר וללא התעסקות נוספת.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">
+                        <h3 class="feature-title" data-i18n="feature3_title">
                             שפות זמינות +
-                            <span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.7em; margin-right: 8px;">חדש!</span>
+                            <span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.7em; margin-right: 8px;" data-i18n="new_badge">חדש!</span>
                             תרגום לעברית, לאידיש ולאנגלית
                         </h3>
-                        <p class="feature-description">
+                        <p class="feature-description" data-i18n="feature3_desc">
                             ניתן לתמלל בשפות הבאות: עברית, אידיש, אנגלית, צרפתית, ספרדית ורוסית. אחוז דיוק גבוה במיוחד!<br><br>
                             תרגום לעברית, לאידיש או לאנגלית מכל השפות הנתמכות. בתפריט השפות יש לבחור: תרגום לעברית, תרגום לאידיש, תרגום לאנגלית.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">קבצים נתמכים</h3>
-                        <p class="feature-description">
+                        <h3 class="feature-title" data-i18n="feature4_title">קבצים נתמכים</h3>
+                        <p class="feature-description" data-i18n="feature4_desc">
                             כל סוגי קבצי האודיו והווידאו, כולל קבצים ארוכים במיוחד.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">מערכת תשלומים נוחה</h3>
-                        <p class="feature-description">
+                        <h3 class="feature-title" data-i18n="feature5_title">מערכת תשלומים נוחה</h3>
+                        <p class="feature-description" data-i18n="feature5_desc">
                             תשלום באשראי. מגוון חבילות לכל כיס ולכל תקציב, החל מ-10 ש"ח לשעת תמלול, וללא צורך במנוי חודשי. קבלה תישלח אוטומטית על כל רכישה.
                         </p>
                     </div>
 
                     <div class="feature-card">
-                        <h3 class="feature-title">בין לקוחותינו</h3>
-                        <p class="feature-description">
+                        <h3 class="feature-title" data-i18n="feature6_title">בין לקוחותינו</h3>
+                        <p class="feature-description" data-i18n="feature6_desc">
                             עורכים תורניים, רבנים, מוסדות ומכוני הוצאה לאור, המשתמשים בשירות באופן קבוע וחוסכים זמן רב.
                         </p>
                     </div>
@@ -1566,7 +1647,7 @@
 
                 <!-- Support Section -->
                 <div class="support-section">
-                    <div class="support-info">
+                    <div class="support-info" data-i18n="support_info">
                         לתמיכה טכנית: timlul.h@gmail.com
                     </div>
                 </div>
@@ -1574,27 +1655,27 @@
                 <!-- Login/Register Section -->
                 <div id="authSection">
                     <div class="section-title" style="text-align: center; margin-bottom: 30px; margin-top: 60px;">
-                        <span id="authTitle">התחברות למערכת</span>
+                        <span id="authTitle" data-i18n="auth_title_login">התחברות למערכת</span>
                     </div>
 
             <div id="loginTab" class="tab-content active">
                 <div class="auth-container">
                     <form id="loginForm">
                         <div class="form-group">
-                            <label for="loginEmail">אימייל:</label>
+                            <label for="loginEmail" data-i18n="label_email">אימייל:</label>
                           <input type="text" id="loginEmail" required>
                         </div>
                         <div class="form-group">
-                            <label for="loginPassword">סיסמה:</label>
+                            <label for="loginPassword" data-i18n="label_password">סיסמה:</label>
                            <input type="password" id="loginPassword" required>
                         </div>
-                        <button type="submit" class="btn">התחבר</button>
+                        <button type="submit" class="btn" data-i18n="btn_login">התחבר</button>
                     </form>
 
                    <div class="text-center">
-                        <button class="link-btn" onclick="switchTab('register')">אין לך חשבון? הירשם כאן</button>
+                        <button class="link-btn" onclick="switchTab('register')" data-i18n="link_no_account">אין לך חשבון? הירשם כאן</button>
                         <br><br>
-                        <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
+                        <button class="terms-btn" onclick="openTermsModal()" data-i18n="btn_terms">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
                     </div>
                 </div>
                 <!-- Status for auth messages -->
@@ -1605,27 +1686,27 @@
                 <div class="auth-container">
                     <form id="registerForm">
                         <div class="form-group">
-                            <label for="registerName">שם מלא:</label>
+                            <label for="registerName" data-i18n="label_fullname">שם מלא:</label>
                             <input type="text" id="registerName" required>
                         </div>
                         <div class="form-group">
-                            <label for="registerEmail">אימייל:</label>
+                            <label for="registerEmail" data-i18n="label_email">אימייל:</label>
                            <input type="text" id="registerEmail" required>
                         </div>
                         <div class="form-group">
-                            <label for="registerPassword">סיסמה:</label>
+                            <label for="registerPassword" data-i18n="label_password">סיסמה:</label>
                             <input type="password" id="registerPassword" required minlength="6">
                         </div>
                         <div class="form-group">
-                            <label for="registerPhone">טלפון:</label>
+                            <label for="registerPhone" data-i18n="label_phone">טלפון:</label>
                             <input type="tel" id="registerPhone">
                         </div>
-                        <button type="submit" class="btn">הירשם</button>
+                        <button type="submit" class="btn" data-i18n="btn_register">הירשם</button>
                     </form>
                     <div class="text-center">
-                        <button class="link-btn" onclick="switchTab('login')">יש לך חשבון? התחבר כאן</button>
+                        <button class="link-btn" onclick="switchTab('login')" data-i18n="link_have_account">יש לך חשבון? התחבר כאן</button>
                         <br><br>
-                        <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
+                        <button class="terms-btn" onclick="openTermsModal()" data-i18n="btn_terms">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
                     </div>
                 </div>
                 <!-- Status for auth messages -->
@@ -1635,27 +1716,27 @@
             <!-- Email Verification Tab -->
             <div id="verificationTab" class="tab-content">
                 <div class="auth-container">
-                    <h3>אימות מייל</h3>
-                    <p>נשלח קוד אימות לכתובת המייל שלך. אנא הזן את הקוד כדי להשלים את ההרשמה.</p>
+                    <h3 data-i18n="verify_title">אימות מייל</h3>
+                    <p data-i18n="verify_desc">נשלח קוד אימות לכתובת המייל שלך. אנא הזן את הקוד כדי להשלים את ההרשמה.</p>
 
                     <form id="verificationForm">
                         <div class="form-group">
-                            <label for="verificationEmail">אימייל:</label>
+                            <label for="verificationEmail" data-i18n="label_email">אימייל:</label>
                             <input type="email" id="verificationEmail" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="verificationCode">קוד אימות (6 ספרות):</label>
+                            <label for="verificationCode" data-i18n="label_verify_code">קוד אימות (6 ספרות):</label>
                             <input type="text" id="verificationCode" maxlength="6" pattern="[0-9]{6}" required
                                    placeholder="123456" style="text-align: center; font-size: 18px; letter-spacing: 3px;">
                         </div>
-                        <button type="submit" class="btn">אמת מייל</button>
+                        <button type="submit" class="btn" data-i18n="btn_verify">אמת מייל</button>
                     </form>
 
                     <div class="text-center" style="margin-top: 20px;">
-                        <button class="link-btn" onclick="switchTab('register')">חזור להרשמה</button>
-                        <button class="link-btn" onclick="switchTab('login')">יש לך חשבון? התחבר כאן</button>
+                        <button class="link-btn" onclick="switchTab('register')" data-i18n="link_back_register">חזור להרשמה</button>
+                        <button class="link-btn" onclick="switchTab('login')" data-i18n="link_have_account">יש לך חשבון? התחבר כאן</button>
                         <br><br>
-                        <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
+                        <button class="terms-btn" onclick="openTermsModal()" data-i18n="btn_terms">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
                     </div>
                 </div>
                 <!-- Status for verification messages -->
@@ -1668,16 +1749,16 @@
     <!-- User Testimonials Section - Always Visible -->
     <div id="testimonials" class="testimonials-section" style="padding: 40px 20px; background: #f8f9fa;">
         <div class="container" style="max-width: 1200px; margin: 0 auto;">
-            <h3 class="testimonials-title">📝 משתמשים ממליצים</h3>
+            <h3 class="testimonials-title" data-i18n="testimonials_title">📝 משתמשים ממליצים</h3>
             <div class="testimonials-grid">
                 <div class="testimonial-card">
-                    <p>"אני רוצה לומר לך יישר כח גדול! התוכנה הזו עוזרת לי המון בכל שבוע מחדש! מלבד החיסכון הכספי... הממשק שלה נוח מאוד, והיא קלה לתפעול ומדוייקת להפליא."</p>
+                    <p data-i18n="testimonial1">"אני רוצה לומר לך יישר כח גדול! התוכנה הזו עוזרת לי המון בכל שבוע מחדש! מלבד החיסכון הכספי... הממשק שלה נוח מאוד, והיא קלה לתפעול ומדוייקת להפליא."</p>
                 </div>
                 <div class="testimonial-card">
-                    <p>"וואו!! לא האמנתי שזה מגיע בצורה כ"כ טובה לקריאה! כמדומני שהשקעתם הרבה זמן ללמד את הג'מיני איך לכתוב..."</p>
+                    <p data-i18n="testimonial2">"וואו!! לא האמנתי שזה מגיע בצורה כ"כ טובה לקריאה! כמדומני שהשקעתם הרבה זמן ללמד את הג'מיני איך לכתוב..."</p>
                 </div>
                 <div class="testimonial-card">
-                    <p>"זה פשוט מדהים! עולה פי מאה על כמה אתרי תמלול שניסיתי עד היום ללא הצלחה"</p>
+                    <p data-i18n="testimonial3">"זה פשוט מדהים! עולה פי מאה על כמה אתרי תמלול שניסיתי עד היום ללא הצלחה"</p>
                 </div>
             </div>
         </div>
@@ -1687,11 +1768,11 @@
     <div id="appSection" style="display: none;">
         <div class="container">
             <div class="nav-tabs">
-                <button class="nav-tab active" onclick="switchAppTab('dashboard')">דשבורד</button>
-                <button class="nav-tab" onclick="switchAppTab('transcribe')">תמלול חדש</button>
-                <button class="nav-tab" onclick="switchAppTab('history')">היסטוריה</button>
-                <button class="nav-tab" onclick="switchAppTab('payment')">רכישת דקות</button>
-                <button class="nav-tab" onclick="logout()">יציאה</button>
+                <button class="nav-tab active" onclick="switchAppTab('dashboard')" data-i18n="tab_dashboard">דשבורד</button>
+                <button class="nav-tab" onclick="switchAppTab('transcribe')" data-i18n="tab_new_transcription">תמלול חדש</button>
+                <button class="nav-tab" onclick="switchAppTab('history')" data-i18n="tab_history">היסטוריה</button>
+                <button class="nav-tab" onclick="switchAppTab('payment')" data-i18n="tab_buy_minutes">רכישת דקות</button>
+                <button class="nav-tab" onclick="logout()" data-i18n="tab_logout">יציאה</button>
             </div>
 
             <!-- Dashboard Tab -->
@@ -1704,64 +1785,64 @@
                 <div class="dashboard-grid">
                     <div class="stat-card">
                         <div class="stat-number" id="remainingMinutes">0</div>
-                        <div class="stat-label">דקות זמינות</div>
+                        <div class="stat-label" data-i18n="stat_available_minutes">דקות זמינות</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-number" id="totalTranscribed">0</div>
-                        <div class="stat-label">דקות מתומללות</div>
+                        <div class="stat-label" data-i18n="stat_transcribed_minutes">דקות מתומללות</div>
                     </div>
                 </div>
 
                 <div class="text-center" style="margin-top: 20px;">
-                    <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
+                    <button class="terms-btn" onclick="openTermsModal()" data-i18n="btn_terms">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
                 </div>
 
                 <!-- Admin Panel -->
                 <div id="adminPanel" class="admin-panel" style="display: none;">
                     <!-- Admin Sub-tabs -->
                     <div class="nav-tabs">
-                        <button class="nav-tab active" onclick="switchAdminTab('overview')">סקירה כללית</button>
-                        <button class="nav-tab" onclick="switchAdminTab('users')">ניהול משתמשים</button>
-                        <button class="nav-tab" onclick="switchAdminTab('transcriptions')">תמלולים</button>
-                        <button class="nav-tab" onclick="switchAdminTab('add-minutes')">הוספת דקות</button>
+                        <button class="nav-tab active" onclick="switchAdminTab('overview')" data-i18n="admin_overview">סקירה כללית</button>
+                        <button class="nav-tab" onclick="switchAdminTab('users')" data-i18n="admin_users">ניהול משתמשים</button>
+                        <button class="nav-tab" onclick="switchAdminTab('transcriptions')" data-i18n="admin_transcriptions">תמלולים</button>
+                        <button class="nav-tab" onclick="switchAdminTab('add-minutes')" data-i18n="admin_add_minutes">הוספת דקות</button>
                     </div>
 
                     <!-- Overview Tab -->
                     <div id="overviewTab" class="tab-content active">
-                        <div class="admin-title">📊 סקירה כללית</div>
+                        <div class="admin-title" data-i18n="admin_overview_title">📊 סקירה כללית</div>
                         <div class="admin-stats">
                             <div class="stat-card">
                                 <div class="stat-number" id="totalUsers">-</div>
-                                <div class="stat-label">סה"כ משתמשים</div>
+                                <div class="stat-label" data-i18n="stat_total_users">סה"כ משתמשים</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="newUsersToday">-</div>
-                                <div class="stat-label">משתמשים חדשים היום</div>
+                                <div class="stat-label" data-i18n="stat_new_users_today">משתמשים חדשים היום</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="totalTranscriptions">-</div>
-                                <div class="stat-label">סה"כ תמלולים</div>
+                                <div class="stat-label" data-i18n="stat_total_transcriptions">סה"כ תמלולים</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-number" id="totalMinutesUsed">-</div>
-                                <div class="stat-label">דקות שנוצלו</div>
+                                <div class="stat-label" data-i18n="stat_minutes_used">דקות שנוצלו</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Users Management Tab -->
                     <div id="usersTab" class="tab-content">
-                        <div class="admin-title">👥 ניהול משתמשים</div>
+                        <div class="admin-title" data-i18n="admin_users_title">👥 ניהול משתמשים</div>
                         <div class="table-container">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
-                                        <th>שם</th>
-                                        <th>אימייל</th>
-                                        <th>דקות זמינות</th>
-                                        <th>דקות מתומללות</th>
-                                        <th>תאריך הצטרפות</th>
-                                        <th>פעולות</th>
+                                        <th data-i18n="th_name">שם</th>
+                                        <th data-i18n="th_email">אימייל</th>
+                                        <th data-i18n="th_available_minutes">דקות זמינות</th>
+                                        <th data-i18n="th_transcribed_minutes">דקות מתומללות</th>
+                                        <th data-i18n="th_join_date">תאריך הצטרפות</th>
+                                        <th data-i18n="th_actions">פעולות</th>
                                     </tr>
                                 </thead>
                                 <tbody id="usersTableBody">
@@ -1773,18 +1854,18 @@
 
                     <!-- Transcriptions Tab -->
                     <div id="transcriptionsTab" class="tab-content">
-                        <div class="admin-title">📄 תמלולים אחרונים</div>
+                        <div class="admin-title" data-i18n="admin_recent_transcriptions">📄 תמלולים אחרונים</div>
                         <div class="table-container">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
-                                        <th>תאריך</th>
-                                        <th>משתמש</th>
-                                        <th>שם קובץ</th>
-                                        <th>משך</th>
-                                        <th>שפה</th>
-                                        <th>סטטוס</th>
-                                        <th>הורדה</th>
+                                        <th data-i18n="th_date">תאריך</th>
+                                        <th data-i18n="th_user">משתמש</th>
+                                        <th data-i18n="th_filename">שם קובץ</th>
+                                        <th data-i18n="th_duration">משך</th>
+                                        <th data-i18n="th_language">שפה</th>
+                                        <th data-i18n="th_status">סטטוס</th>
+                                        <th data-i18n="th_download">הורדה</th>
                                     </tr>
                                 </thead>
                                 <tbody id="transcriptionsTableBody">
@@ -1796,23 +1877,23 @@
 
                     <!-- Add Minutes Tab -->
                     <div id="addMinutesTab" class="tab-content">
-                        <div class="admin-title">🔧 הוספת דקות</div>
+                        <div class="admin-title" data-i18n="admin_add_minutes_title">🔧 הוספת דקות</div>
                         <div class="admin-controls">
                             <div>
                                 <div class="form-group">
-                                    <label for="adminUserEmail">אימייל לקוח:</label>
-                                    <input type="email" id="adminUserEmail" placeholder="הכנס אימייל לקוח">
+                                    <label for="adminUserEmail" data-i18n="label_customer_email">אימייל לקוח:</label>
+                                    <input type="email" id="adminUserEmail" data-i18n-placeholder="placeholder_customer_email" placeholder="הכנס אימייל לקוח">
                                 </div>
                                 <div class="form-group">
-                                    <label for="adminMinutesToAdd">דקות להוספה:</label>
-                                    <input type="number" id="adminMinutesToAdd" min="1" placeholder="מספר דקות">
+                                    <label for="adminMinutesToAdd" data-i18n="label_minutes_to_add">דקות להוספה:</label>
+                                    <input type="number" id="adminMinutesToAdd" min="1" data-i18n-placeholder="placeholder_minutes" placeholder="מספר דקות">
                                 </div>
                             </div>
-                            <button class="btn" onclick="addMinutesToUser()">הוסף דקות</button>
+                            <button class="btn" onclick="addMinutesToUser()" data-i18n="btn_add_minutes">הוסף דקות</button>
                         </div>
 
                         <div style="margin-top: 15px; padding: 10px; background: rgba(255, 193, 7, 0.2); border-radius: 5px; font-size: 0.9em;">
-                            <strong>💡 טיפ:</strong> בחר משתמש מהרשימה למעלה
+                            <strong data-i18n="tip_label">💡 טיפ:</strong> <span data-i18n="tip_select_user">בחר משתמש מהרשימה למעלה</span>
                         </div>
                     </div>
                 </div>
@@ -1823,21 +1904,21 @@
                 <form id="transcriptionForm">
                     <div class="upload-area" id="uploadArea">
                         <div class="upload-icon">📁</div>
-                        <div class="upload-text">לחץ כאן או גרור קבצים (ללא הגבלה)</div>
-                        <div class="upload-subtext">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV</div>
-                        <div style="margin-top: 10px; font-size: 0.8em; color: #3b82f6;">
+                        <div class="upload-text" data-i18n="upload_text">לחץ כאן או גרור קבצים (ללא הגבלה)</div>
+                        <div class="upload-subtext" data-i18n="upload_formats">תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV</div>
+                        <div style="margin-top: 10px; font-size: 0.8em; color: #3b82f6;" data-i18n="upload_model_info">
                             ✨ תמלול באמצעות המודל המתקדם והמעודכן ביותר
                         </div>
-                        <div style="margin-top: 8px; font-size: 0.85em; color: #28a745; font-weight: 600;">
+                        <div style="margin-top: 8px; font-size: 0.85em; color: #28a745; font-weight: 600;" data-i18n="upload_accuracy">
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
-                        <div style="margin-top: 8px; font-size: 0.8em; color: #6b7280; background-color: #f3f4f6; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6;">
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #6b7280; background-color: #f3f4f6; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6;" data-i18n="upload_limits">
                             📏 <strong>מגבלות:</strong> עד 1.2GB לקובץ בודד • ללא הגבלה על מספר קבצים
                         </div>
-                        <div style="margin-top: 8px; font-size: 0.8em; color: #dc3545; background-color: #fff5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #dc3545;">
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #dc3545; background-color: #fff5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #dc3545;" data-i18n="upload_filename_warning">
                             ⚠️ <strong>לתשומת לב:</strong> שם הקובץ צריך להיות עד 150 תווים וללא סימנים נוספים כגון גרשיים, פסיק, נקודה, סימן קריאה, סימן שאלה וכדומה
                         </div>
-                        <div style="margin-top: 8px; font-size: 0.8em; color: #1f2937; background-color: #f0f9ff; padding: 8px; border-radius: 6px; border-left: 3px solid #0ea5e9;">
+                        <div style="margin-top: 8px; font-size: 0.8em; color: #1f2937; background-color: #f0f9ff; padding: 8px; border-radius: 6px; border-left: 3px solid #0ea5e9;" data-i18n="upload_gdrive_info">
                             כדי להעלות קבצים מגוגל דרייב, יש להתקין במחשב את <a href="https://support.google.com/drive/answer/10838124?hl=iw" target="_blank" style="color: #0ea5e9; text-decoration: underline;">תוכנת 'גוגל דרייב' לשולחן העבודה</a>. לאחר מכן ניתן להעלות את הקבצים מהמחשב, כמו מכל כונן אחר.
                         </div>
                         <input type="file" id="fileInput" class="file-input" accept="audio/*,video/*" multiple>
@@ -1846,10 +1927,10 @@
 
                     <!-- Upload options buttons -->
                     <div style="display: flex; gap: 15px; justify-content: center; margin: 20px 0; flex-wrap: wrap;">
-                        <button type="button" class="btn-upload-option" onclick="selectFiles()">
+                        <button type="button" class="btn-upload-option" onclick="selectFiles()" data-i18n="btn_select_files">
                             📄 בחר קבצים
                         </button>
-                        <button type="button" class="btn-upload-option" onclick="selectFolder()" title="בחר תיקייה עם כל הקבצים שבתוכה">
+                        <button type="button" class="btn-upload-option" onclick="selectFolder()" data-i18n="btn_select_folder" data-i18n-title="btn_select_folder_title" title="בחר תיקייה עם כל הקבצים שבתוכה">
                             📂 בחר תיקייה שלמה
                         </button>
                         <!-- Google Drive integration - ready but disabled for now -->
@@ -1862,18 +1943,18 @@
 
                     <!-- Folder preview (shown when folder is selected) -->
                     <div id="folderPreview" class="folder-preview">
-                        <div class="folder-title">📂 קבצים בתיקייה: <span id="folderName"></span></div>
+                        <div class="folder-title"><span data-i18n="folder_files_in">📂 קבצים בתיקייה:</span> <span id="folderName"></span></div>
                         <div class="folder-files" id="folderFiles">
                             <!-- Files will be populated here -->
                         </div>
                         <div class="folder-actions">
-                            <button type="button" class="btn-secondary" onclick="selectAllFolderFiles()">
+                            <button type="button" class="btn-secondary" onclick="selectAllFolderFiles()" data-i18n="btn_select_all">
                                 ✅ בחר הכל
                             </button>
-                            <button type="button" class="btn-secondary" onclick="deselectAllFolderFiles()">
+                            <button type="button" class="btn-secondary" onclick="deselectAllFolderFiles()" data-i18n="btn_deselect_all">
                                 ❌ בטל הכל
                             </button>
-                            <button type="button" class="btn" onclick="addSelectedFolderFiles()">
+                            <button type="button" class="btn" onclick="addSelectedFolderFiles()" data-i18n="btn_add_selected">
                                 ➕ הוסף קבצים נבחרים
                             </button>
                         </div>
@@ -1881,38 +1962,38 @@
 
                     <!-- Clear all button (shown when files are selected) -->
                     <div id="clearAllContainer" style="display: none; margin: 15px 0; text-align: center;">
-                        <button type="button" class="btn-clear-all" onclick="clearAllFiles()">
+                        <button type="button" class="btn-clear-all" onclick="clearAllFiles()" data-i18n="btn_clear_all">
                             🗑️ נקה הכל
                         </button>
                     </div>
 
                     <div id="estimatedCost" style="display: none;" class="insufficient-minutes">
-                        <strong>אמידת זמן תמלול:</strong> <span id="estimatedMinutes">0</span> דקות<br>
-                        <strong>יתרה נוכחית:</strong> <span id="currentBalance">0</span> דקות
+                        <strong data-i18n="estimated_time">אמידת זמן תמלול:</strong> <span id="estimatedMinutes">0</span> <span data-i18n="minutes">דקות</span><br>
+                        <strong data-i18n="current_balance">יתרה נוכחית:</strong> <span id="currentBalance">0</span> <span data-i18n="minutes">דקות</span>
                     </div>
 
 
                     <div class="form-group">
-                        <label for="customInstructions">הנחייה אישית (אופציונלי):</label>
+                        <label for="customInstructions" data-i18n="label_custom_instructions">הנחייה אישית (אופציונלי):</label>
                         <textarea id="customInstructions" placeholder="" rows="3" style="width: 100%; padding: 12px 15px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 1em; transition: border-color 0.3s ease; resize: vertical; font-family: inherit;"></textarea>
                     </div>
 
                     <div class="form-group">
-                        <label for="language">שפת התמלול:</label>
+                        <label for="language" data-i18n="label_transcription_language">שפת התמלול:</label>
                         <select id="language">
-                            <option value="he">עברית</option>
-                            <option value="translate-he">תרגום לעברית</option>
-                            <option value="yi">אידיש</option>
-                            <option value="translate-yi">תרגום לאידיש</option>
-                            <option value="en">אנגלית</option>
-                            <option value="translate-en">תרגום לאנגלית</option>
-                            <option value="fr">צרפתית</option>
-                            <option value="es">ספרדית</option>
-                            <option value="ru">רוסית</option>
+                            <option value="he" data-i18n="lang_hebrew">עברית</option>
+                            <option value="translate-he" data-i18n="lang_translate_hebrew">תרגום לעברית</option>
+                            <option value="yi" data-i18n="lang_yiddish">אידיש</option>
+                            <option value="translate-yi" data-i18n="lang_translate_yiddish">תרגום לאידיש</option>
+                            <option value="en" data-i18n="lang_english">אנגלית</option>
+                            <option value="translate-en" data-i18n="lang_translate_english">תרגום לאנגלית</option>
+                            <option value="fr" data-i18n="lang_french">צרפתית</option>
+                            <option value="es" data-i18n="lang_spanish">ספרדית</option>
+                            <option value="ru" data-i18n="lang_russian">רוסית</option>
                         </select>
                     </div>
 
-                    <button type="submit" class="btn" id="submitBtn" disabled>
+                    <button type="submit" class="btn" id="submitBtn" disabled data-i18n="btn_start_transcription">
                         התחל תמלול
                     </button>
 
@@ -1926,16 +2007,16 @@
 
             <!-- History Tab -->
             <div id="historyTab" class="tab-content">
-                <h3>היסטוריית תמלולים</h3>
+                <h3 data-i18n="history_title">היסטוריית תמלולים</h3>
                 <table class="history-table">
                     <thead>
                         <tr>
-                            <th>תאריך</th>
-                            <th>שם הקובץ</th>
-                            <th>משך זמן</th>
-                            <th>שפה</th>
-                            <th>סטטוס</th>
-                            <th>פעולות</th>
+                            <th data-i18n="th_date">תאריך</th>
+                            <th data-i18n="th_filename">שם הקובץ</th>
+                            <th data-i18n="th_duration">משך זמן</th>
+                            <th data-i18n="th_language">שפה</th>
+                            <th data-i18n="th_status">סטטוס</th>
+                            <th data-i18n="th_actions">פעולות</th>
                         </tr>
                     </thead>
                     <tbody id="historyTableBody">
@@ -1948,30 +2029,30 @@
             <div id="paymentTab" class="tab-content">
 
                <div class="payment-info" style="text-align: center !important; margin: 20px auto; width: 100%; display: block;">
-                    <p style="font-size: 18px; color: #333; margin: 20px auto; text-align: center !important; display: block; width: fit-content;">
+                    <p style="font-size: 18px; color: #333; margin: 20px auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_packages">
                         מגוון חבילות החל מ-10 ש"ח ל-60 דקות תמלול
                     </p>
                 </div>
 
                <div class="payment-notice-center" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%;">
-                    <p style="font-size: 16px; color: #856404; margin: 0 auto; text-align: center !important; display: block; width: fit-content;">
+                    <p style="font-size: 16px; color: #856404; margin: 0 auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_notice">
                         <strong>⚠️ חשוב!</strong><br>
                         בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!
                     </p>
                 </div>
-                <button class="btn" onclick="processPurchase()">
+                <button class="btn" onclick="processPurchase()" data-i18n="btn_go_to_purchase">
                     💳 למעבר לדף הרכישה
                 </button>
 
                 <div class="payment-terms">
-                    <button class="terms-btn" onclick="openTermsModal()">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
+                    <button class="terms-btn" onclick="openTermsModal()" data-i18n="btn_terms">תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות</button>
                 </div>
             </div>
         </div>
 
        <!-- Email delivery banner - only visible in transcribe tab -->
        <div class="info-banner" style="background: #f8f9fa; border: 1px solid #e9ecef; padding: 12px 16px; margin-bottom: 12px; text-align: center; border-radius: 8px; display: none;" id="transcribeInfoBanner">
-            <div style="margin: 0; font-size: 0.9em; font-weight: 600; color: #495057; text-align: center; width: 100%; display: flex; justify-content: center;">אין צורך להמתין עד סוף העיבוד. התמלול יישלח לאימייל ויהיה זמין להורדה בעמוד ההיסטוריה.</div>
+            <div style="margin: 0; font-size: 0.9em; font-weight: 600; color: #495057; text-align: center; width: 100%; display: flex; justify-content: center;" data-i18n="info_banner_email">אין צורך להמתין עד סוף העיבוד. התמלול יישלח לאימייל ויהיה זמין להורדה בעמוד ההיסטוריה.</div>
         </div>
 
     </div>
@@ -1989,7 +2070,7 @@
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             transition: all 0.3s ease;
-        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'" onclick="showAccessibilityModal()">
+        " onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'" onclick="showAccessibilityModal()" data-i18n="btn_accessibility">
             ♿ נגישות
         </button>
     </div>
@@ -2029,13 +2110,13 @@
                 padding: 5px;
             ">×</button>
 
-            <h2 style="color: #2563eb; margin-bottom: 20px; font-size: 24px;">פטור מהנגשה</h2>
+            <h2 style="color: #2563eb; margin-bottom: 20px; font-size: 24px;" data-i18n="accessibility_title">פטור מהנגשה</h2>
 
-            <p style="font-size: 18px; line-height: 1.6; margin-bottom: 15px; color: #333;">
+            <p style="font-size: 18px; line-height: 1.6; margin-bottom: 15px; color: #333;" data-i18n="accessibility_exempt">
                 לאתר זה קיים פטור מחובת הנגשה.
             </p>
 
-            <p style="font-size: 16px; line-height: 1.6; color: #555;">
+            <p style="font-size: 16px; line-height: 1.6; color: #555;" data-i18n="accessibility_contact">
                 במידה והנכם זקוקים לסיוע בתפעול האתר או בצריכת השירותים המפורסמים בו,
                 ניתן לפנות לפנינים עריכה תורנית בטלפון: <strong>052-7166925</strong>.
             </p>
@@ -2046,14 +2127,14 @@
     <div id="cookieBanner" class="cookie-banner" style="display: none;">
         <div class="cookie-banner-content">
             <div class="cookie-banner-text">
-                <h4>שימוש בעוגיות</h4>
-                <p>האתר שלנו משתמש בעוגיות כדי לשפר את החוויה שלך, לזכור את פרטי ההתחברות ולהבטיח פעולה תקינה של המערכת.</p>
+                <h4 data-i18n="cookie_title">שימוש בעוגיות</h4>
+                <p data-i18n="cookie_text">האתר שלנו משתמש בעוגיות כדי לשפר את החוויה שלך, לזכור את פרטי ההתחברות ולהבטיח פעולה תקינה של המערכת.</p>
             </div>
             <div class="cookie-banner-buttons">
-                <button class="cookie-btn cookie-btn-accept" onclick="acceptCookies()">
+                <button class="cookie-btn cookie-btn-accept" onclick="acceptCookies()" data-i18n="cookie_accept">
                     ✅ אישור
                 </button>
-                <button class="cookie-btn cookie-btn-decline" onclick="declineCookies()">
+                <button class="cookie-btn cookie-btn-decline" onclick="declineCookies()" data-i18n="cookie_decline">
                     ❌ דחייה
                 </button>
             </div>
@@ -4530,6 +4611,555 @@
                 currentEventSource = null;
             }
         }
+    </script>
+
+    <!-- Language Translations Script -->
+    <script>
+        // Translations object
+        const translations = {
+            he: {
+                // Navigation
+                nav_features: 'הייחודיות שלנו',
+                nav_testimonials: 'משתמשים ממליצים',
+                nav_login: 'התחברות',
+                nav_register: 'הרשמה',
+
+                // Hero
+                hero_title: '🎯 תמלול חכם',
+                hero_badge: 'מעל 30,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!',
+
+                // Features
+                features_title: 'שירות תמלול לשיעורים תורניים – מדויק בהיר ומוכן לעריכה',
+                feature1_title: 'מותאם לשיעורים תורניים',
+                feature1_desc: 'שירות תמלול ייעודי לשיעורים תורניים, דרשות והרצאות הנמסרים בשפה ישיבתית. המערכת מותאמת להקלטות הכוללות הגייה ישיבתית, לשון חז״ל ומונחים תורניים.',
+                feature2_title: 'נוחות ומקצועיות',
+                feature2_desc: 'הקבצים מתומללים במהירות ונשלחים ישירות לתיבת הדוא״ל כקובץ וורד מסודר ומוכן לעבודה, ללא צורך בהמתנה באתר וללא התעסקות נוספת.',
+                feature3_title: 'שפות זמינות + תרגום לעברית, לאידיש ולאנגלית',
+                new_badge: 'חדש!',
+                feature3_desc: 'ניתן לתמלל בשפות הבאות: עברית, אידיש, אנגלית, צרפתית, ספרדית ורוסית. אחוז דיוק גבוה במיוחד!<br><br>תרגום לעברית, לאידיש או לאנגלית מכל השפות הנתמכות. בתפריט השפות יש לבחור: תרגום לעברית, תרגום לאידיש, תרגום לאנגלית.',
+                feature4_title: 'קבצים נתמכים',
+                feature4_desc: 'כל סוגי קבצי האודיו והווידאו, כולל קבצים ארוכים במיוחד.',
+                feature5_title: 'מערכת תשלומים נוחה',
+                feature5_desc: 'תשלום באשראי. מגוון חבילות לכל כיס ולכל תקציב, החל מ-10 ש"ח לשעת תמלול, וללא צורך במנוי חודשי. קבלה תישלח אוטומטית על כל רכישה.',
+                feature6_title: 'בין לקוחותינו',
+                feature6_desc: 'עורכים תורניים, רבנים, מוסדות ומכוני הוצאה לאור, המשתמשים בשירות באופן קבוע וחוסכים זמן רב.',
+                support_info: 'לתמיכה טכנית: timlul.h@gmail.com',
+
+                // Auth
+                auth_title_login: 'התחברות למערכת',
+                auth_title_register: 'הרשמה למערכת',
+                label_email: 'אימייל:',
+                label_password: 'סיסמה:',
+                label_fullname: 'שם מלא:',
+                label_phone: 'טלפון:',
+                btn_login: 'התחבר',
+                btn_register: 'הירשם',
+                link_no_account: 'אין לך חשבון? הירשם כאן',
+                link_have_account: 'יש לך חשבון? התחבר כאן',
+                btn_terms: 'תקנון שימוש, מדיניות ביטולים ומדיניות פרטיות',
+
+                // Verification
+                verify_title: 'אימות מייל',
+                verify_desc: 'נשלח קוד אימות לכתובת המייל שלך. אנא הזן את הקוד כדי להשלים את ההרשמה.',
+                label_verify_code: 'קוד אימות (6 ספרות):',
+                btn_verify: 'אמת מייל',
+                link_back_register: 'חזור להרשמה',
+
+                // Testimonials
+                testimonials_title: '📝 משתמשים ממליצים',
+                testimonial1: '"אני רוצה לומר לך יישר כח גדול! התוכנה הזו עוזרת לי המון בכל שבוע מחדש! מלבד החיסכון הכספי... הממשק שלה נוח מאוד, והיא קלה לתפעול ומדוייקת להפליא."',
+                testimonial2: '"וואו!! לא האמנתי שזה מגיע בצורה כ"כ טובה לקריאה! כמדומני שהשקעתם הרבה זמן ללמד את הג\'מיני איך לכתוב..."',
+                testimonial3: '"זה פשוט מדהים! עולה פי מאה על כמה אתרי תמלול שניסיתי עד היום ללא הצלחה"',
+
+                // App tabs
+                tab_dashboard: 'דשבורד',
+                tab_new_transcription: 'תמלול חדש',
+                tab_history: 'היסטוריה',
+                tab_buy_minutes: 'רכישת דקות',
+                tab_logout: 'יציאה',
+
+                // Dashboard
+                stat_available_minutes: 'דקות זמינות',
+                stat_transcribed_minutes: 'דקות מתומללות',
+
+                // Admin
+                admin_overview: 'סקירה כללית',
+                admin_users: 'ניהול משתמשים',
+                admin_transcriptions: 'תמלולים',
+                admin_add_minutes: 'הוספת דקות',
+                admin_overview_title: '📊 סקירה כללית',
+                stat_total_users: 'סה"כ משתמשים',
+                stat_new_users_today: 'משתמשים חדשים היום',
+                stat_total_transcriptions: 'סה"כ תמלולים',
+                stat_minutes_used: 'דקות שנוצלו',
+                admin_users_title: '👥 ניהול משתמשים',
+                admin_recent_transcriptions: '📄 תמלולים אחרונים',
+                admin_add_minutes_title: '🔧 הוספת דקות',
+                label_customer_email: 'אימייל לקוח:',
+                placeholder_customer_email: 'הכנס אימייל לקוח',
+                label_minutes_to_add: 'דקות להוספה:',
+                placeholder_minutes: 'מספר דקות',
+                btn_add_minutes: 'הוסף דקות',
+                tip_label: '💡 טיפ:',
+                tip_select_user: 'בחר משתמש מהרשימה למעלה',
+
+                // Table headers
+                th_name: 'שם',
+                th_email: 'אימייל',
+                th_available_minutes: 'דקות זמינות',
+                th_transcribed_minutes: 'דקות מתומללות',
+                th_join_date: 'תאריך הצטרפות',
+                th_actions: 'פעולות',
+                th_date: 'תאריך',
+                th_user: 'משתמש',
+                th_filename: 'שם קובץ',
+                th_duration: 'משך',
+                th_language: 'שפה',
+                th_status: 'סטטוס',
+                th_download: 'הורדה',
+
+                // Upload
+                upload_text: 'לחץ כאן או גרור קבצים (ללא הגבלה)',
+                upload_formats: 'תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
+                upload_model_info: '✨ תמלול באמצעות המודל המתקדם והמעודכן ביותר',
+                upload_accuracy: '🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק',
+                upload_limits: '📏 <strong>מגבלות:</strong> עד 1.2GB לקובץ בודד • ללא הגבלה על מספר קבצים',
+                upload_filename_warning: '⚠️ <strong>לתשומת לב:</strong> שם הקובץ צריך להיות עד 150 תווים וללא סימנים נוספים כגון גרשיים, פסיק, נקודה, סימן קריאה, סימן שאלה וכדומה',
+                upload_gdrive_info: 'כדי להעלות קבצים מגוגל דרייב, יש להתקין במחשב את <a href="https://support.google.com/drive/answer/10838124?hl=iw" target="_blank" style="color: #0ea5e9; text-decoration: underline;">תוכנת \'גוגל דרייב\' לשולחן העבודה</a>. לאחר מכן ניתן להעלות את הקבצים מהמחשב, כמו מכל כונן אחר.',
+                btn_select_files: '📄 בחר קבצים',
+                btn_select_folder: '📂 בחר תיקייה שלמה',
+                btn_select_folder_title: 'בחר תיקייה עם כל הקבצים שבתוכה',
+                folder_files_in: '📂 קבצים בתיקייה:',
+                btn_select_all: '✅ בחר הכל',
+                btn_deselect_all: '❌ בטל הכל',
+                btn_add_selected: '➕ הוסף קבצים נבחרים',
+                btn_clear_all: '🗑️ נקה הכל',
+                estimated_time: 'אמידת זמן תמלול:',
+                current_balance: 'יתרה נוכחית:',
+                minutes: 'דקות',
+                label_custom_instructions: 'הנחייה אישית (אופציונלי):',
+                label_transcription_language: 'שפת התמלול:',
+                btn_start_transcription: 'התחל תמלול',
+
+                // Languages
+                lang_hebrew: 'עברית',
+                lang_translate_hebrew: 'תרגום לעברית',
+                lang_yiddish: 'אידיש',
+                lang_translate_yiddish: 'תרגום לאידיש',
+                lang_english: 'אנגלית',
+                lang_translate_english: 'תרגום לאנגלית',
+                lang_french: 'צרפתית',
+                lang_spanish: 'ספרדית',
+                lang_russian: 'רוסית',
+
+                // History
+                history_title: 'היסטוריית תמלולים',
+
+                // Payment
+                payment_packages: 'מגוון חבילות החל מ-10 ש"ח ל-60 דקות תמלול',
+                payment_notice: '<strong>⚠️ חשוב!</strong><br>בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!',
+                btn_go_to_purchase: '💳 למעבר לדף הרכישה',
+
+                // Info banner
+                info_banner_email: 'אין צורך להמתין עד סוף העיבוד. התמלול יישלח לאימייל ויהיה זמין להורדה בעמוד ההיסטוריה.',
+
+                // Accessibility
+                btn_accessibility: '♿ נגישות',
+                accessibility_title: 'פטור מהנגשה',
+                accessibility_exempt: 'לאתר זה קיים פטור מחובת הנגשה.',
+                accessibility_contact: 'במידה והנכם זקוקים לסיוע בתפעול האתר או בצריכת השירותים המפורסמים בו, ניתן לפנות לפנינים עריכה תורנית בטלפון: <strong>052-7166925</strong>.',
+
+                // Cookies
+                cookie_title: 'שימוש בעוגיות',
+                cookie_text: 'האתר שלנו משתמש בעוגיות כדי לשפר את החוויה שלך, לזכור את פרטי ההתחברות ולהבטיח פעולה תקינה של המערכת.',
+                cookie_accept: '✅ אישור',
+                cookie_decline: '❌ דחייה'
+            },
+            en: {
+                // Navigation
+                nav_features: 'Our Features',
+                nav_testimonials: 'Testimonials',
+                nav_login: 'Login',
+                nav_register: 'Sign Up',
+
+                // Hero
+                hero_title: '🎯 Smart Transcription',
+                hero_badge: 'Over 30,000 minutes already transcribed. Join us and get 30 free trial minutes!',
+
+                // Features
+                features_title: 'Professional Transcription Service – Accurate, Clear, and Ready to Edit',
+                feature1_title: 'Specialized for Religious Lectures',
+                feature1_desc: 'Dedicated transcription service for religious lectures, sermons, and presentations. The system is optimized for recordings with religious terminology and traditional pronunciation.',
+                feature2_title: 'Convenience and Professionalism',
+                feature2_desc: 'Files are transcribed quickly and sent directly to your email as a formatted Word document, ready to work with. No need to wait on the website.',
+                feature3_title: 'Available Languages + Translation to Hebrew, Yiddish & English',
+                new_badge: 'New!',
+                feature3_desc: 'Transcription available in: Hebrew, Yiddish, English, French, Spanish, and Russian. Exceptionally high accuracy!<br><br>Translation to Hebrew, Yiddish, or English from all supported languages.',
+                feature4_title: 'Supported Files',
+                feature4_desc: 'All audio and video file types, including extra-long files.',
+                feature5_title: 'Convenient Payment System',
+                feature5_desc: 'Credit card payment. Various packages for every budget, starting from $3 per hour of transcription, no monthly subscription required. Receipt sent automatically.',
+                feature6_title: 'Our Clients',
+                feature6_desc: 'Religious editors, rabbis, institutions, and publishing houses who use our service regularly and save significant time.',
+                support_info: 'Technical support: timlul.h@gmail.com',
+
+                // Auth
+                auth_title_login: 'Login to System',
+                auth_title_register: 'Register to System',
+                label_email: 'Email:',
+                label_password: 'Password:',
+                label_fullname: 'Full Name:',
+                label_phone: 'Phone:',
+                btn_login: 'Login',
+                btn_register: 'Register',
+                link_no_account: "Don't have an account? Register here",
+                link_have_account: 'Already have an account? Login here',
+                btn_terms: 'Terms of Use, Cancellation & Privacy Policy',
+
+                // Verification
+                verify_title: 'Email Verification',
+                verify_desc: 'A verification code was sent to your email. Please enter the code to complete registration.',
+                label_verify_code: 'Verification Code (6 digits):',
+                btn_verify: 'Verify Email',
+                link_back_register: 'Back to Registration',
+
+                // Testimonials
+                testimonials_title: '📝 User Testimonials',
+                testimonial1: '"I want to say thank you so much! This software helps me tremendously every week! Besides the cost savings... the interface is very convenient and incredibly accurate."',
+                testimonial2: '"Wow!! I couldn\'t believe it comes out so readable! I think you invested a lot of time training the AI how to write..."',
+                testimonial3: '"This is simply amazing! A hundred times better than several transcription sites I tried without success"',
+
+                // App tabs
+                tab_dashboard: 'Dashboard',
+                tab_new_transcription: 'New Transcription',
+                tab_history: 'History',
+                tab_buy_minutes: 'Buy Minutes',
+                tab_logout: 'Logout',
+
+                // Dashboard
+                stat_available_minutes: 'Available Minutes',
+                stat_transcribed_minutes: 'Transcribed Minutes',
+
+                // Admin
+                admin_overview: 'Overview',
+                admin_users: 'User Management',
+                admin_transcriptions: 'Transcriptions',
+                admin_add_minutes: 'Add Minutes',
+                admin_overview_title: '📊 Overview',
+                stat_total_users: 'Total Users',
+                stat_new_users_today: 'New Users Today',
+                stat_total_transcriptions: 'Total Transcriptions',
+                stat_minutes_used: 'Minutes Used',
+                admin_users_title: '👥 User Management',
+                admin_recent_transcriptions: '📄 Recent Transcriptions',
+                admin_add_minutes_title: '🔧 Add Minutes',
+                label_customer_email: 'Customer Email:',
+                placeholder_customer_email: 'Enter customer email',
+                label_minutes_to_add: 'Minutes to Add:',
+                placeholder_minutes: 'Number of minutes',
+                btn_add_minutes: 'Add Minutes',
+                tip_label: '💡 Tip:',
+                tip_select_user: 'Select a user from the list above',
+
+                // Table headers
+                th_name: 'Name',
+                th_email: 'Email',
+                th_available_minutes: 'Available Minutes',
+                th_transcribed_minutes: 'Transcribed Minutes',
+                th_join_date: 'Join Date',
+                th_actions: 'Actions',
+                th_date: 'Date',
+                th_user: 'User',
+                th_filename: 'File Name',
+                th_duration: 'Duration',
+                th_language: 'Language',
+                th_status: 'Status',
+                th_download: 'Download',
+
+                // Upload
+                upload_text: 'Click here or drag files (unlimited)',
+                upload_formats: 'Supported formats: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
+                upload_model_info: '✨ Transcription using the most advanced and updated model',
+                upload_accuracy: '🎯 Hebrew lectures - 98% accuracy • Yeshiva pronunciation - 95% accuracy',
+                upload_limits: '📏 <strong>Limits:</strong> Up to 1.2GB per file • Unlimited number of files',
+                upload_filename_warning: '⚠️ <strong>Note:</strong> File name should be up to 150 characters without special characters like quotes, commas, periods, exclamation marks, etc.',
+                upload_gdrive_info: 'To upload files from Google Drive, install <a href="https://support.google.com/drive/answer/10838124?hl=en" target="_blank" style="color: #0ea5e9; text-decoration: underline;">Google Drive for Desktop</a>. Then you can upload files from your computer like any other drive.',
+                btn_select_files: '📄 Select Files',
+                btn_select_folder: '📂 Select Folder',
+                btn_select_folder_title: 'Select a folder with all files inside',
+                folder_files_in: '📂 Files in folder:',
+                btn_select_all: '✅ Select All',
+                btn_deselect_all: '❌ Deselect All',
+                btn_add_selected: '➕ Add Selected Files',
+                btn_clear_all: '🗑️ Clear All',
+                estimated_time: 'Estimated transcription time:',
+                current_balance: 'Current balance:',
+                minutes: 'minutes',
+                label_custom_instructions: 'Custom Instructions (optional):',
+                label_transcription_language: 'Transcription Language:',
+                btn_start_transcription: 'Start Transcription',
+
+                // Languages
+                lang_hebrew: 'Hebrew',
+                lang_translate_hebrew: 'Translate to Hebrew',
+                lang_yiddish: 'Yiddish',
+                lang_translate_yiddish: 'Translate to Yiddish',
+                lang_english: 'English',
+                lang_translate_english: 'Translate to English',
+                lang_french: 'French',
+                lang_spanish: 'Spanish',
+                lang_russian: 'Russian',
+
+                // History
+                history_title: 'Transcription History',
+
+                // Payment
+                payment_packages: 'Various packages starting from $3 for 60 minutes of transcription',
+                payment_notice: '<strong>⚠️ Important!</strong><br>Before making payment, click on the email and name fields to activate the confirmation checkbox!',
+                btn_go_to_purchase: '💳 Go to Purchase Page',
+
+                // Info banner
+                info_banner_email: 'No need to wait until processing ends. The transcription will be sent to your email and available for download in the History page.',
+
+                // Accessibility
+                btn_accessibility: '♿ Accessibility',
+                accessibility_title: 'Accessibility Exemption',
+                accessibility_exempt: 'This website has an accessibility exemption.',
+                accessibility_contact: 'If you need assistance using the website or accessing services, please contact us at: <strong>052-7166925</strong>.',
+
+                // Cookies
+                cookie_title: 'Cookie Usage',
+                cookie_text: 'Our website uses cookies to improve your experience, remember your login details, and ensure proper system operation.',
+                cookie_accept: '✅ Accept',
+                cookie_decline: '❌ Decline'
+            },
+            fr: {
+                // Navigation
+                nav_features: 'Nos Fonctionnalités',
+                nav_testimonials: 'Témoignages',
+                nav_login: 'Connexion',
+                nav_register: 'Inscription',
+
+                // Hero
+                hero_title: '🎯 Transcription Intelligente',
+                hero_badge: 'Plus de 30 000 minutes déjà transcrites. Rejoignez-nous et obtenez 30 minutes d\'essai gratuites!',
+
+                // Features
+                features_title: 'Service de Transcription Professionnel – Précis, Clair et Prêt à Éditer',
+                feature1_title: 'Spécialisé pour les Cours Religieux',
+                feature1_desc: 'Service de transcription dédié aux cours religieux, sermons et présentations. Le système est optimisé pour les enregistrements avec une terminologie religieuse et une prononciation traditionnelle.',
+                feature2_title: 'Commodité et Professionnalisme',
+                feature2_desc: 'Les fichiers sont transcrits rapidement et envoyés directement à votre email en document Word formaté, prêt à utiliser. Pas besoin d\'attendre sur le site.',
+                feature3_title: 'Langues Disponibles + Traduction vers l\'Hébreu, Yiddish & Anglais',
+                new_badge: 'Nouveau!',
+                feature3_desc: 'Transcription disponible en: hébreu, yiddish, anglais, français, espagnol et russe. Précision exceptionnellement élevée!<br><br>Traduction vers l\'hébreu, le yiddish ou l\'anglais depuis toutes les langues supportées.',
+                feature4_title: 'Fichiers Supportés',
+                feature4_desc: 'Tous les types de fichiers audio et vidéo, y compris les fichiers très longs.',
+                feature5_title: 'Système de Paiement Pratique',
+                feature5_desc: 'Paiement par carte de crédit. Différents forfaits pour tous les budgets, à partir de 3€ par heure de transcription, sans abonnement mensuel. Reçu envoyé automatiquement.',
+                feature6_title: 'Nos Clients',
+                feature6_desc: 'Éditeurs religieux, rabbins, institutions et maisons d\'édition qui utilisent notre service régulièrement et économisent un temps considérable.',
+                support_info: 'Support technique: timlul.h@gmail.com',
+
+                // Auth
+                auth_title_login: 'Connexion au Système',
+                auth_title_register: 'Inscription au Système',
+                label_email: 'Email:',
+                label_password: 'Mot de passe:',
+                label_fullname: 'Nom complet:',
+                label_phone: 'Téléphone:',
+                btn_login: 'Se connecter',
+                btn_register: 'S\'inscrire',
+                link_no_account: 'Pas de compte? Inscrivez-vous ici',
+                link_have_account: 'Déjà un compte? Connectez-vous ici',
+                btn_terms: 'Conditions d\'Utilisation, Politique d\'Annulation et de Confidentialité',
+
+                // Verification
+                verify_title: 'Vérification Email',
+                verify_desc: 'Un code de vérification a été envoyé à votre email. Veuillez entrer le code pour compléter l\'inscription.',
+                label_verify_code: 'Code de vérification (6 chiffres):',
+                btn_verify: 'Vérifier Email',
+                link_back_register: 'Retour à l\'inscription',
+
+                // Testimonials
+                testimonials_title: '📝 Témoignages Utilisateurs',
+                testimonial1: '"Je veux vous dire un grand merci! Ce logiciel m\'aide énormément chaque semaine! En plus des économies... l\'interface est très pratique et incroyablement précise."',
+                testimonial2: '"Wow!! Je n\'arrivais pas à croire que ça sort si lisible! Je pense que vous avez investi beaucoup de temps pour former l\'IA..."',
+                testimonial3: '"C\'est tout simplement incroyable! Cent fois mieux que plusieurs sites de transcription que j\'ai essayés sans succès"',
+
+                // App tabs
+                tab_dashboard: 'Tableau de Bord',
+                tab_new_transcription: 'Nouvelle Transcription',
+                tab_history: 'Historique',
+                tab_buy_minutes: 'Acheter des Minutes',
+                tab_logout: 'Déconnexion',
+
+                // Dashboard
+                stat_available_minutes: 'Minutes Disponibles',
+                stat_transcribed_minutes: 'Minutes Transcrites',
+
+                // Admin
+                admin_overview: 'Aperçu',
+                admin_users: 'Gestion Utilisateurs',
+                admin_transcriptions: 'Transcriptions',
+                admin_add_minutes: 'Ajouter Minutes',
+                admin_overview_title: '📊 Aperçu',
+                stat_total_users: 'Total Utilisateurs',
+                stat_new_users_today: 'Nouveaux Utilisateurs Aujourd\'hui',
+                stat_total_transcriptions: 'Total Transcriptions',
+                stat_minutes_used: 'Minutes Utilisées',
+                admin_users_title: '👥 Gestion Utilisateurs',
+                admin_recent_transcriptions: '📄 Transcriptions Récentes',
+                admin_add_minutes_title: '🔧 Ajouter Minutes',
+                label_customer_email: 'Email Client:',
+                placeholder_customer_email: 'Entrez l\'email du client',
+                label_minutes_to_add: 'Minutes à Ajouter:',
+                placeholder_minutes: 'Nombre de minutes',
+                btn_add_minutes: 'Ajouter Minutes',
+                tip_label: '💡 Conseil:',
+                tip_select_user: 'Sélectionnez un utilisateur dans la liste ci-dessus',
+
+                // Table headers
+                th_name: 'Nom',
+                th_email: 'Email',
+                th_available_minutes: 'Minutes Disponibles',
+                th_transcribed_minutes: 'Minutes Transcrites',
+                th_join_date: 'Date d\'Inscription',
+                th_actions: 'Actions',
+                th_date: 'Date',
+                th_user: 'Utilisateur',
+                th_filename: 'Nom du Fichier',
+                th_duration: 'Durée',
+                th_language: 'Langue',
+                th_status: 'Statut',
+                th_download: 'Télécharger',
+
+                // Upload
+                upload_text: 'Cliquez ici ou glissez des fichiers (illimité)',
+                upload_formats: 'Formats supportés: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
+                upload_model_info: '✨ Transcription utilisant le modèle le plus avancé et mis à jour',
+                upload_accuracy: '🎯 Cours en hébreu - 98% de précision • Prononciation yeshiva - 95% de précision',
+                upload_limits: '📏 <strong>Limites:</strong> Jusqu\'à 1.2GB par fichier • Nombre illimité de fichiers',
+                upload_filename_warning: '⚠️ <strong>Note:</strong> Le nom du fichier doit contenir jusqu\'à 150 caractères sans caractères spéciaux comme guillemets, virgules, points, etc.',
+                upload_gdrive_info: 'Pour télécharger des fichiers depuis Google Drive, installez <a href="https://support.google.com/drive/answer/10838124?hl=fr" target="_blank" style="color: #0ea5e9; text-decoration: underline;">Google Drive pour Bureau</a>. Ensuite, vous pouvez télécharger les fichiers depuis votre ordinateur.',
+                btn_select_files: '📄 Sélectionner Fichiers',
+                btn_select_folder: '📂 Sélectionner Dossier',
+                btn_select_folder_title: 'Sélectionner un dossier avec tous les fichiers',
+                folder_files_in: '📂 Fichiers dans le dossier:',
+                btn_select_all: '✅ Tout Sélectionner',
+                btn_deselect_all: '❌ Tout Désélectionner',
+                btn_add_selected: '➕ Ajouter Fichiers Sélectionnés',
+                btn_clear_all: '🗑️ Tout Effacer',
+                estimated_time: 'Temps de transcription estimé:',
+                current_balance: 'Solde actuel:',
+                minutes: 'minutes',
+                label_custom_instructions: 'Instructions Personnalisées (optionnel):',
+                label_transcription_language: 'Langue de Transcription:',
+                btn_start_transcription: 'Démarrer Transcription',
+
+                // Languages
+                lang_hebrew: 'Hébreu',
+                lang_translate_hebrew: 'Traduire en Hébreu',
+                lang_yiddish: 'Yiddish',
+                lang_translate_yiddish: 'Traduire en Yiddish',
+                lang_english: 'Anglais',
+                lang_translate_english: 'Traduire en Anglais',
+                lang_french: 'Français',
+                lang_spanish: 'Espagnol',
+                lang_russian: 'Russe',
+
+                // History
+                history_title: 'Historique des Transcriptions',
+
+                // Payment
+                payment_packages: 'Différents forfaits à partir de 3€ pour 60 minutes de transcription',
+                payment_notice: '<strong>⚠️ Important!</strong><br>Avant de payer, cliquez sur les champs email et nom pour activer la case de confirmation!',
+                btn_go_to_purchase: '💳 Aller à la Page d\'Achat',
+
+                // Info banner
+                info_banner_email: 'Pas besoin d\'attendre la fin du traitement. La transcription sera envoyée à votre email et disponible dans la page Historique.',
+
+                // Accessibility
+                btn_accessibility: '♿ Accessibilité',
+                accessibility_title: 'Exemption d\'Accessibilité',
+                accessibility_exempt: 'Ce site web bénéficie d\'une exemption d\'accessibilité.',
+                accessibility_contact: 'Si vous avez besoin d\'aide pour utiliser le site ou accéder aux services, veuillez nous contacter au: <strong>052-7166925</strong>.',
+
+                // Cookies
+                cookie_title: 'Utilisation des Cookies',
+                cookie_text: 'Notre site utilise des cookies pour améliorer votre expérience, mémoriser vos informations de connexion et assurer le bon fonctionnement du système.',
+                cookie_accept: '✅ Accepter',
+                cookie_decline: '❌ Refuser'
+            }
+        };
+
+        // Current language
+        let currentLang = localStorage.getItem('siteLanguage') || 'he';
+
+        // Set language function
+        function setLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('siteLanguage', lang);
+
+            // Update HTML direction
+            const html = document.documentElement;
+            if (lang === 'he') {
+                html.setAttribute('dir', 'rtl');
+                html.setAttribute('lang', 'he');
+            } else {
+                html.setAttribute('dir', 'ltr');
+                html.setAttribute('lang', lang);
+            }
+
+            // Update active button
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.getAttribute('data-lang') === lang) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Apply translations
+            applyTranslations(lang);
+        }
+
+        // Apply translations function
+        function applyTranslations(lang) {
+            const trans = translations[lang];
+            if (!trans) return;
+
+            // Update all elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (trans[key]) {
+                    el.innerHTML = trans[key];
+                }
+            });
+
+            // Update placeholders
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (trans[key]) {
+                    el.placeholder = trans[key];
+                }
+            });
+
+            // Update title attributes
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.getAttribute('data-i18n-title');
+                if (trans[key]) {
+                    el.title = trans[key];
+                }
+            });
+
+            // Update page title
+            document.title = lang === 'he' ? 'תמלול חכם' : (lang === 'en' ? 'Smart Transcription' : 'Transcription Intelligente');
+        }
+
+        // Initialize language on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            setLanguage(currentLang);
+        });
     </script>
 
         </div>
