@@ -2075,7 +2075,18 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     if (chunksData.chunks.length === 0) {
       throw new Error('No chunks were created');
     }
-    
+
+    // Send progress update after chunking is complete
+    if (transcriptionId) {
+      const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+      updateTranscriptionProgress(
+        transcriptionId,
+        Math.round(baseProgress),
+        `מעבד ${chunksData.chunks.length} חלקים של ${filename}...`,
+        filename
+      );
+    }
+
     // 🔥 Process all chunks in parallel using Promise.all with improved error handling
     const transcriptions = await Promise.all(
       chunksData.chunks.map(async (chunk, i) => {
@@ -2085,18 +2096,8 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
         console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
 
-        // Send progress update for each chunk
-        if (transcriptionId) {
-          // Calculate progress within the file: 20% base + 60% for file processing
-          const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-          const chunkProgress = baseProgress + ((i / chunksData.chunks.length) * (60 / totalFiles));
-          updateTranscriptionProgress(
-            transcriptionId,
-            Math.round(chunkProgress),
-            `מעבד חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
-            filename
-          );
-        }
+        // Note: Progress update is sent when chunk COMPLETES, not when it starts
+        // This prevents the progress bar from jumping ahead when chunks are processed in parallel
 
         while (retryCount <= maxRetries && !chunkTranscription) {
           try {
@@ -2144,27 +2145,37 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             // 🔹 SMART: Accept all chunks, mark quality status
             if (chunkTranscription && chunkTranscription.trim().length >= 20) {
               console.log(`✅ Chunk ${i + 1} completed successfully with ${chunkTranscription.length} characters`);
+              // Send progress update for chunk completion - BEFORE break!
+              if (transcriptionId) {
+                const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                updateTranscriptionProgress(
+                  transcriptionId,
+                  Math.round(completedProgress),
+                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                  filename
+                );
+              }
               break; // Good chunk - exit retry loop
             } else if (chunkTranscription && chunkTranscription.trim().length > 0) {
               console.warn(`⚠️ Chunk ${i + 1} is short/suspect (${chunkTranscription.length} chars) - marking for later review`);
+              // Send progress update for chunk completion - BEFORE break!
+              if (transcriptionId) {
+                const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                updateTranscriptionProgress(
+                  transcriptionId,
+                  Math.round(completedProgress),
+                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                  filename
+                );
+              }
               break; // Accept short chunk, will handle later
             } else {
               // Really empty - try retry
               console.warn(`❌ Chunk ${i + 1} returned empty, will retry...`);
               chunkTranscription = null;
               throw new Error('Empty transcription result');
-            }
-
-            // Send progress update for chunk completion
-            if (transcriptionId) {
-              const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-              const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
-              updateTranscriptionProgress(
-                transcriptionId,
-                Math.round(completedProgress),
-                `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
-                filename
-              );
             }
 
           } catch (chunkError) {
@@ -2174,6 +2185,17 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             if (retryCount > maxRetries) {
               console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
               chunkTranscription = `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
+              // Send progress update even for failed chunks
+              if (transcriptionId) {
+                const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
+                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                updateTranscriptionProgress(
+                  transcriptionId,
+                  Math.round(completedProgress),
+                  `חלק ${i + 1} מתוך ${chunksData.chunks.length} (נכשל) - ${filename}`,
+                  filename
+                );
+              }
               break; // Exit retry loop with error message
             } else {
               // Wait before retry
