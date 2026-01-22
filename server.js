@@ -2088,16 +2088,17 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
     }
 
     // 🔥 Process all chunks in parallel using Promise.all with improved error handling
+    // Counter for completed chunks - ensures progress only goes UP, never down
+    let completedChunksCount = 0;
+    const totalChunks = chunksData.chunks.length;
+
     const transcriptions = await Promise.all(
       chunksData.chunks.map(async (chunk, i) => {
         const maxRetries = 2;
         let retryCount = 0;
         let chunkTranscription = null;
 
-        console.log(`🎯 Processing chunk ${i + 1}/${chunksData.chunks.length} - Adding to queue...`);
-
-        // Note: Progress update is sent when chunk COMPLETES, not when it starts
-        // This prevents the progress bar from jumping ahead when chunks are processed in parallel
+        console.log(`🎯 Processing chunk ${i + 1}/${totalChunks} - Adding to queue...`);
 
         while (retryCount <= maxRetries && !chunkTranscription) {
           try {
@@ -2145,10 +2146,11 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             // 🔹 SMART: Accept all chunks, mark quality status
             if (chunkTranscription && chunkTranscription.trim().length >= 20) {
               console.log(`✅ Chunk ${i + 1} completed successfully with ${chunkTranscription.length} characters`);
-              // Send progress update for chunk completion - BEFORE break!
+              // Increment completed counter and send progress update
+              completedChunksCount++;
               if (transcriptionId) {
                 const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                const completedProgress = baseProgress + ((completedChunksCount / totalChunks) * (60 / totalFiles));
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
@@ -2159,10 +2161,11 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
               break; // Good chunk - exit retry loop
             } else if (chunkTranscription && chunkTranscription.trim().length > 0) {
               console.warn(`⚠️ Chunk ${i + 1} is short/suspect (${chunkTranscription.length} chars) - marking for later review`);
-              // Send progress update for chunk completion - BEFORE break!
+              // Increment completed counter and send progress update
+              completedChunksCount++;
               if (transcriptionId) {
                 const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                const completedProgress = baseProgress + ((completedChunksCount / totalChunks) * (60 / totalFiles));
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
@@ -2185,10 +2188,11 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
             if (retryCount > maxRetries) {
               console.error(`💀 Chunk ${i + 1} failed after ${maxRetries} retries`);
               chunkTranscription = `[שגיאה בתמלול קטע ${i + 1} - נכשל אחרי ${maxRetries} ניסיונות]`;
-              // Send progress update even for failed chunks
+              // Increment completed counter and send progress update even for failed chunks
+              completedChunksCount++;
               if (transcriptionId) {
                 const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
-                const completedProgress = baseProgress + (((i + 1) / chunksData.chunks.length) * (60 / totalFiles));
+                const completedProgress = baseProgress + ((completedChunksCount / totalChunks) * (60 / totalFiles));
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
