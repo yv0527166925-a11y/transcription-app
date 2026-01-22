@@ -2840,33 +2840,6 @@ const attachments = transcriptions.map(trans => {
             ${failureSection}
 
 
-           <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0; border-right: 4px solid #2196f3;">
-              <h3 style="color: #1976d2; margin-bottom: 15px; font-size: 18px;">לעבודה נוחה עם הטקסט המתומלל:</h3>
-              <p style="font-size: 15px; color: #1565c0; margin: 10px 0; margin-bottom: 15px;">
-                מומלץ לבחור את כל הטקסט מקובץ הוורד עם קונטרול +A, לפתוח קובץ וורד חדש ולהדביק בו את הטקסט, אך לא בהדבקה רגילה, אלא <strong>באופציה השמאלית</strong> באפשרויות ההדבקה:
-              </p>
-              <div style="text-align: center; margin: 15px 0; position: relative; display: inline-block; width: 100%;">
-                <div style="background: #fff; padding: 10px; border-radius: 6px; display: inline-block; border: 1px solid #ccc; position: relative;">
-                  <div style="color: #333; font-size: 12px; margin-bottom: 5px; font-weight: bold;">אפשרויות הדבקה:</div>
-                  <div style="display: flex; gap: 8px; align-items: center; justify-content: center;">
-                    <!-- שלוש האופציות הראשונות -->
-                    <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📄</div>
-                    <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📋</div>
-                    <div style="width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 4px; background: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 10px; opacity: 0.6;">📝</div>
-                    <!-- האופציה השמאלית - מודגשת -->
-                    <div style="position: relative;">
-                      <div style="width: 24px; height: 24px; border: 2px solid #ff4444; border-radius: 4px; background: #f0f8ff; display: flex; align-items: center; justify-content: center; font-size: 10px;">✏️</div>
-                      <div style="position: absolute; top: -5px; right: -5px; width: 12px; height: 12px; background: #ff4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 8px; font-weight: bold;">!</div>
-                    </div>
-                  </div>
-                  <div style="margin-top: 8px; color: #ff4444; font-size: 11px; font-weight: bold;">← בחר באופציה זו (הראשונה משמאל)</div>
-                </div>
-              </div>
-              <p style="font-size: 13px; color: #1565c0; margin: 10px 0; font-style: italic;">
-                הבחירה באופציה הראשונה (השמאלית) תשמור על העיצוב הנכון של הטקסט העברי
-              </p>
-            </div>
-
             <div style="text-align: center; margin: 30px 0;">
               <p style="font-size: 18px; color: #667eea; font-weight: bold;">
                 🎉 תמלול מלא ושלם - אפילו לקבצים של שעות!
