@@ -16,10 +16,10 @@ def get_word_language_code(language):
         'Hebrew': 'he-IL',
         'he': 'he-IL',
         'translate-he': 'he-IL',
-        # יידיש
-        'Yiddish': 'yi',
-        'yi': 'yi',
-        'translate-yi': 'yi',
+        # יידיש - משתמש בעברית כי כתוב באותיות עבריות
+        'Yiddish': 'he-IL',
+        'yi': 'he-IL',
+        'translate-yi': 'he-IL',
         # ערבית
         'Arabic': 'ar-SA',
         'ar': 'ar-SA',
