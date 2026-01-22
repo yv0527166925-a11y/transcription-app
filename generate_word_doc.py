@@ -7,6 +7,28 @@ import json
 # Don't import docx at module level - do it only when needed
 # This prevents immediate failure if docx is not installed
 
+def get_word_language_code(language):
+    """
+    מחזיר את קוד השפה המתאים ל-Word לפי שם השפה או קוד השפה
+    """
+    language_map = {
+        # עברית
+        'Hebrew': 'he-IL',
+        'he': 'he-IL',
+        'translate-he': 'he-IL',
+        # יידיש
+        'Yiddish': 'yi',
+        'yi': 'yi',
+        'translate-yi': 'yi',
+        # ערבית
+        'Arabic': 'ar-SA',
+        'ar': 'ar-SA',
+        # אנגלית (ברירת מחדל לשפות LTR)
+        'English': 'en-US',
+        'en': 'en-US',
+    }
+    return language_map.get(language, 'he-IL')  # ברירת מחדל: עברית
+
 def create_hebrew_word_document(transcription, title, output_path, language='Hebrew'):
     """
     יוצר מסמך Word בשיטה של החלפת תבנית עובדת
@@ -42,6 +64,7 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         # בדיקה אם קיימת תבנית עובדת (רק לשפות RTL)
         print(f"📝 Creating RTL document with template for language: {language}", file=sys.stderr)
         possible_templates = [
+            'template-hebrew-rtl.docx',  # תבנית RTL חדשה ומתוקנת
             'חזר מהשרת תקין 2.docx',
             'דוגמה_Word_מושלמת.docx',
             'בדיקה_תבנית_עובדת.docx',
@@ -87,19 +110,24 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         print(f"🔍 DEBUG: Received language = '{language}'", file=sys.stderr)
         rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar', 'translate-he', 'translate-yi']
         is_rtl = language in rtl_languages
-        alignment = 'right' if is_rtl else 'left'
-        print(f"🔍 DEBUG: is_rtl = {is_rtl}, alignment = '{alignment}'", file=sys.stderr)
+        # ב-RTL עם bidi, "left" = התחלה = ימין. ב-LTR, "left" = שמאל
+        alignment = 'left'  # תמיד left - עם bidi זה יהיה בצד הנכון
+        lang_code = get_word_language_code(language)
+        print(f"🔍 DEBUG: is_rtl = {is_rtl}, alignment = '{alignment}', lang_code = '{lang_code}'", file=sys.stderr)
 
-        # כותרת
+        # כותרת - עם הגדרת שפה מפורשת לפי השפה שנבחרה
         title_paragraph = f'''
-<w:p w14:paraId="6A1F55DC" w14:textId="77777777">
+<w:p>
   <w:pPr>
+    <w:bidi/>
     <w:jc w:val="{alignment}"/>
     <w:spacing w:after="400"/>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="32"/>
       <w:b/>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
     </w:rPr>
   </w:pPr>
   <w:r>
@@ -107,6 +135,8 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="32"/>
       <w:b/>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
     </w:rPr>
     <w:t>{escape_xml(title)}</w:t>
   </w:r>
@@ -151,12 +181,19 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
 <w:p>
   <w:pPr>
     <w:jc w:val="{alignment}"/>
+    <w:bidi/>
     <w:spacing w:after="240"/>
+    <w:rPr>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
+    </w:rPr>
   </w:pPr>
   <w:r>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="28"/>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
     </w:rPr>
     <w:t>{escape_xml(para_text)}</w:t>
   </w:r>
@@ -172,12 +209,19 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
 <w:p>
   <w:pPr>
     <w:jc w:val="{alignment}"/>
+    <w:bidi/>
     <w:spacing w:after="240"/>
+    <w:rPr>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
+    </w:rPr>
   </w:pPr>
   <w:r>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="28"/>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
     </w:rPr>
     <w:t>{escape_xml(para_text)}</w:t>
   </w:r>
@@ -192,12 +236,19 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
 <w:p>
   <w:pPr>
     <w:jc w:val="{alignment}"/>
+    <w:bidi/>
     <w:spacing w:after="240"/>
+    <w:rPr>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
+    </w:rPr>
   </w:pPr>
   <w:r>
     <w:rPr>
       <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
       <w:sz w:val="28"/>
+      <w:lang w:val="{lang_code}" w:bidi="{lang_code}"/>
+      <w:rtl/>
     </w:rPr>
     <w:t>{escape_xml(processed_text)}</w:t>
   </w:r>
@@ -206,8 +257,26 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
 
         # החלפת התוכן
         import re
-        # מוצא את ה-body ומחליף את התוכן
-        body_content = ''.join(new_paragraphs)
+
+        # הוספת sectPr (הגדרות סעיף) עם כיוון RTL
+        if is_rtl:
+            section_props = '''<w:sectPr>
+  <w:bidi/>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="1440" w:right="1800" w:bottom="1440" w:left="1800" w:header="720" w:footer="720" w:gutter="0"/>
+  <w:cols w:space="720"/>
+  <w:docGrid w:linePitch="360"/>
+</w:sectPr>'''
+        else:
+            section_props = '''<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="1440" w:right="1800" w:bottom="1440" w:left="1800" w:header="720" w:footer="720" w:gutter="0"/>
+  <w:cols w:space="720"/>
+  <w:docGrid w:linePitch="360"/>
+</w:sectPr>'''
+
+        # מוצא את ה-body ומחליף את התוכן - כולל sectPr בסוף
+        body_content = ''.join(new_paragraphs) + section_props
         new_doc_content = re.sub(
             r'<w:body[^>]*>.*?</w:body>',
             f'<w:body>{body_content}</w:body>',
@@ -220,12 +289,63 @@ def create_hebrew_word_document(transcription, title, output_path, language='Heb
         with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_file:
             temp_path = temp_file.name
 
-        # עדכון הקובץ
+        # עדכון הקובץ - כולל styles.xml לתמיכה ב-RTL
         with ZipFile(template_path, 'r') as original_zip:
             with ZipFile(temp_path, 'w') as new_zip:
                 for item in original_zip.infolist():
                     if item.filename == 'word/document.xml':
                         new_zip.writestr(item, new_doc_content.encode('utf-8'))
+                    elif item.filename == 'word/styles.xml' and is_rtl:
+                        # עדכון styles.xml להוספת RTL כברירת מחדל
+                        styles_content = original_zip.read(item.filename).decode('utf-8')
+
+                        # עדכון pPrDefault להוספת bidi
+                        if '<w:pPrDefault>' in styles_content:
+                            # אם יש pPrDefault, נוסיף bidi בתוכו
+                            if '<w:pPr>' in styles_content and '<w:pPrDefault>' in styles_content:
+                                # הוסף bidi ל-pPr הקיים
+                                styles_content = re.sub(
+                                    r'(<w:pPrDefault>\s*<w:pPr>)',
+                                    r'\1<w:bidi/>',
+                                    styles_content
+                                )
+                            else:
+                                # הוסף pPr עם bidi
+                                styles_content = styles_content.replace(
+                                    '<w:pPrDefault>',
+                                    '<w:pPrDefault><w:pPr><w:bidi/></w:pPr>'
+                                )
+
+                        # עדכון השפה ב-rPrDefault
+                        styles_content = re.sub(
+                            r'<w:lang[^/]*/>',
+                            f'<w:lang w:val="{lang_code}" w:eastAsia="en-US" w:bidi="{lang_code}"/>',
+                            styles_content
+                        )
+
+                        print(f"Updated styles.xml with RTL defaults", file=sys.stderr)
+                        new_zip.writestr(item, styles_content.encode('utf-8'))
+                    elif item.filename == 'word/settings.xml' and is_rtl:
+                        # עדכון settings.xml להוספת כיוון מסמך RTL
+                        settings_content = original_zip.read(item.filename).decode('utf-8')
+
+                        # הוסף bidi אחרי characterSpacingControl או בתחילת settings
+                        if '<w:bidi/>' not in settings_content:
+                            if '<w:characterSpacingControl' in settings_content:
+                                settings_content = re.sub(
+                                    r'(<w:characterSpacingControl[^/]*/>)',
+                                    r'\1<w:bidi/>',
+                                    settings_content
+                                )
+                            elif '<w:defaultTabStop' in settings_content:
+                                settings_content = re.sub(
+                                    r'(<w:defaultTabStop[^/]*/>)',
+                                    r'\1<w:bidi/>',
+                                    settings_content
+                                )
+
+                        print(f"Updated settings.xml with RTL direction", file=sys.stderr)
+                        new_zip.writestr(item, settings_content.encode('utf-8'))
                     else:
                         data = original_zip.read(item.filename)
                         new_zip.writestr(item, data)
@@ -244,6 +364,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
     """
     יצירת מסמך בסיסי אם אין תבנית - עם הגדרות RTL או LTR לפי השפה
     """
+    import re  # needed for sentence splitting
     try:
         # Import docx here too
         from docx import Document
@@ -256,12 +377,27 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
         rtl_languages = ['Hebrew', 'Yiddish', 'Arabic', 'he', 'yi', 'ar', 'translate-he', 'translate-yi']
         is_rtl = language in rtl_languages
 
-        print(f"📝 Creating basic document: language={language}, RTL={is_rtl}", file=sys.stderr)
+        # קבלת קוד השפה המתאים
+        lang_code = get_word_language_code(language)
+        print(f"📝 Creating basic document: language={language}, RTL={is_rtl}, lang_code={lang_code}", file=sys.stderr)
         doc = Document()
 
-        # הגדרת השפה העיקרית של המסמך לעברית
+        # הגדרת השפה העיקרית של המסמך
         doc_element = doc.element
-        doc_element.set(qn('xml:lang'), 'he-IL')
+        doc_element.set(qn('xml:lang'), lang_code)
+
+        # הגדרת שפת ברירת מחדל למסמך בתוך settings
+        if is_rtl:
+            try:
+                # הגדרת שפה ב-document settings
+                settings = doc.settings.element
+                themeFontLang = OxmlElement('w:themeFontLang')
+                themeFontLang.set(qn('w:val'), lang_code)
+                themeFontLang.set(qn('w:bidi'), lang_code)
+                settings.append(themeFontLang)
+                print(f"Set document default language to {lang_code}", file=sys.stderr)
+            except Exception as lang_err:
+                print(f"Warning: Could not set document language: {lang_err}", file=sys.stderr)
 
     except Exception as e:
         print(f"Error creating basic document: {str(e)}", file=sys.stderr)
@@ -280,7 +416,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
         if is_rtl:
             title_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             # הוספת הגדרות RTL לכותרת
-            set_rtl_paragraph(title_paragraph)
+            set_rtl_paragraph(title_paragraph, language)
         else:
             title_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -336,7 +472,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
 
                             if is_rtl:
                                 paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                                set_rtl_paragraph(paragraph)
+                                set_rtl_paragraph(paragraph, language)
                             else:
                                 paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -356,7 +492,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
 
                 if is_rtl:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                    set_rtl_paragraph(paragraph)
+                    set_rtl_paragraph(paragraph, language)
                 else:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -386,7 +522,7 @@ def create_basic_hebrew_document(transcription, title, output_path, language='He
 
                 if is_rtl:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                    set_rtl_paragraph(paragraph)
+                    set_rtl_paragraph(paragraph, language)
                 else:
                     paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
@@ -720,13 +856,16 @@ def fix_hebrew_punctuation(text):
     print('✅ ULTIMATE Hebrew processing completed!', file=sys.stderr)
     return text
 
-def set_rtl_paragraph(paragraph):
+def set_rtl_paragraph(paragraph, language='Hebrew'):
     """
-    מגדיר פסקה כ-RTL (ימין לשמאל) - גרסה משופרת
+    מגדיר פסקה כ-RTL (ימין לשמאל) עם שפה מתאימה - גרסה משופרת
     """
     try:
         from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+
+        # קבלת קוד השפה המתאים
+        lang_code = get_word_language_code(language)
 
         # הוספת הגדרת RTL ל-XML של הפסקה
         p = paragraph._element
@@ -747,7 +886,32 @@ def set_rtl_paragraph(paragraph):
         jc.set(qn('w:val'), 'right')
         pPr.append(jc)
 
-        print(f"RTL settings applied to paragraph", file=sys.stderr)
+        # הוספת הגדרת שפה ל-paragraph properties
+        rPr_para = OxmlElement('w:rPr')
+        lang_para = OxmlElement('w:lang')
+        lang_para.set(qn('w:val'), lang_code)
+        lang_para.set(qn('w:bidi'), lang_code)
+        rPr_para.append(lang_para)
+        rtl_para = OxmlElement('w:rtl')
+        rPr_para.append(rtl_para)
+        pPr.append(rPr_para)
+
+        # הוספת הגדרת שפה לכל ה-runs בפסקה
+        for run in paragraph.runs:
+            r = run._element
+            rPr = r.get_or_add_rPr()
+
+            # הוספת שפה
+            lang = OxmlElement('w:lang')
+            lang.set(qn('w:val'), lang_code)
+            lang.set(qn('w:bidi'), lang_code)
+            rPr.append(lang)
+
+            # הוספת RTL marker
+            rtl = OxmlElement('w:rtl')
+            rPr.append(rtl)
+
+        print(f"RTL and {lang_code} language settings applied to paragraph", file=sys.stderr)
 
     except Exception as e:
         print(f"Warning: Cannot set RTL: {str(e)}", file=sys.stderr)
