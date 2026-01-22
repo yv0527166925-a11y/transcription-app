@@ -2027,7 +2027,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
       updateTranscriptionProgress(
         transcriptionId,
         Math.round(paragraphProgress),
-        `מחלק לפסקאות עבור ${filename}`,
+        `מעבד...`,
         filename
       );
     }
@@ -2045,7 +2045,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
       updateTranscriptionProgress(
         transcriptionId,
         Math.round(baseProgress),
-        `הושלם תמלול עבור ${filename}`,
+        `מתמלל...`,
         filename
       );
     }
@@ -2076,13 +2076,13 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
       throw new Error('No chunks were created');
     }
 
-    // Send progress update after chunking is complete
+    // Send progress update - start transcribing
     if (transcriptionId) {
       const baseProgress = 20 + ((fileIndex / totalFiles) * 60);
       updateTranscriptionProgress(
         transcriptionId,
         Math.round(baseProgress),
-        `מעבד ${chunksData.chunks.length} חלקים של ${filename}...`,
+        `מתמלל...`,
         filename
       );
     }
@@ -2152,7 +2152,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
-                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                  `מתמלל...`,
                   filename
                 );
               }
@@ -2166,7 +2166,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
-                  `הושלם חלק ${i + 1} מתוך ${chunksData.chunks.length} של ${filename}`,
+                  `מתמלל...`,
                   filename
                 );
               }
@@ -2192,7 +2192,7 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
                 updateTranscriptionProgress(
                   transcriptionId,
                   Math.round(completedProgress),
-                  `חלק ${i + 1} מתוך ${chunksData.chunks.length} (נכשל) - ${filename}`,
+                  `מתמלל...`,
                   filename
                 );
               }
