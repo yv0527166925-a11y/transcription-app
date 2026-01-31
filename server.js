@@ -2499,6 +2499,34 @@ async function createWordDocument(transcription, filename, duration) {
       .map(p => p.trim())
       .filter(p => p.length > 0);
 
+    // יצירת כותרת
+    const titleParagraph = `
+      <w:p w14:paraId="346CE71B" w14:textId="424A57EE" w:rsidR="009550AA" w:rsidRPr="009F17F4" w:rsidRDefault="0056303E" w:rsidP="0056303E">
+        <w:pPr>
+          <w:jc w:val="center"/>
+          <w:bidi w:val="1"/>
+          <w:textDirection w:val="rl"/>
+          <w:spacing w:after="400"/>
+          <w:rPr>
+            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
+            <w:rtl/>
+          </w:rPr>
+        </w:pPr>
+        <w:r w:rsidRPr="0056303E">
+          <w:rPr>
+            <w:rFonts w:ascii="David" w:hAnsi="David" w:cs="David"/>
+            <w:b/>
+            <w:sz w:val="28"/>
+            <w:lang w:val="he-IL" w:eastAsia="he-IL" w:bidi="he-IL"/>
+            <w:rtl/>
+          </w:rPr>
+          <w:t>${escapeXml(cleanName)}</w:t>
+        </w:r>
+      </w:p>`;
+
     // יצירת XML לכל פסקה קצרה
     const paragraphElements = shortParagraphs.map(paragraph => `
       <w:p w14:paraId="346CE71B" w14:textId="424A57EE" w:rsidR="009550AA" w:rsidRPr="009F17F4" w:rsidRDefault="0056303E" w:rsidP="0056303E">
@@ -3217,6 +3245,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
     // Send email with results
     if (transcriptions.length > 0) {
       updateTranscriptionProgress(transcriptionId, 95, 'שולח תוצאות באימייל...');
+
       await sendTranscriptionEmail(userEmail, transcriptions, failedTranscriptions);
       console.log(`📧 Email sent with ${transcriptions.length} successful transcriptions`);
 
