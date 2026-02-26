@@ -835,7 +835,10 @@ async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename,
       model: modelName,
       generationConfig: {
         temperature: 0,
-        maxOutputTokens: modelName === "gemini-2.5-pro" ? 32768 : 32768
+        maxOutputTokens: 65536,
+        candidateCount: 1,
+        topP: 0.95,
+        topK: 40
       }
     });
 
@@ -861,14 +864,17 @@ ${contextPrompt}
 
 קובץ אודיו (חלק ${chunkIndex + 1}/${totalChunks}) - מודל: ${modelName}
 
-🚨 הוראות קריטיות:
-1. תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט
-2. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
-3. התחל ישירות עם התוכן המתומלל
-4. סיים ישירות עם התוכן - אל תוסיף סיכום
-5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
-6. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק, גם אם הם נשמעים חסרים, שגויים או לא שלמים. אסור לך לתקן, להשלים או לשפר אותם בשום דרך!
-7. 🚨 **אין להשמיט מילים או ביטויי ייחוס שנשמעים באודיו** (כגון: "כך אמר", "כך שאל", "כך ענה"), גם אם הם קצרים, נאמרים במהירות או נראים משניים.
+🚨 הוראות קריטיות - חובה לקרוא ולבצע:
+1. 🔴 תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט - אל תדלג על שום דבר
+2. 🔴 **אסור לסכם, לקצר או להשמיט** - גם אם הקטע ארוך או חוזר על עצמו
+3. 🔴 **אסור לכתוב "..." או "[...]"** - תמלל הכל מילה במילה
+4. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
+5. התחל ישירות עם התוכן המתומלל
+6. סיים ישירות עם התוכן - אל תוסיף סיכום
+7. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
+8. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק
+9. 🚨 **אין להשמיט מילים או ביטויי ייחוס שנשמעים באודיו** (כגון: "כך אמר", "כך שאל", "כך ענה")
+10. 🔴 **זה לא סיכום - זה תמלול מלא ומדויק של כל מה שנאמר**
 
 תתחיל עכשיו עם התמלול:`;
 
@@ -919,6 +925,13 @@ ${contextPrompt}
       throw new Error(`🚨 CRITICAL: Transcription returned empty after processing with ${modelName}`);
     }
 
+    // 🔧 NEW: Check for potential content omission
+    const audioSizeMB = audioData.length / (1024 * 1024);
+    const expectedMinChars = Math.max(50, audioSizeMB * 100); // Minimum expected characters based on file size
+    if (transcription.length < expectedMinChars && audioSizeMB > 1) {
+      console.log(`⚠️ Warning: Transcription may be too short for file size. Expected ~${expectedMinChars}, got ${transcription.length}`);
+    }
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ Chunk ${chunkIndex + 1} transcribed with ${modelName}: ${transcription.length} characters in ${duration}s`);
     console.log(`📄 Chunk ${chunkIndex + 1} content preview: "${transcription.substring(0, 100)}..."`);
@@ -957,21 +970,25 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
     
     const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
-🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
-אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
+🚨 **אל תקצר את התמלול** - תמלל את כל התוכן מילה במילה!
+🚨 אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
+🔴 **זהו תמלול מלא, לא סיכום או קיצור** - אסור להשמיט תוכן!
 
 ${contextPrompt}
 
 קובץ אודיו (חלק ${chunkIndex + 1}/${totalChunks})
 
-🚨 הוראות קריטיות:
-1. תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט
-2. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
-3. התחל ישירות עם התוכן המתומלל
-4. סיים ישירות עם התוכן - אל תוסיף סיכום
-5. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
-6. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק, גם אם הם נשמעים חסרים, שגויים או לא שלמים. אסור לך לתקן, להשלים או לשפר אותם בשום דרך!
-7. 🚨 **אין להשמיט מילים או ביטויי ייחוס שנשמעים באודיו** (כגון: "כך אמר", "כך שאל", "כך ענה"), גם אם הם קצרים, נאמרים במהירות או נראים משניים.
+🚨 הוראות קריטיות - חובה לקרוא ולבצע:
+1. 🔴 תמלל את כל התוכן בקטע הזה - כל מילה, כל משפט - אל תדלג על שום דבר
+2. 🔴 **אסור לסכם, לקצר או להשמיט** - גם אם הקטע ארוך או חוזר על עצמו
+3. 🔴 **אסור לכתוב "..." או "[...]"** - תמלל הכל מילה במילה
+4. אל תוסיף הערות כמו "זהו המשך" או "סיום חלק"
+5. התחל ישירות עם התוכן המתומלל
+6. סיים ישירות עם התוכן - אל תוסיף סיכום
+7. אם יש חיתוך באמצע מילה/משפט - כתוב את מה שאתה שומע
+8. 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שנאמרו בדיוק
+9. 🚨 **אין להשמיט מילים או ביטויי ייחוס שנשמעים באודיו** (כגון: "כך אמר", "כך שאל", "כך ענה")
+10. 🔴 **זה לא סיכום - זה תמלול מלא ומדויק של כל מה שנאמר**
 
 תתחיל עכשיו עם התמלול:`;
 
