@@ -780,7 +780,7 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
 
   // First attempt: Gemini 3 Pro Preview
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 0);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
       throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 1)');
     }
@@ -791,7 +791,7 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
 
     // Second attempt: Gemini 3 Pro Preview again
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-pro-preview", startTime, 1);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 1);
       if (!transcription || transcription.trim().length === 0) {
         throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 2)');
       }
@@ -935,7 +935,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 32768
@@ -1155,7 +1155,7 @@ async function smartParagraphDivision(text) {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 500000
@@ -1525,7 +1525,7 @@ ${text}
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3.1-pro-preview",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 500000
@@ -1926,7 +1926,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 65536
@@ -2347,7 +2347,7 @@ async function improveTranscriptionQuality(transcription, language = 'Hebrew') {
     console.log('🔧 Starting text quality improvement with Gemini...');
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 32768
@@ -3381,7 +3381,7 @@ app.get('/test-gemini', async (req, res) => {
     }
 
     // Test with a simple text generation
-    const model = genAI.getGenerativeModel({ model: "gemini-3-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
     const text = response.text();
