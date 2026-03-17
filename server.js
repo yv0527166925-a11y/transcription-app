@@ -778,44 +778,44 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First attempt: Gemini 3 Pro Preview
+  // First attempt: Gemini 2.5 Pro
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 0);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 1)');
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro (attempt 1)');
     }
     console.log(`✅ Gemini 3 Pro Preview (attempt 1) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error1) {
     console.log(`⚠️ Gemini 3 Pro Preview (attempt 1) failed for chunk ${chunkIndex + 1}:`, error1.message);
 
-    // Second attempt: Gemini 3 Pro Preview again
+    // Second attempt: Gemini 2.5 Pro again
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 1);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 1);
       if (!transcription || transcription.trim().length === 0) {
-        throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 2)');
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro (attempt 2)');
       }
       console.log(`✅ Gemini 3 Pro Preview (attempt 2) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
       return transcription;
     } catch (error2) {
       console.log(`⚠️ Gemini 3 Pro Preview (attempt 2) failed for chunk ${chunkIndex + 1}:`, error2.message);
 
-      // Third attempt: Gemini 2.5 Pro
+      // Third attempt: Gemini 2.5 Flash
       try {
-        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 2);
+        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, 2);
         if (!transcription || transcription.trim().length === 0) {
-          throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro');
+          throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Flash');
         }
         console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
         return transcription;
       } catch (proError) {
         console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}, trying final Gemini 2.5 Flash fallback:`, proError.message);
 
-        // Fourth attempt: Final fallback to Gemini 2.5 Flash
+        // Fourth attempt: Final fallback to Gemini Pro
         try {
-          const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, 3);
+          const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-pro", startTime, 3);
           if (!transcription || transcription.trim().length === 0) {
-            throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Flash (final attempt)');
+            throw new Error('🚨 FALLBACK: Empty transcription from Gemini Pro (final attempt)');
           }
           console.log(`✅ Gemini 2.5 Flash final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
           return transcription;
@@ -948,7 +948,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 32768
@@ -1172,7 +1172,7 @@ async function smartParagraphDivision(text) {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 500000
@@ -1953,7 +1953,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 65536
@@ -2378,7 +2378,7 @@ async function improveTranscriptionQuality(transcription, language = 'Hebrew') {
     console.log('🔧 Starting text quality improvement with Gemini...');
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 32768
@@ -3414,7 +3414,7 @@ app.get('/test-gemini', async (req, res) => {
     }
 
     // Test with a simple text generation
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
     const text = response.text();
