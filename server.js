@@ -855,8 +855,12 @@ async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename,
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
 
-    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית בדיוק כפי שנאמר.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
+🚨 **איסור מוחלט על תיקון או שינוי מילים:**
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו"
+❌ אל תשפר או תשנה שום מילה שנאמרה
+❌ תמלל מילה במילה בדיוק כפי שנאמר
 🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
 אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
 
@@ -968,8 +972,12 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
       contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
     
-    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+    const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית בדיוק כפי שנאמר.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
 
+🚨 **איסור מוחלט על תיקון או שינוי מילים:**
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו"
+❌ אל תשפר או תשנה שום מילה שנאמרה
+❌ תמלל מילה במילה בדיוק כפי שנאמר
 🚨 **אל תקצר את התמלול** - תמלל את כל התוכן מילה במילה!
 🚨 אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות.
 🔴 **זהו תמלול מלא, לא סיכום או קיצור** - אסור להשמיט תוכן!
@@ -1208,6 +1216,8 @@ async function smartParagraphDivision(text) {
 🔒 איסור מוחלט על החלפת מילים או שינוי ניסוחים:
 
 🚫 אין לשנות אף מילה שנאמרה, גם אם נדמה שהמילה שגויה, לא טבעית או נשמעת מוזרה.
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו" או כל תיקון דומה!
+❌ אל תשפר ביטויים או תחליף מילים במילים נרדפות!
 אין להחליף מילים במילים נרדפות, קרובות או בעלות משמעות דומה
 (לדוגמה: "מזיק לעצמי" ≠ "מעניש את עצמי").
 אסור לשפר, לשכתב, לקצר או להרחיב ניסוחים.
@@ -1441,6 +1451,8 @@ async function smartParagraphDivisionWithFlashFallback(text) {
 🔒 איסור מוחלט על החלפת מילים או שינוי ניסוחים:
 
 🚫 אין לשנות אף מילה שנאמרה, גם אם נדמה שהמילה שגויה, לא טבעית או נשמעת מוזרה.
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו" או כל תיקון דומה!
+❌ אל תשפר ביטויים או תחליף מילים במילים נרדפות!
 אין להחליף מילים במילים נרדפות, קרובות או בעלות משמעות דומה
 (לדוגמה: "מזיק לעצמי" ≠ "מעניש את עצמי").
 אסור לשפר, לשכתב, לקצר או להרחיב ניסוחים.
@@ -1509,6 +1521,8 @@ ${text}
 🔒 איסור מוחלט על החלפת מילים או שינוי ניסוחים:
 
 🚫 אין לשנות אף מילה שנאמרה, גם אם נדמה שהמילה שגויה, לא טבעית או נשמעת מוזרה.
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו" או כל תיקון דומה!
+❌ אל תשפר ביטויים או תחליף מילים במילים נרדפות!
 אין להחליף מילים במילים נרדפות, קרובות או בעלות משמעות דומה
 (לדוגמה: "מזיק לעצמי" ≠ "מעניש את עצמי").
 אסור לשפר, לשכתב, לקצר או להרחיב ניסוחים.
@@ -1585,6 +1599,8 @@ async function smartParagraphDivisionSingle(text) {
 🔒 איסור מוחלט על החלפת מילים או שינוי ניסוחים:
 
 🚫 אין לשנות אף מילה שנאמרה, גם אם נדמה שהמילה שגויה, לא טבעית או נשמעת מוזרה.
+❌ אל תתקן "בערוב ימיו" ל"באחרית ימיו" או כל תיקון דומה!
+❌ אל תשפר ביטויים או תחליף מילים במילים נרדפות!
 אין להחליף מילים במילים נרדפות, קרובות או בעלות משמעות דומה
 (לדוגמה: "מזיק לעצמי" ≠ "מעניש את עצמי").
 אסור לשפר, לשכתב, לקצר או להרחיב ניסוחים.
@@ -2372,70 +2388,14 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
 
 
 
-// 🔥 NEW: פונקציה לשיפור איכות הטקסט עם ג'מיני (ללא שינוי מבנה פסקאות)
+// ❌ DISABLED: פונקציה לשיפור בוטלה - לא משנים מילים שנאמרו!
 async function improveTranscriptionQuality(transcription, language = 'Hebrew') {
   try {
-    console.log('🔧 Starting text quality improvement with Gemini...');
+    console.log('🚨 שלב שיפור בוטל לחלוטין - החזרת טקסט מקורי בלבד');
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 32768
-      }
-    });
-
-    const improvementPrompt = `אתה עורך טקסט מקצועי. תקבל טקסט מתומלל ותשפר אותו **מבלי לשנות את מבנה הפסקאות**.
-
-🚨 חשוב מאוד: תחזיר רק את הטקסט המשופר, ללא שום הקדמה, הסבר או הערה טכנית. אל תכתוב "הנה הטקסט המשופר" או כל הערה דומה. התחל מיד עם התוכן עצמו.
-
-🎯 **משימות שיפור:**
-1. **תקן שגיאות כתיב ודקדוק** - הקפד על עברית תקנית
-2. **שפר סימני פיסוק** - פסיקים, נקודות, סימני שאלה במקומות הנכונים
-3. **תקן מילות מפתח שגויות** - שמות, מונחים מקצועיים
-4. **הסר חזרות מיותרות** - מילים שחוזרות ללא הצדקה
-5. **שמור על המבנה המדויק** - אל תוסיף או תסיר שורות ריקות
-6. **🚨 אין להשמיט מילים או ביטויי ייחוס** (כגון: "כך אמר", "כך שאל", "כך ענה"), גם אם הם קצרים או נראים משניים
-
-🚨 **חוקים קריטיים:**
-- אל תשנה את מבנה הפסקאות הקיים
-- אל תוסיף תוכן חדש
-- אל תקצר משמעותית
-- שמור על הסגנון המקורי של הדובר
-- התחל ישירות עם הטקסט המשופר
-
-🔒 **איסור מוחלט על החלפת מילים או שינוי ניסוחים:**
-
-🚫 אין לשנות אף מילה שנאמרה, גם אם נדמה שהמילה שגויה, לא טבעית או נשמעת מוזרה.
-אין להחליף מילים במילים נרדפות, קרובות או בעלות משמעות דומה
-(לדוגמה: "מזיק לעצמי" ≠ "מעניש את עצמי").
-אסור לשפר, לשכתב, לקצר או להרחיב ניסוחים.
-
-🪶 **מותרות בודדות בלבד:**
-- תיקון טעויות כתיב או היגוי טכניות (כגון: "במילא" → "ממילא", "הי'" → "היה").
-- החלקת היגוי ליטאי לצורת כתיב תקנית בלבד – בלי לשנות מילה או משמעות.
-- איחוד חזרות טכניות ("אני אני אומר" → "אני אומר").
-- תיקון פיסוק בלבד (פסיקים, נקודות, סימני שאלה).
-
-❗ אין לשנות משמעות, אין לשפר סגנון, ואין להשלים ניסוחים שנראים חסרים.
-המטרה: **תמלול מדויק מילה במילה**, עם תיקונים טכניים בלבד.
-
-**הטקסט לשיפור:**
-${transcription}`;
-
-    const result = await model.generateContent(improvementPrompt);
-    const response = await result.response;
-    let improvedText = response.text();
-
-    // נקה מקדמות מיותרות
-    improvedText = improvedText
-      .replace(/^\s*טקסט משופר[:\s]*/i, '')
-      .replace(/^\s*הנה הטקסט המשופר[:\s]*/i, '')
-      .replace(/^\s*תוצאה[:\s]*/i, '')
-      .trim();
-
-    console.log(`✅ Text quality improvement completed: ${transcription.length} -> ${improvedText.length} characters`);
-    return improvedText;
+    // החזרת הטקסט המקורי ללא כל שינוי
+    console.log(`✅ Transcription returned unchanged: ${transcription.length} characters`);
+    return transcription;
 
   } catch (error) {
     console.error('❌ Error in text quality improvement:', error.message);
