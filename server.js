@@ -774,55 +774,43 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for final retry - 4 stages: 3Pro(x2), 2.5Pro, 2.5Flash
+// Function with fallback for final retry - 3 stages: 3.1Pro, ProLatest, FlashLatest
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First attempt: Gemini 3 Pro Preview
+  // First attempt: Gemini 3.1 Pro Preview
   try {
     const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 1)');
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3.1 Pro Preview');
     }
-    console.log(`✅ Gemini 3 Pro Preview (attempt 1) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    console.log(`✅ Gemini 3.1 Pro Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error1) {
-    console.log(`⚠️ Gemini 3 Pro Preview (attempt 1) failed for chunk ${chunkIndex + 1}:`, error1.message);
+    console.log(`⚠️ Gemini 3.1 Pro Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
 
-    // Second attempt: Gemini 3 Pro Preview again
+    // Second attempt: Gemini Pro Latest
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 1);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-pro-latest", startTime, 1);
       if (!transcription || transcription.trim().length === 0) {
-        throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Pro Preview (attempt 2)');
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Pro Latest');
       }
-      console.log(`✅ Gemini 3 Pro Preview (attempt 2) transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+      console.log(`✅ Gemini Pro Latest fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
       return transcription;
     } catch (error2) {
-      console.log(`⚠️ Gemini 3 Pro Preview (attempt 2) failed for chunk ${chunkIndex + 1}:`, error2.message);
+      console.log(`⚠️ Gemini Pro Latest failed for chunk ${chunkIndex + 1}, trying final Gemini Flash Latest fallback:`, error2.message);
 
-      // Third attempt: Gemini 2.5 Pro
+      // Third attempt: Final fallback to Gemini Flash Latest
       try {
-        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 2);
+        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 2);
         if (!transcription || transcription.trim().length === 0) {
-          throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro');
+          throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest (final attempt)');
         }
-        console.log(`✅ Gemini 2.5 Pro fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+        console.log(`✅ Gemini Flash Latest final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
         return transcription;
-      } catch (proError) {
-        console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}, trying final Gemini 2.5 Flash fallback:`, proError.message);
-
-        // Fourth attempt: Final fallback to Gemini 2.5 Flash
-        try {
-          const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-flash", startTime, 3);
-          if (!transcription || transcription.trim().length === 0) {
-            throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Flash (final attempt)');
-          }
-          console.log(`✅ Gemini 2.5 Flash final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
-          return transcription;
-        } catch (flashError) {
-          console.error(`❌ All 4 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
-          throw new Error(`All 4 attempts failed for chunk ${chunkIndex + 1}: Gemini 3 Pro Preview (x2), 2.5 Pro, and 2.5 Flash all failed`);
-        }
+      } catch (flashError) {
+        console.error(`❌ All 3 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
+        throw new Error(`All 3 attempts failed for chunk ${chunkIndex + 1}: Gemini 3.1 Pro Preview, Pro Latest, and Flash Latest all failed`);
       }
     }
   }
@@ -1417,18 +1405,18 @@ function splitTextIntoChunks(text, maxChars) {
 
 // 🆕 NEW: Smart paragraph division with Flash fallback for failed chunks
 async function smartParagraphDivisionWithFlashFallback(text) {
-  // First try Gemini Pro
+  // First try Gemini 3.1 Pro Preview
   try {
     const processedText = await smartParagraphDivisionSingle(text);
-    console.log(`✅ Gemini Pro processed chunk successfully (${processedText.length} chars)`);
+    console.log(`✅ Gemini 3.1 Pro Preview processed chunk successfully (${processedText.length} chars)`);
     return processedText;
   } catch (error) {
-    console.log(`⚠️ Gemini Pro failed, trying Gemini 2.5 Pro fallback:`, error.message);
+    console.log(`⚠️ Gemini 3.1 Pro Preview failed, trying Gemini Pro Latest fallback:`, error.message);
 
-    // Fallback to Gemini 2.5 Pro
+    // Fallback to Gemini Pro Latest
     try {
       const proModel = genAI.getGenerativeModel({
-        model: "gemini-2.5-pro",
+        model: "gemini-pro-latest",
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 500000
@@ -1489,18 +1477,18 @@ ${text}
       let dividedText = response.text();
 
       if (dividedText && dividedText.length > text.length * 0.8) {
-        console.log(`✅ Gemini 2.5 Pro fallback successful (${dividedText.length} chars)`);
+        console.log(`✅ Gemini Pro Latest fallback successful (${dividedText.length} chars)`);
         return dividedText;
       } else {
-        throw new Error('Gemini 2.5 Pro output too short or empty');
+        throw new Error('Gemini Pro Latest output too short or empty');
       }
     } catch (proError) {
-      console.log(`⚠️ Gemini 2.5 Pro fallback failed, trying Gemini 2.5 Flash fallback:`, proError.message);
+      console.log(`⚠️ Gemini Pro Latest fallback failed, trying Gemini Flash Latest fallback:`, proError.message);
 
-      // Final fallback to Gemini 2.5 Flash
+      // Final fallback to Gemini Flash Latest
       try {
         const flashModel = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash",
+          model: "gemini-flash-latest",
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: 500000
@@ -1559,10 +1547,10 @@ ${text}
         let dividedText = response.text();
 
         if (dividedText && dividedText.length > text.length * 0.8) {
-          console.log(`✅ Gemini 2.5 Flash fallback successful (${dividedText.length} chars)`);
+          console.log(`✅ Gemini Flash Latest fallback successful (${dividedText.length} chars)`);
           return dividedText;
         } else {
-          throw new Error('Gemini 2.5 Flash output too short or empty');
+          throw new Error('Gemini Flash Latest output too short or empty');
         }
       } catch (flashError) {
         console.error(`❌ All paragraph division models failed:`, flashError.message);
