@@ -774,21 +774,33 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function for transcription using unified Gemini Flash Latest model
+// Function with fallback for transcription - Flash Latest -> Flash Lite Latest
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // Using unified Gemini Flash Latest model
+  // First attempt: Gemini Flash Latest
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, retryCount);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 Empty transcription from Gemini Flash Latest');
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest');
     }
     console.log(`✅ Gemini Flash Latest transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
-  } catch (error) {
-    console.error(`❌ Gemini Flash Latest failed for chunk ${chunkIndex + 1}:`, error.message);
-    throw new Error(`Transcription failed for chunk ${chunkIndex + 1}: ${error.message}`);
+  } catch (error1) {
+    console.log(`⚠️ Gemini Flash Latest failed for chunk ${chunkIndex + 1}:`, error1.message);
+
+    // Second attempt: Fallback to Gemini Flash Lite Latest
+    try {
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-lite-latest", startTime, 1);
+      if (!transcription || transcription.trim().length === 0) {
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Lite Latest (final attempt)');
+      }
+      console.log(`✅ Gemini Flash Lite Latest fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      return transcription;
+    } catch (flashError) {
+      console.error(`❌ All 2 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
+      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: Flash Latest and Flash Lite Latest both failed`);
+    }
   }
 }
 
@@ -913,6 +925,8 @@ ${contextPrompt}
 
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
+
+  // First attempt: Gemini Flash Latest
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -989,13 +1003,97 @@ ${contextPrompt}`;
       .trim();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
+    console.log(`✅ Gemini Flash Latest - Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
     return transcription;
 
-  } catch (error) {
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.error(`❌ Error transcribing chunk ${chunkIndex + 1} after ${duration}s:`, error.message);
-    throw error;
+  } catch (error1) {
+    console.log(`⚠️ Gemini Flash Latest failed for chunk ${chunkIndex + 1}:`, error1.message);
+
+    // Second attempt: Fallback to Gemini Flash Lite Latest
+    try {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-flash-lite-latest",
+        generationConfig: {
+          temperature: 0,
+          maxOutputTokens: 32768
+        }
+      });
+
+      const audioData = fs.readFileSync(chunkPath);
+      const base64Audio = audioData.toString('base64');
+
+      // Enhanced prompt for chunk transcription with context
+      let contextPrompt = '';
+      if (chunkIndex === 0) {
+        contextPrompt = '🎯 זהו החלק הראשון של הקובץ - התחל מההתחלה המוחלטת.';
+      } else if (chunkIndex === totalChunks - 1) {
+        contextPrompt = '🎯 זהו החלק האחרון של הקובץ - המשך עד הסוף המוחלט.';
+      } else {
+        contextPrompt = `🎯 זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
+      }
+
+      const prompt = `${(language === 'Hebrew' || language === 'he') ? 'תמלל את קטע האודיו הזה לעברית תקנית.' : (language === 'yi') ? 'תמלל את קטע האודיו הזה לאידיש באותיות עבריות בלבד. אל תשתמש באותיות לטיניות או אנגליות, ואל תתרגם לעברית.' : (language === 'translate-he') ? 'תרגם את קטע האודיו הזה לעברית תקנית וברורה, תוך שמירה על המשמעות והסגנון המקוריים. אל תדלג ואל תוסיף מידע.' : (language === 'translate-yi') ? 'TRANSLATE this audio chunk into Yiddish. Write Yiddish using Hebrew letters only. Do NOT use Latin or English characters. Do NOT transcribe the original language. TRANSLATE EVERYTHING to proper Yiddish while preserving the original meaning and style. Do not skip or add information.' : (language === 'translate-en') ? 'TRANSLATE this audio chunk into clear and fluent English. Do NOT transcribe in the original language. TRANSLATE EVERYTHING to proper English while preserving the original meaning and style. Do not skip or add information.' : `Transcribe this audio chunk in ${language || 'the original language'}. Do NOT translate.`}
+
+🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
+אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
+
+🔴 **החזר אך ורק את התמלול עצמו.**
+אין להוסיף הקדמות, הסברים, כותרות או משפטים כמו "להלן התמלול".
+
+${contextPrompt}`;
+
+      const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
+      console.log(`🎯 Fallback transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) with Flash Lite Latest...`);
+
+      // Determine timeout based on retry count: 100s (1st), 90s (2nd), 60s (3rd), 60s (4th)
+      const timeoutSeconds = retryCount === 0 ? 100 : (retryCount === 1 ? 90 : 60);
+      console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for fallback retry ${retryCount + 1}`);
+
+      // Add timeout wrapper
+      const transcriptionPromise = model.generateContent([
+        {
+          inlineData: {
+            mimeType: 'audio/wav',
+            data: base64Audio
+          }
+        },
+        prompt
+      ]);
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Transcription timeout after ${timeoutSeconds} seconds (fallback retry ${retryCount + 1})`)), timeoutSeconds * 1000)
+      );
+
+      const result = await Promise.race([transcriptionPromise, timeoutPromise]);
+
+      const response = await result.response;
+      let transcription = response.text();
+
+      // 🔥 NEW: הסר חזרות קיצוניות מהמודל
+      transcription = removeExtremeRepetitions(transcription);
+
+      // Validate transcription - only check if not empty
+      if (!transcription || transcription.trim().length === 0) {
+        throw new Error(`Invalid transcription: empty (${transcription ? transcription.length : 0} characters)`);
+      }
+
+      // Clean the transcription
+      transcription = transcription
+        .replace(/\r\n/g, '\n')
+        .replace(/^\s*תמלול[:\s]*/i, '') // Remove "תמלול:" prefix
+        .replace(/^\s*חלק \d+[:\s]*/i, '') // Remove "חלק X:" prefix
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`✅ Gemini Flash Lite Latest fallback - Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
+      return transcription;
+
+    } catch (flashError) {
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.error(`❌ All fallback attempts failed for chunk ${chunkIndex + 1} after ${duration}s:`, flashError.message);
+      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: Flash Latest and Flash Lite Latest both failed`);
+    }
   }
 }
 
@@ -1114,7 +1212,7 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   return merged;
 }
 
-// 🎯 NEW: Smart paragraph division with Gemini
+// 🎯 NEW: Smart paragraph division with Gemini Flash Latest + Flash Lite Latest fallback
 async function smartParagraphDivision(text) {
   try {
     // Check if text is too long (over 7.5K chars) and split it - reduced for better concurrent processing
@@ -1124,6 +1222,7 @@ async function smartParagraphDivision(text) {
       return await smartParagraphDivisionChunked(text, MAX_CHARS);
     }
 
+    // First attempt: Gemini Flash Latest
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
       generationConfig: {
@@ -1268,10 +1367,83 @@ ${text}
     // If we get here, all attempts (fast + extended) failed
     throw new Error('All retry attempts (fast + extended) failed');
 
-  } catch (error) {
-    console.error('🔥 Smart paragraph division failed:', error);
-    console.log(`⚠️ Falling back to original text`);
-    return text; // חזור לטקסט המקורי אם נכשל
+  } catch (error1) {
+    console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error1.message);
+
+    // Second attempt: Fallback to Gemini Flash Lite Latest
+    try {
+      console.log(`🔄 Trying Gemini Flash Lite Latest fallback for paragraph division...`);
+
+      const fallbackModel = genAI.getGenerativeModel({
+        model: "gemini-flash-lite-latest",
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 500000
+        }
+      });
+
+      const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🚨 חשוב מאוד: תחזיר רק את הטקסט המחולק לפסקאות, ללא שום הקדמה, הסבר או הערה טכנית. אל תכתוב "להלן הטקסט" או כל הערה דומה. התחל מיד עם התוכן עצמו.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשכתב, אל תסגנן ואל תחליף מילים במילים אחרות.
+
+🔴 **החזר אך ורק את התמלול עצמו.**
+אין להוסיף הקדמות, הסברים, כותרות או משפטים כמו "להלן התמלול".
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+      console.log(`🎯 Sending ${text.length} characters to Gemini Flash Lite Latest for smart division...`);
+
+      // Retry mechanism with timeout for fallback
+      let result;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Smart division timeout after 2 minutes')), 2 * 60 * 1000)
+          );
+
+          const generatePromise = fallbackModel.generateContent(prompt);
+          result = await Promise.race([generatePromise, timeoutPromise]);
+
+          console.log(`✅ Gemini Flash Lite Latest fallback division successful on attempt ${attempt}`);
+          break;
+        } catch (attemptError) {
+          console.error(`❌ Fallback attempt ${attempt} failed:`, attemptError.message);
+          if (attempt === 2) throw attemptError;
+          console.log(`⏳ Waiting 30 seconds before fallback retry...`);
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+      }
+
+      const response = await result.response;
+      let dividedText = response.text();
+
+      if (dividedText && dividedText.length > text.length * 0.4) {
+        console.log(`✅ Gemini Flash Lite Latest fallback successful: ${dividedText.length} chars`);
+        return dividedText;
+      } else {
+        throw new Error('Gemini Flash Lite Latest output too short or empty');
+      }
+
+    } catch (fallbackError) {
+      console.error('🔥 All paragraph division models failed:', fallbackError.message);
+      console.log(`⚠️ Falling back to original text`);
+      return text; // חזור לטקסט המקורי אם נכשל
+    }
   }
 }
 
@@ -1335,17 +1507,27 @@ function splitTextIntoChunks(text, maxChars) {
   return chunks;
 }
 
-// 🆕 NEW: Smart paragraph division using unified Gemini Flash Latest
+// 🆕 NEW: Smart paragraph division with Flash Latest -> Flash Lite Latest fallback
 async function smartParagraphDivisionWithFlashFallback(text) {
-  // Using unified Gemini Flash Latest model
+  // First attempt: Gemini Flash Latest
   try {
     const processedText = await smartParagraphDivisionSingle(text);
     console.log(`✅ Gemini Flash Latest processed chunk successfully (${processedText.length} chars)`);
     return processedText;
-  } catch (error) {
-    console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error.message);
-    console.log(`⚠️ Returning original text for this chunk`);
-    return text;
+  } catch (error1) {
+    console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error1.message);
+
+    // Second attempt: Fallback to Gemini Flash Lite Latest
+    try {
+      console.log(`🔄 Trying Gemini Flash Lite Latest fallback for chunk...`);
+      const processedText = await smartParagraphDivisionSingleFallback(text);
+      console.log(`✅ Gemini Flash Lite Latest fallback processed chunk successfully (${processedText.length} chars)`);
+      return processedText;
+    } catch (error2) {
+      console.log(`⚠️ All paragraph division models failed for chunk:`, error2.message);
+      console.log(`⚠️ Returning original text for this chunk`);
+      return text;
+    }
   }
 }
 
