@@ -1913,7 +1913,7 @@
                             🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק
                         </div>
                         <div style="margin-top: 8px; font-size: 0.8em; color: #6b7280; background-color: #f3f4f6; padding: 8px; border-radius: 6px; border-left: 3px solid #3b82f6;" data-i18n="upload_limits">
-                            📏 <strong>מגבלות:</strong> עד 1.2GB לקובץ בודד • ללא הגבלה על מספר קבצים
+                            📏 <strong>מגבלות:</strong> עד 500 מ"ב לקובץ בודד • ללא הגבלה על מספר קבצים
                         </div>
                         <div style="margin-top: 8px; font-size: 0.8em; color: #dc3545; background-color: #fff5f5; padding: 8px; border-radius: 6px; border-left: 3px solid #dc3545;" data-i18n="upload_filename_warning">
                             ⚠️ <strong>לתשומת לב:</strong> שם הקובץ צריך להיות עד 150 תווים וללא סימנים נוספים כגון גרשיים, פסיק, נקודה, סימן קריאה, סימן שאלה וכדומה
@@ -1993,6 +1993,18 @@
                         </select>
                     </div>
 
+                    <div class="form-group" style="margin-top: 20px;">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="addTitles" name="addTitles" style="margin-left: 10px;">
+                            <label for="addTitles" data-i18n="label_add_titles" style="cursor: pointer;">
+                                📋 הוסף כותרות לתמלול (חלוקה לנושאים)
+                            </label>
+                        </div>
+                        <small style="color: #666; margin-top: 5px; display: block;" data-i18n="help_add_titles">
+                            הבינה המלאכותית תנתח את התמלול ותוסיף כותרות לחלקים השונים לפי התוכן
+                        </small>
+                    </div>
+
                     <button type="submit" class="btn" id="submitBtn" disabled data-i18n="btn_start_transcription">
                         התחל תמלול
                     </button>
@@ -2038,6 +2050,13 @@
                     <p style="font-size: 16px; color: #856404; margin: 0 auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_notice">
                         <strong>⚠️ חשוב!</strong><br>
                         בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!
+                    </p>
+                </div>
+
+               <div class="payment-notice-center" style="background: #f8d7da; border: 2px solid #dc3545; border-radius: 8px; padding: 15px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%;">
+                    <p style="font-size: 15px; color: #721c24; margin: 0 auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_card_notice">
+                        <strong>💳 לתשומת לב:</strong><br>
+                        המערכת אינה תומכת בכרטיסי דיינרס ואמריקן אקספרס
                     </p>
                 </div>
                 <button class="btn" onclick="processPurchase()" data-i18n="btn_go_to_purchase">
@@ -4723,7 +4742,7 @@
                 upload_formats: 'תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
                 upload_model_info: '✨ תמלול באמצעות המודל המתקדם והמעודכן ביותר',
                 upload_accuracy: '🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק',
-                upload_limits: '📏 <strong>מגבלות:</strong> עד 1.2GB לקובץ בודד • ללא הגבלה על מספר קבצים',
+                upload_limits: '📏 <strong>מגבלות:</strong> עד 500 מ"ב לקובץ בודד • ללא הגבלה על מספר קבצים',
                 upload_filename_warning: '⚠️ <strong>לתשומת לב:</strong> שם הקובץ צריך להיות עד 150 תווים וללא סימנים נוספים כגון גרשיים, פסיק, נקודה, סימן קריאה, סימן שאלה וכדומה',
                 upload_gdrive_info: 'כדי להעלות קבצים מגוגל דרייב, יש להתקין במחשב את <a href="https://support.google.com/drive/answer/10838124?hl=iw" target="_blank" style="color: #0ea5e9; text-decoration: underline;">תוכנת \'גוגל דרייב\' לשולחן העבודה</a>. לאחר מכן ניתן להעלות את הקבצים מהמחשב, כמו מכל כונן אחר.',
                 btn_select_files: '📄 בחר קבצים',
@@ -4758,6 +4777,7 @@
                 // Payment
                 payment_packages: 'מגוון חבילות החל מ-10 ש"ח ל-60 דקות תמלול',
                 payment_notice: '<strong>⚠️ חשוב!</strong><br>בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!',
+                payment_card_notice: '<strong>💳 לתשומת לב:</strong><br>המערכת אינה תומכת בכרטיסי דיינרס ואמריקן אקספרס',
                 btn_go_to_purchase: '💳 למעבר לדף הרכישה',
 
                 // Info banner
@@ -4881,7 +4901,7 @@
                 upload_formats: 'Supported formats: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
                 upload_model_info: '✨ Transcription using the most advanced and updated model',
                 upload_accuracy: '🎯 Hebrew lectures - 98% accuracy • Yeshiva pronunciation - 95% accuracy',
-                upload_limits: '📏 <strong>Limits:</strong> Up to 1.2GB per file • Unlimited number of files',
+                upload_limits: '📏 <strong>Limits:</strong> Up to 500 MB per file • Unlimited number of files',
                 upload_filename_warning: '⚠️ <strong>Note:</strong> File name should be up to 150 characters without special characters like quotes, commas, periods, exclamation marks, etc.',
                 upload_gdrive_info: 'To upload files from Google Drive, install <a href="https://support.google.com/drive/answer/10838124?hl=en" target="_blank" style="color: #0ea5e9; text-decoration: underline;">Google Drive for Desktop</a>. Then you can upload files from your computer like any other drive.',
                 btn_select_files: '📄 Select Files',
@@ -4916,6 +4936,7 @@
                 // Payment
                 payment_packages: 'Various packages starting from 10 NIS for 60 minutes of transcription',
                 payment_notice: '<strong>⚠️ Important!</strong><br>Before making payment, click on the email and name fields to activate the confirmation checkbox!',
+                payment_card_notice: '<strong>💳 Please Note:</strong><br>The system does not support Diners Club and American Express cards',
                 btn_go_to_purchase: '💳 Go to Purchase Page',
 
                 // Info banner
@@ -5039,7 +5060,7 @@
                 upload_formats: 'Formats supportés: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
                 upload_model_info: '✨ Transcription utilisant le modèle le plus avancé et mis à jour',
                 upload_accuracy: '🎯 Cours en hébreu - 98% de précision • Prononciation yeshiva - 95% de précision',
-                upload_limits: '📏 <strong>Limites:</strong> Jusqu\'à 1.2GB par fichier • Nombre illimité de fichiers',
+                upload_limits: '📏 <strong>Limites:</strong> Jusqu\'à 500 MB par fichier • Nombre illimité de fichiers',
                 upload_filename_warning: '⚠️ <strong>Note:</strong> Le nom du fichier doit contenir jusqu\'à 150 caractères sans caractères spéciaux comme guillemets, virgules, points, etc.',
                 upload_gdrive_info: 'Pour télécharger des fichiers depuis Google Drive, installez <a href="https://support.google.com/drive/answer/10838124?hl=fr" target="_blank" style="color: #0ea5e9; text-decoration: underline;">Google Drive pour Bureau</a>. Ensuite, vous pouvez télécharger les fichiers depuis votre ordinateur.',
                 btn_select_files: '📄 Sélectionner Fichiers',
@@ -5074,6 +5095,7 @@
                 // Payment
                 payment_packages: 'Différents forfaits à partir de 10 NIS pour 60 minutes de transcription',
                 payment_notice: '<strong>⚠️ Important!</strong><br>Avant de payer, cliquez sur les champs email et nom pour activer la case de confirmation!',
+                payment_card_notice: '<strong>💳 Attention:</strong><br>Le système ne supporte pas les cartes Diners Club et American Express',
                 btn_go_to_purchase: '💳 Aller à la Page d\'Achat',
 
                 // Info banner
