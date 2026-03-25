@@ -4178,9 +4178,10 @@ function handleMulterError(err, req, res, next) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
         success: false,
-        error: `הקובץ גדול מדי! המגבלה היא 1.2GB. הקובץ שלך: ${Math.round(err.field?.size / (1024 * 1024) || 0)}MB`,
+        error: `הקובץ גדול מדי! המגבלה היא 500 מ"ב בלבד. אנא בחר קובץ קטן יותר.`,
+        hebrewError: 'הקובץ גדול מדי - המגבלה היא 500 מ"ב',
         errorCode: 'FILE_TOO_LARGE',
-        maxSize: '1.2GB'
+        maxSize: '500MB'
       });
     }
 

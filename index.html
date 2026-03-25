@@ -3215,8 +3215,8 @@
                 return;
             }
 
-            // Check for files that exceed the size limit (1.2GB)
-            const maxFileSize = 1.2 * 1024 * 1024 * 1024; // 1.2GB in bytes
+            // Check for files that exceed the size limit (500MB)
+            const maxFileSize = 500 * 1024 * 1024; // 500MB in bytes
             const oversizedFiles = validFiles.filter(file => file.size > maxFileSize);
 
             if (oversizedFiles.length > 0) {
@@ -3225,7 +3225,7 @@
                 ).join('<br>');
 
                 showStatus(
-                    `❌ <strong>קבצים גדולים מדי!</strong><br>המגבלה היא 1.2GB לקובץ<br><br>קבצים שחורגים:<br>${oversizedNames}`,
+                    `❌ <strong>קבצים גדולים מדי!</strong><br>המגבלה היא 500 מ"ב לקובץ<br><br>קבצים שחורגים:<br>${oversizedNames}`,
                     'error'
                 );
                 return;
