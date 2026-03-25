@@ -774,7 +774,7 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for transcription - Flash Latest -> Flash Lite Latest
+// Function with fallback for transcription - Flash Latest -> Flash Latest -> Flash Lite Latest
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
@@ -789,17 +789,29 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
   } catch (error1) {
     console.log(`⚠️ Gemini Flash Latest failed for chunk ${chunkIndex + 1}:`, error1.message);
 
-    // Second attempt: Fallback to Gemini Flash Lite Latest
+    // Second attempt: Retry with Gemini Flash Latest
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-lite-latest", startTime, 1);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 1);
       if (!transcription || transcription.trim().length === 0) {
-        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Lite Latest (final attempt)');
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest (retry)');
       }
-      console.log(`✅ Gemini Flash Lite Latest fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      console.log(`✅ Gemini Flash Latest retry successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
       return transcription;
-    } catch (flashError) {
-      console.error(`❌ All 2 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
-      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: Flash Latest and Flash Lite Latest both failed`);
+    } catch (error2) {
+      console.log(`⚠️ Gemini Flash Latest retry also failed for chunk ${chunkIndex + 1}:`, error2.message);
+
+      // Third attempt: Final fallback to Gemini Flash Lite Latest
+      try {
+        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-lite-latest", startTime, 2);
+        if (!transcription || transcription.trim().length === 0) {
+          throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Lite Latest (final attempt)');
+        }
+        console.log(`✅ Gemini Flash Lite Latest final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+        return transcription;
+      } catch (flashError) {
+        console.error(`❌ All 3 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
+        throw new Error(`All 3 attempts failed for chunk ${chunkIndex + 1}: Flash Latest → Flash Latest → Flash Lite Latest all failed`);
+      }
     }
   }
 }
@@ -860,8 +872,8 @@ ${contextPrompt}
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) using ${modelName}...`);
 
-    // Determine timeout based on retry count: 100s (1st), 90s (2nd), 60s (3rd), 60s (4th)
-    const timeoutSeconds = retryCount === 0 ? 100 : (retryCount === 1 ? 90 : 60);
+    // Determine timeout based on retry count: 90s (1st), 90s (2nd), 40s (3rd) - same as historical settings
+    const timeoutSeconds = retryCount === 0 ? 90 : (retryCount === 1 ? 90 : 40);
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     const transcriptionPromise = model.generateContent([
@@ -962,8 +974,8 @@ ${contextPrompt}`;
     const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
     console.log(`🎯 Transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB)...`);
 
-    // Determine timeout based on retry count: 100s (1st), 90s (2nd), 60s (3rd), 60s (4th)
-    const timeoutSeconds = retryCount === 0 ? 100 : (retryCount === 1 ? 90 : 60);
+    // Determine timeout based on retry count: 90s (1st), 90s (2nd), 40s (3rd) - same as historical settings
+    const timeoutSeconds = retryCount === 0 ? 90 : (retryCount === 1 ? 90 : 40);
     console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for retry ${retryCount + 1}`);
 
     // Add timeout wrapper
@@ -1045,8 +1057,8 @@ ${contextPrompt}`;
       const chunkSizeMB = (audioData.length / (1024 * 1024)).toFixed(1);
       console.log(`🎯 Fallback transcribing chunk ${chunkIndex + 1}/${totalChunks} (${chunkSizeMB}MB) with Flash Lite Latest...`);
 
-      // Determine timeout based on retry count: 100s (1st), 90s (2nd), 60s (3rd), 60s (4th)
-      const timeoutSeconds = retryCount === 0 ? 100 : (retryCount === 1 ? 90 : 60);
+      // Determine timeout based on retry count: 90s (1st), 90s (2nd), 40s (3rd) - same as historical settings
+      const timeoutSeconds = retryCount === 0 ? 90 : (retryCount === 1 ? 90 : 40);
       console.log(`⏱️ Setting timeout to ${timeoutSeconds} seconds for fallback retry ${retryCount + 1}`);
 
       // Add timeout wrapper
@@ -1212,7 +1224,7 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   return merged;
 }
 
-// 🎯 NEW: Smart paragraph division with Gemini Flash Latest + Flash Lite Latest fallback
+// 🎯 NEW: Smart paragraph division with Gemini Flash Latest → Flash Latest → Flash Lite Latest fallback
 async function smartParagraphDivision(text) {
   try {
     // Check if text is too long (over 7.5K chars) and split it - reduced for better concurrent processing
@@ -1370,7 +1382,77 @@ ${text}
   } catch (error1) {
     console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error1.message);
 
-    // Second attempt: Fallback to Gemini Flash Lite Latest
+    // Second attempt: Retry with Gemini Flash Latest
+    try {
+      console.log(`🔄 Retrying with Gemini Flash Latest for paragraph division...`);
+
+      const retryModel = genAI.getGenerativeModel({
+        model: "gemini-flash-latest",
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 500000
+        }
+      });
+
+      const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+
+🚨 חשוב מאוד: תחזיר רק את הטקסט המחולק לפסקאות, ללא שום הקדמה, הסבר או הערה טכנית. אל תכתוב "להלן הטקסט" או כל הערה דומה. התחל מיד עם התוכן עצמו.
+
+🎯 חוקי חלוקה חכמה:
+- כל פסקה צריכה להיות רעיון או נושא שלם
+- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
+- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
+- פסקה חדשה לכל סיפור או דוגמה
+- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
+- שאלות ותשובות בפסקאות נפרדות
+
+🔥 חשוב ביותר:
+- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
+- אל תשכתב, אל תסגנן ואל תחליף מילים במילים אחרות.
+
+🔴 **החזר אך ורק את התמלול עצמו.**
+אין להוסיף הקדמות, הסברים, כותרות או משפטים כמו "להלן התמלול".
+
+הטקסט לחלוקה:
+${text}
+
+תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
+
+      // Retry mechanism for the second Flash Latest attempt
+      let retryResult;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+          );
+
+          const generatePromise = retryModel.generateContent(prompt);
+          retryResult = await Promise.race([generatePromise, timeoutPromise]);
+
+          console.log(`✅ Gemini Flash Latest retry successful on attempt ${attempt}`);
+          break;
+        } catch (attemptError) {
+          console.error(`❌ Flash Latest retry attempt ${attempt} failed:`, attemptError.message);
+          if (attempt === 3) throw attemptError;
+          console.log(`⏳ Waiting 1 minute before next Flash Latest retry...`);
+          await new Promise(resolve => setTimeout(resolve, 60000));
+        }
+      }
+
+      const retryResponse = await retryResult.response;
+      let retryDividedText = retryResponse.text();
+
+      if (retryDividedText && retryDividedText.length > text.length * 0.4) {
+        console.log(`✅ Gemini Flash Latest retry successful: ${retryDividedText.length} chars`);
+        return retryDividedText;
+      } else {
+        throw new Error('Gemini Flash Latest retry output too short or empty');
+      }
+
+    } catch (error2) {
+      console.log(`⚠️ Gemini Flash Latest retry also failed for paragraph division:`, error2.message);
+
+      // Third attempt: Final fallback to Gemini Flash Lite Latest
     try {
       console.log(`🔄 Trying Gemini Flash Lite Latest fallback for paragraph division...`);
 
@@ -1440,9 +1522,10 @@ ${text}
       }
 
     } catch (fallbackError) {
-      console.error('🔥 All paragraph division models failed:', fallbackError.message);
+      console.error('🔥 All 3 paragraph division attempts failed:', fallbackError.message);
       console.log(`⚠️ Falling back to original text`);
       return text; // חזור לטקסט המקורי אם נכשל
+    }
     }
   }
 }
@@ -1507,7 +1590,7 @@ function splitTextIntoChunks(text, maxChars) {
   return chunks;
 }
 
-// 🆕 NEW: Smart paragraph division with Flash Latest -> Flash Lite Latest fallback
+// 🆕 NEW: Smart paragraph division with Flash Latest -> Flash Latest -> Flash Lite Latest fallback
 async function smartParagraphDivisionWithFlashFallback(text) {
   // First attempt: Gemini Flash Latest
   try {
@@ -1517,16 +1600,26 @@ async function smartParagraphDivisionWithFlashFallback(text) {
   } catch (error1) {
     console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error1.message);
 
-    // Second attempt: Fallback to Gemini Flash Lite Latest
+    // Second attempt: Retry with Gemini Flash Latest
     try {
-      console.log(`🔄 Trying Gemini Flash Lite Latest fallback for chunk...`);
-      const processedText = await smartParagraphDivisionSingleFallback(text);
-      console.log(`✅ Gemini Flash Lite Latest fallback processed chunk successfully (${processedText.length} chars)`);
+      console.log(`🔄 Retrying with Gemini Flash Latest for paragraph division...`);
+      const processedText = await smartParagraphDivisionSingle(text);
+      console.log(`✅ Gemini Flash Latest retry successful for paragraph division (${processedText.length} chars)`);
       return processedText;
     } catch (error2) {
-      console.log(`⚠️ All paragraph division models failed for chunk:`, error2.message);
-      console.log(`⚠️ Returning original text for this chunk`);
-      return text;
+      console.log(`⚠️ Gemini Flash Latest retry also failed for paragraph division:`, error2.message);
+
+      // Third attempt: Final fallback to Gemini Flash Lite Latest
+      try {
+        console.log(`🔄 Trying Gemini Flash Lite Latest fallback for chunk...`);
+        const processedText = await smartParagraphDivisionSingleFallback(text);
+        console.log(`✅ Gemini Flash Lite Latest fallback processed chunk successfully (${processedText.length} chars)`);
+        return processedText;
+      } catch (error3) {
+        console.log(`⚠️ All paragraph division models failed for chunk:`, error3.message);
+        console.log(`⚠️ Returning original text for this chunk`);
+        return text;
+      }
     }
   }
 }
