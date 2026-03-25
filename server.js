@@ -1396,20 +1396,36 @@ ${text}
 
 תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
 
-      const result = await flashModel.generateContent(prompt);
-      const response = await result.response;
-      let dividedText = response.text();
+  let result;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    console.log(`🔍 DEBUG: Starting retry attempt ${attempt}/2...`);
+    try {
+      console.log(`🔄 Attempt ${attempt}/2 for chunk smart division...`);
+      console.log(`🔍 DEBUG: About to call model.generateContent...`);
 
-      if (dividedText && dividedText.length > text.length * 0.8) {
-        console.log(`✅ Gemini Flash Latest fallback successful (${dividedText.length} chars)`);
-        return dividedText;
-      } else {
-        throw new Error('Gemini Flash Latest output too short or empty');
-      }
-    } catch (flashError) {
-      console.error(`❌ All paragraph division models failed:`, flashError.message);
-      console.log(`⚠️ Returning original text for this chunk`);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+      );
+
+      const generatePromise = model.generateContent(prompt);
+      console.log(`🔍 DEBUG: Starting Promise.race...`);
+      result = await Promise.race([generatePromise, timeoutPromise]);
+      console.log(`🔍 DEBUG: Promise.race completed successfully`);
+
+      console.log(`🔍 DEBUG: Getting response from result...`);
+      const response = await result.response;
+      console.log(`🔍 DEBUG: Reading response text...`);
+      const text = response.text().trim();
+      console.log(`🔍 DEBUG: Response text read successfully`);
+
       return text;
+
+    } catch (attemptError) {
+      console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
+      if (attempt === 2) throw attemptError;
+
+      console.log(`⏳ Waiting 5 seconds before retry attempt ${attempt + 1}...`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
   }
 }
