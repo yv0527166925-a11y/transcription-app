@@ -774,33 +774,21 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for final retry - 2 stages: 2.5Pro, FlashLatest
+// Function for transcription using unified Gemini Flash Latest model
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First attempt: Gemini 2.5 Pro
+  // Using unified Gemini Flash Latest model
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 0);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, retryCount);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro');
+      throw new Error('🚨 Empty transcription from Gemini Flash Latest');
     }
-    console.log(`✅ Gemini 2.5 Pro transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    console.log(`✅ Gemini Flash Latest transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
-  } catch (error1) {
-    console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}:`, error1.message);
-
-    // Second attempt: Final fallback to Gemini Flash Latest
-    try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 1);
-      if (!transcription || transcription.trim().length === 0) {
-        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest (final attempt)');
-      }
-      console.log(`✅ Gemini Flash Latest final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
-      return transcription;
-    } catch (flashError) {
-      console.error(`❌ All 2 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
-      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: Gemini 2.5 Pro and Flash Latest all failed`);
-    }
+  } catch (error) {
+    console.error(`❌ Gemini Flash Latest failed for chunk ${chunkIndex + 1}:`, error.message);
+    throw new Error(`Transcription failed for chunk ${chunkIndex + 1}: ${error.message}`);
   }
 }
 
@@ -927,7 +915,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 32768
@@ -1137,7 +1125,7 @@ async function smartParagraphDivision(text) {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 500000
@@ -1347,27 +1335,31 @@ function splitTextIntoChunks(text, maxChars) {
   return chunks;
 }
 
-// 🆕 NEW: Smart paragraph division with Flash fallback for failed chunks
+// 🆕 NEW: Smart paragraph division using unified Gemini Flash Latest
 async function smartParagraphDivisionWithFlashFallback(text) {
-  // First try Gemini 2.5 Pro
+  // Using unified Gemini Flash Latest model
   try {
     const processedText = await smartParagraphDivisionSingle(text);
-    console.log(`✅ Gemini 2.5 Pro processed chunk successfully (${processedText.length} chars)`);
+    console.log(`✅ Gemini Flash Latest processed chunk successfully (${processedText.length} chars)`);
     return processedText;
   } catch (error) {
-    console.log(`⚠️ Gemini 2.5 Pro failed, trying Gemini Flash Latest fallback:`, error.message);
+    console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error.message);
+    console.log(`⚠️ Returning original text for this chunk`);
+    return text;
+  }
+}
 
-    // Final fallback to Gemini Flash Latest
-    try {
-      const flashModel = genAI.getGenerativeModel({
-        model: "gemini-flash-latest",
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 500000
-        }
-      });
+// Single chunk processing (same as original but without chunking check)
+async function smartParagraphDivisionSingle(text) {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-flash-latest",
+    generationConfig: {
+      temperature: 0.1,
+      maxOutputTokens: 500000
+    }
+  });
 
-      const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
+  const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
 
 🚨 חשוב מאוד: תחזיר רק את הטקסט המחולק לפסקאות, ללא שום הקדמה, הסבר או הערה טכנית. אל תכתוב "להלן הטקסט" או כל הערה דומה. התחל מיד עם התוכן עצמו.
 
@@ -1425,7 +1417,7 @@ ${text}
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
   const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-pro",
+    model: "gemini-flash-latest",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 500000
@@ -1819,7 +1811,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
+      model: "gemini-flash-latest",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 65536
@@ -3224,7 +3216,7 @@ app.get('/test-gemini', async (req, res) => {
     }
 
     // Test with a simple text generation
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
     const text = response.text();
