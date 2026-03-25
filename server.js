@@ -774,44 +774,32 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for final retry - 3 stages: 3.1Pro, ProLatest, FlashLatest
+// Function with fallback for final retry - 2 stages: 2.5Pro, FlashLatest
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First attempt: Gemini 3.1 Pro Preview
+  // First attempt: Gemini 2.5 Pro
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 0);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-2.5-pro", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3.1 Pro Preview');
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 2.5 Pro');
     }
-    console.log(`✅ Gemini 3.1 Pro Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    console.log(`✅ Gemini 2.5 Pro transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error1) {
-    console.log(`⚠️ Gemini 3.1 Pro Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
+    console.log(`⚠️ Gemini 2.5 Pro failed for chunk ${chunkIndex + 1}:`, error1.message);
 
-    // Second attempt: Gemini Pro Latest
+    // Second attempt: Final fallback to Gemini Flash Latest
     try {
-      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-pro-latest", startTime, 1);
+      const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 1);
       if (!transcription || transcription.trim().length === 0) {
-        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Pro Latest');
+        throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest (final attempt)');
       }
-      console.log(`✅ Gemini Pro Latest fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
+      console.log(`✅ Gemini Flash Latest final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
       return transcription;
-    } catch (error2) {
-      console.log(`⚠️ Gemini Pro Latest failed for chunk ${chunkIndex + 1}, trying final Gemini Flash Latest fallback:`, error2.message);
-
-      // Third attempt: Final fallback to Gemini Flash Latest
-      try {
-        const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 2);
-        if (!transcription || transcription.trim().length === 0) {
-          throw new Error('🚨 FALLBACK: Empty transcription from Gemini Flash Latest (final attempt)');
-        }
-        console.log(`✅ Gemini Flash Latest final fallback successful for chunk ${chunkIndex + 1} (${transcription.length} chars)`);
-        return transcription;
-      } catch (flashError) {
-        console.error(`❌ All 3 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
-        throw new Error(`All 3 attempts failed for chunk ${chunkIndex + 1}: Gemini 3.1 Pro Preview, Pro Latest, and Flash Latest all failed`);
-      }
+    } catch (flashError) {
+      console.error(`❌ All 2 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
+      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: Gemini 2.5 Pro and Flash Latest all failed`);
     }
   }
 }
@@ -939,7 +927,7 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 32768
@@ -1149,7 +1137,7 @@ async function smartParagraphDivision(text) {
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 500000
@@ -1361,18 +1349,18 @@ function splitTextIntoChunks(text, maxChars) {
 
 // 🆕 NEW: Smart paragraph division with Flash fallback for failed chunks
 async function smartParagraphDivisionWithFlashFallback(text) {
-  // First try Gemini 3.1 Pro Preview
+  // First try Gemini 2.5 Pro
   try {
     const processedText = await smartParagraphDivisionSingle(text);
-    console.log(`✅ Gemini 3.1 Pro Preview processed chunk successfully (${processedText.length} chars)`);
+    console.log(`✅ Gemini 2.5 Pro processed chunk successfully (${processedText.length} chars)`);
     return processedText;
   } catch (error) {
-    console.log(`⚠️ Gemini 3.1 Pro Preview failed, trying Gemini Pro Latest fallback:`, error.message);
+    console.log(`⚠️ Gemini 2.5 Pro failed, trying Gemini Flash Latest fallback:`, error.message);
 
-    // Fallback to Gemini Pro Latest
+    // Final fallback to Gemini Flash Latest
     try {
-      const proModel = genAI.getGenerativeModel({
-        model: "gemini-pro-latest",
+      const flashModel = genAI.getGenerativeModel({
+        model: "gemini-flash-latest",
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 500000
@@ -1416,79 +1404,20 @@ ${text}
 
 תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
 
-      const result = await proModel.generateContent(prompt);
+      const result = await flashModel.generateContent(prompt);
       const response = await result.response;
       let dividedText = response.text();
 
       if (dividedText && dividedText.length > text.length * 0.8) {
-        console.log(`✅ Gemini Pro Latest fallback successful (${dividedText.length} chars)`);
+        console.log(`✅ Gemini Flash Latest fallback successful (${dividedText.length} chars)`);
         return dividedText;
       } else {
-        throw new Error('Gemini Pro Latest output too short or empty');
+        throw new Error('Gemini Flash Latest output too short or empty');
       }
-    } catch (proError) {
-      console.log(`⚠️ Gemini Pro Latest fallback failed, trying Gemini Flash Latest fallback:`, proError.message);
-
-      // Final fallback to Gemini Flash Latest
-      try {
-        const flashModel = genAI.getGenerativeModel({
-          model: "gemini-flash-latest",
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 500000
-          }
-        });
-
-        const prompt = `אני נותן לך טקסט של שיעור תורה שתומלל, ואני רוצה שתחלק אותו לפסקאות חכמות לפי הנושאים והרעיונות.
-
-🎯 חוקי חלוקה חכמה:
-- כל פסקה צריכה להיות רעיון או נושא שלם
-- פסקה חדשה למעבר נושא (מהלכה לאגדה, ממשל לפסק, מסיפור לעיקרון)
-- פסקה חדשה לכל ציטוט ארוך (פסוק, מאמר חז"ל, הלכה)
-- פסקה חדשה לכל סיפור או דוגמה
-- פסקה חדשה כשהרב עובר לדבר אחר ("אני רוצה לספר", "דבר אחר", "למשל")
-- שאלות ותשובות בפסקאות נפרדות
-- **שפר מירכאות** - ודא שכל ציטוט (פסוק, מאמר חז"ל, אמרה) ודיאלוג ישיר עטוף במירכאות ("...") באופן מדויק ונכון תחבירית.
-- אם קיימת מירכאה בודדת בלבד (פותחת או סוגרת), ורק אם ברור בוודאות היכן חסרה בת הזוג שלה עקב שגיאה טכנית – מותר להשלים את המירכאה החסרה בלבד. אין לנחש ואין לשנות את גבולות הציטוט.
-- 🔒 **אסור בהחלט לשפר או להשלים ציטוטים** - פסוקים, מאמרי חז"ל ואמירות חכמים חייבים להישאר כמו שהם בדיוק, גם אם נשמעים חסרים, שגויים או לא שלמים. אסור לתקן, להשלים או לשפר אותם בשום דרך!
-- **חיבור משפטים שבורים** – חבר יחד משפטים שבורים שנשמעים כהמשך ישיר זה לזה, גם אף הדובר עצמו אמר אותם בצורה מקוטעת, אך בלי לשנות ניסוח, בלי להוסיף ובלי ללטש סגנון.
-- **ניקוי חזרות טכניות בלבד** – מותר להסיר חזרות רצופות של אותה מילה או ביטוי כאשר מדובר בכפילות טכנית (כגון גמגום), כל עוד אין בכך שינוי של משמעות הדברים. ✔ דוגמאות: "אני אני אומר" → "אני אומר", "זה זה זה חשוב" → "זה חשוב". ❗ אם החזרה נראית כהדגשה או כחלק מהסגנון – יש להשאיר אותה כפי שנאמרה.
-- **יישור רצף דיבור לא עקבי** – כאשר קיימות עצירות לא טבעיות בתמלול (כמו "...", ריבוי נקודות, מקפים מרובים או הפסקות טכניות), המודל רשאי להחליק את הרצף למשפט תקין, ללא כל שינוי בניסוח וללא עריכה סגנונית.
-- **פיצול פסקאות ארוכות לפי רעיון משנה** – אם פסקה ארוכה מדי (מעל 6–7 שורות) ויש בה מעבר רעיוני נוסף—even אם אינו מסומן במעבר מפורש—חלק אותה לפסקה חדשה בהתאם לרעיונות, אך בלי לשנות ניסוח, לנסח מחדש או להוסיף תוכן.
-- **החלקת חיבור בין משפטים סמוכים** – כאשר שני משפטים קצרים עומדים ברצף ומשלימים זה את זה מבחינה משמעותית, ניתן לחברם למשפט אחד זורם, כל עוד אין שינוי בניסוח והמשמעות נשמרת במלואה.
-
-🔥 חשוב ביותר:
-- הפרד כל פסקה עם שורה ריקה כפולה (\\n\\n)
-- אל תשכתב, אל תסגנן ואל תחליף מילים במילים אחרות.
-- מותר לבצע רק את התיקונים הטכניים שהוגדרו למעלה (חיבור שבירות, איחוד חזרות, יישור רצף, פיצול פסקאות וכד').
-- אל תוסיף או תסיר תוכן חדש שאינו מופיע בטקסט.
-
-🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
-אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
-
-🔴 **החזר אך ורק את התמלול עצמו.**
-אין להוסיף הקדמות, הסברים, כותרות או משפטים כמו "להלן התמלול".
-
-הטקסט לחלוקה:
-${text}
-
-תחזיר את הטקסט המחולק לפסקאות עם \\n\\n בין כל פסקה:`;
-
-        const result = await flashModel.generateContent(prompt);
-        const response = await result.response;
-        let dividedText = response.text();
-
-        if (dividedText && dividedText.length > text.length * 0.8) {
-          console.log(`✅ Gemini Flash Latest fallback successful (${dividedText.length} chars)`);
-          return dividedText;
-        } else {
-          throw new Error('Gemini Flash Latest output too short or empty');
-        }
-      } catch (flashError) {
-        console.error(`❌ All paragraph division models failed:`, flashError.message);
-        console.log(`⚠️ Returning original text for this chunk`);
-        return text;
-      }
+    } catch (flashError) {
+      console.error(`❌ All paragraph division models failed:`, flashError.message);
+      console.log(`⚠️ Returning original text for this chunk`);
+      return text;
     }
   }
 }
@@ -1496,7 +1425,7 @@ ${text}
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
   const model = genAI.getGenerativeModel({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-2.5-pro",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 500000
@@ -1890,7 +1819,7 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     }
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3.1-pro-preview",
+      model: "gemini-2.5-pro",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 65536
@@ -3295,7 +3224,7 @@ app.get('/test-gemini', async (req, res) => {
     }
 
     // Test with a simple text generation
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
     const text = response.text();
