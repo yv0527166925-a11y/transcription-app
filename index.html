@@ -1584,8 +1584,19 @@
         <section class="hero-section">
             <div class="content-wrapper">
                 <h1 class="hero-title" data-i18n="hero_title">🎯 תמלול חכם</h1>
-                <div class="hero-badge">
-                    <strong data-i18n="hero_badge">מעל 60,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!</strong>
+
+                <!-- הודעת סגירת השירות -->
+                <div style="background: #dc3545; border: 3px solid #dc3545; border-radius: 12px; padding: 25px; margin: 25px auto 20px; text-align: center; max-width: 800px; box-shadow: 0 4px 12px rgba(220,53,69,0.3);">
+                    <h2 style="color: white; margin: 0 0 15px 0; font-size: 24px; font-weight: bold;">
+                        🚫 השירות אינו פעיל יותר
+                    </h2>
+                    <p style="color: white; margin: 0; font-size: 18px; line-height: 1.6;">
+                        משתמשים קיימים יוכלו לנצל את יתרת הדקות במשך החודש הקרוב, או יזוכו על ידי המערכת לאחר מכן
+                    </p>
+                </div>
+
+                <div class="hero-badge" style="opacity: 0.6;">
+                    <strong data-i18n="hero_badge">מעל 60,000 דקות כבר תומללו בשירות שלנו.</strong>
                 </div>
             </div>
         </section>
@@ -1902,12 +1913,6 @@
             <!-- Transcribe Tab -->
             <div id="transcribeTab" class="tab-content">
 
-                <!-- Cost Update Notice -->
-                <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 12px 16px; margin-bottom: 20px; text-align: center; border-radius: 8px; border-right: 4px solid #f39c12;">
-                    <div style="margin: 0; font-size: 0.9em; font-weight: 600; color: #8b5a3c;" data-i18n="cost_update_notice">
-                        ℹ️ עקב שינויים בעלויות התמלול, עודכנה המערכת לעבודה עם מודל חסכוני יותר
-                    </div>
-                </div>
 
                 <form id="transcriptionForm">
                     <div class="upload-area" id="uploadArea">
@@ -2034,26 +2039,35 @@
             <!-- Payment Tab -->
             <div id="paymentTab" class="tab-content">
 
-               <div class="payment-info" style="text-align: center !important; margin: 20px auto; width: 100%; display: block;">
+               <div class="payment-notice-center" style="background: #dc3545; border: 2px solid #dc3545; border-radius: 8px; padding: 25px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%;">
+                    <p style="font-size: 20px; color: white; margin: 0 auto; text-align: center !important; display: block; width: fit-content; font-weight: bold;">
+                        🚫 השירות נסגר
+                    </p>
+                    <p style="font-size: 16px; color: white; margin: 10px auto 0; text-align: center !important; display: block; width: fit-content;">
+                        אין אפשרות לבצע רכישות נוספות
+                    </p>
+                </div>
+
+               <div class="payment-info" style="text-align: center !important; margin: 20px auto; width: 100%; display: block; opacity: 0.5;">
                     <p style="font-size: 18px; color: #333; margin: 20px auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_packages">
                         מגוון חבילות החל מ-10 ש"ח ל-60 דקות תמלול
                     </p>
                 </div>
 
-               <div class="payment-notice-center" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%;">
+               <div class="payment-notice-center" style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%; opacity: 0.5;">
                     <p style="font-size: 16px; color: #856404; margin: 0 auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_notice">
                         <strong>⚠️ חשוב!</strong><br>
                         בטרם ביצוע התשלום בדף הרכישה, יש ללחוץ על שדות המייל והשם כדי להפעיל את תיבת הסימון לאישור!
                     </p>
                 </div>
 
-               <div class="payment-notice-center" style="background: #f8d7da; border: 2px solid #dc3545; border-radius: 8px; padding: 15px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%;">
+               <div class="payment-notice-center" style="background: #f8d7da; border: 2px solid #dc3545; border-radius: 8px; padding: 15px; margin: 20px auto; text-align: center !important; display: block; width: fit-content; max-width: 90%; opacity: 0.5;">
                     <p style="font-size: 15px; color: #721c24; margin: 0 auto; text-align: center !important; display: block; width: fit-content;" data-i18n="payment_card_notice">
                         <strong>💳 לתשומת לב:</strong><br>
                         המערכת אינה תומכת בכרטיסי דיינרס ואמריקן אקספרס
                     </p>
                 </div>
-                <button class="btn" onclick="processPurchase()" data-i18n="btn_go_to_purchase">
+                <button class="btn" onclick="processPurchase()" data-i18n="btn_go_to_purchase" style="opacity: 0.5; cursor: not-allowed;">
                     💳 למעבר לדף הרכישה
                 </button>
 
@@ -2695,7 +2709,7 @@
                 if (data.success) {
                     currentUser = data.user;
                     saveUserToStorage(currentUser);
-                    showVerificationStatus('המייל אומת בהצלחה! קיבלת 30 דקות חינם!', 'success');
+                    showVerificationStatus('המייל אומת בהצלחה! כעת תוכל להתחבר.', 'success');
                     updateDebugInfo('✅ אימות הצליח!');
                     setTimeout(() => showApp(), 2000);
                 } else {
@@ -3904,6 +3918,10 @@
         }
 
         async function processPurchase() {
+            // חסימת גישה לרכישה
+            showStatus('🚫 השירות נסגר. אין אפשרות לבצע רכישות נוספות', 'error');
+            return;
+
             if (!currentUser || !currentUser.email) {
                 showStatus('יש להתחבר למערכת כדי לבצע תשלום', 'error');
                 return;
@@ -4639,7 +4657,7 @@
 
                 // Hero
                 hero_title: '🎯 תמלול חכם',
-                hero_badge: 'מעל 60,000 דקות כבר תומללו. הצטרף אלינו וקבל 30 דקות ניסיון ללא התחייבות!',
+                hero_badge: 'מעל 60,000 דקות כבר תומללו בשירות שלנו.',
 
                 // Features
                 features_title: 'שירות תמלול לשיעורים תורניים – מדויק בהיר ומוכן לעריכה',
@@ -4732,7 +4750,6 @@
                 th_download: 'הורדה',
 
                 // Upload
-                cost_update_notice: 'ℹ️ עקב שינויים בעלויות התמלול, עודכנה המערכת לעבודה עם מודל חסכוני יותר',
                 upload_text: 'לחץ כאן או גרור קבצים (ללא הגבלה)',
                 upload_formats: 'תומך בפורמטים: MP3, MP4, WAV, M4A, MOV, AVI, MKV',
                 upload_accuracy: '🎯 שיעורים בעברית - 98% דיוק • שיעורים בהגייה ישיבתית - 95% דיוק',
@@ -4798,7 +4815,7 @@
 
                 // Hero
                 hero_title: '🎯 Smart Transcription',
-                hero_badge: 'Over 60,000 minutes already transcribed. Join us and get 30 free trial minutes!',
+                hero_badge: 'Over 60,000 minutes already transcribed in our service.',
 
                 // Features
                 features_title: 'Professional Transcription Service – Accurate, Clear, and Ready to Edit',
@@ -4957,7 +4974,7 @@
 
                 // Hero
                 hero_title: '🎯 Transcription Intelligente',
-                hero_badge: 'Plus de 30 000 minutes déjà transcrites. Rejoignez-nous et obtenez 30 minutes d\'essai gratuites!',
+                hero_badge: 'Plus de 60 000 minutes déjà transcrites dans notre service.',
 
                 // Features
                 features_title: 'Service de Transcription Professionnel – Précis, Clair et Prêt à Éditer',

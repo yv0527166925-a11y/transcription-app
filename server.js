@@ -259,9 +259,17 @@ app.use(express.static('.'));
 // const userRoutes = require('./routes/userRoutes'); // Disabled MongoDB routes
 // app.use('/api/users', userRoutes); // Disabled MongoDB routes
 
-// Payment Routes - Tranzila Integration
-const paymentRoutes = require('./routes/paymentRoutes');
-app.use('/api/payment', paymentRoutes);
+// Payment Routes - Tranzila Integration - DISABLED
+// השירות נסגר - אין רכישות חדשות
+app.use('/api/payment', (req, res) => {
+    res.status(403).json({
+        success: false,
+        error: 'השירות נסגר. אין אפשרות לבצע רכישות נוספות',
+        englishError: 'Service is closed. No new purchases allowed'
+    });
+});
+// const paymentRoutes = require('./routes/paymentRoutes');
+// app.use('/api/payment', paymentRoutes);
 
 // Enhanced file storage with proper UTF-8 encoding
 const storage = multer.diskStorage({
@@ -4132,15 +4140,15 @@ app.post('/api/verify-email', (req, res) => {
 
     console.log('✅ Email verified successfully for:', email);
 
-    // Only after verification is safely saved, add welcome bonus
-    user.remainingMinutes += 30; // Add 30 free minutes after verification
-    saveUsersData(); // Save minutes separately
+    // דקות חינם הופסקו - השירות נסגר
+    // user.remainingMinutes += 30; // DISABLED - No more free minutes
+    // saveUsersData(); // Save minutes separately
 
-    console.log('🎁 Added 30 welcome minutes. New balance:', user.remainingMinutes);
+    console.log('📧 Email verified. No welcome minutes (service closed)');
 
     res.json({
       success: true,
-      message: 'המייל אומת בהצלחה! קיבלת 30 דקות חינם. כעת תוכל להתחבר.',
+      message: 'המייל אומת בהצלחה! כעת תוכל להתחבר.',
       user: { ...user, password: undefined }
     });
   } catch (error) {
