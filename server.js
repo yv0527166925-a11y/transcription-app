@@ -128,8 +128,32 @@ function removeExtremeRepetitions(text) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 🔑 API Key Management - Single Source of Truth
+function getApiKey() {
+  const key = process.env.GEMINI_API_KEY;
+  const keyExists = !!key;
+  const keyLength = key ? key.length : 0;
+  const keyLast6 = key ? key.slice(-6) : 'N/A';
+
+  console.log(`🔑 API Key Info - Exists: ${keyExists}, Length: ${keyLength}, Last6: ${keyLast6}`);
+
+  if (!key) {
+    throw new Error('GEMINI_API_KEY not found in environment variables');
+  }
+
+  return key;
+}
+
+// 🔑 Centralized Gemini AI Client Creation
+function createGeminiClient() {
+  const apiKey = getApiKey();
+  const client = new GoogleGenerativeAI(apiKey);
+  console.log(`🤖 Created new Gemini client with key ending in: ${apiKey.slice(-6)}`);
+  return client;
+}
+
 // Initialize Gemini AI
-let genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+let genAI = createGeminiClient();
 
 // ספירת קבצים לאיפוס genAI כל 3 קבצים
 let processedFilesCount = 0;
@@ -819,6 +843,10 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
 // Helper function to transcribe with a specific model
 async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, modelName, startTime, retryCount = 0) {
   try {
+    // 🔑 Log API key info before transcription
+    const currentKey = getApiKey();
+    console.log(`🔑 transcribeWithModel(${modelName}) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
+
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
@@ -940,6 +968,10 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
 
   // First attempt: Gemini Flash Latest
   try {
+    // 🔑 Log API key info before transcription
+    const currentKey = getApiKey();
+    console.log(`🔑 transcribeAudioChunk (gemini-flash-latest) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
+
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
       generationConfig: {
@@ -1023,6 +1055,10 @@ ${contextPrompt}`;
 
     // Second attempt: Fallback to Gemini Flash Lite Latest
     try {
+      // 🔑 Log API key info before fallback transcription
+      const currentKey = getApiKey();
+      console.log(`🔑 transcribeAudioChunk (gemini-flash-lite-latest) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
+
       const model = genAI.getGenerativeModel({
         model: "gemini-flash-lite-latest",
         generationConfig: {
@@ -1235,6 +1271,10 @@ async function smartParagraphDivision(text) {
     }
 
     // First attempt: Gemini Flash Latest
+    // 🔑 Log API key info before paragraph division
+    const currentKey = getApiKey();
+    console.log(`🔑 smartParagraphDivision (gemini-flash-latest): Using key ending in ${currentKey.slice(-6)}`);
+
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
       generationConfig: {
@@ -1386,6 +1426,10 @@ ${text}
     try {
       console.log(`🔄 Retrying with Gemini Flash Latest for paragraph division...`);
 
+      // 🔑 Log API key info before retry
+      const retryKey = getApiKey();
+      console.log(`🔑 smartParagraphDivision RETRY (gemini-flash-latest): Using key ending in ${retryKey.slice(-6)}`);
+
       const retryModel = genAI.getGenerativeModel({
         model: "gemini-flash-latest",
         generationConfig: {
@@ -1455,6 +1499,10 @@ ${text}
       // Third attempt: Final fallback to Gemini Flash Lite Latest
     try {
       console.log(`🔄 Trying Gemini Flash Lite Latest fallback for paragraph division...`);
+
+      // 🔑 Log API key info before fallback
+      const fallbackKey = getApiKey();
+      console.log(`🔑 smartParagraphDivision FALLBACK (gemini-flash-lite-latest): Using key ending in ${fallbackKey.slice(-6)}`);
 
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-flash-lite-latest",
@@ -1626,6 +1674,10 @@ async function smartParagraphDivisionWithFlashFallback(text) {
 
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
+  // 🔑 Log API key info before paragraph division single
+  const currentKey = getApiKey();
+  console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
+
   const model = genAI.getGenerativeModel({
     model: "gemini-flash-latest",
     generationConfig: {
@@ -1707,6 +1759,10 @@ ${text}
 
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
+  // 🔑 Log API key info before paragraph division single
+  const currentKey = getApiKey();
+  console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
+
   const model = genAI.getGenerativeModel({
     model: "gemini-flash-latest",
     generationConfig: {
@@ -2100,6 +2156,10 @@ async function directGeminiTranscription(filePath, filename, language, customIns
         filename
       );
     }
+
+    // 🔑 Log API key info before direct transcription
+    const currentKey = getApiKey();
+    console.log(`🔑 directGeminiTranscription (gemini-flash-latest): Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -3322,7 +3382,7 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
           await new Promise(r => setTimeout(r, 2000));
 
           // יצירת instance חדש של genAI
-          genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+          genAI = createGeminiClient();
           console.log("✅ Model session reset completed");
         }
 
@@ -3493,20 +3553,12 @@ app.get('/health', (req, res) => {
 // Test Gemini API key directly
 app.get('/test-gemini', async (req, res) => {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 🔑 Use centralized API key function
+    const apiKey = getApiKey();
     console.log('🔑 Testing Gemini API key...');
-    console.log('🔑 Key exists:', !!apiKey);
-    console.log('🔑 Key length:', apiKey ? apiKey.length : 0);
-    console.log('🔑 Key prefix:', apiKey ? apiKey.substring(0, 10) + '...' : 'none');
-
-    if (!apiKey) {
-      return res.status(500).json({
-        success: false,
-        error: 'GEMINI_API_KEY not found in environment variables'
-      });
-    }
 
     // Test with a simple text generation
+    console.log(`🔑 test-gemini endpoint: Using key ending in ${apiKey.slice(-6)}`);
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
@@ -3606,12 +3658,14 @@ app.get('/api/download/:filename', (req, res) => {
 });
 
 app.get('/api/test', (req, res) => {
+  // 🔑 Use centralized API key function for status
+  const currentKey = getApiKey();
   res.json({
     success: true,
     message: 'API is working!',
-    geminiConfigured: !!process.env.GEMINI_API_KEY,
-    geminiKeyLength: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.length : 0,
-    geminiKeyPrefix: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + '...' : 'none',
+    geminiConfigured: !!currentKey,
+    geminiKeyLength: currentKey ? currentKey.length : 0,
+    geminiKeyPrefix: currentKey ? currentKey.substring(0, 10) + '...' : 'none',
     emailConfigured: !!process.env.EMAIL_USER,
     ffmpegAvailable: checkFFmpegAvailability()
   });
@@ -5683,7 +5737,15 @@ const server = app.listen(PORT, () => {
   const ffmpegAvailable = checkFFmpegAvailability();
 
   console.log(`🚀 Enhanced server running on port ${PORT}`);
-  console.log(`🔑 Gemini API configured: ${!!process.env.GEMINI_API_KEY}`);
+
+  // 🔑 Use centralized API key function for startup logging
+  try {
+    const startupKey = getApiKey();
+    console.log(`🔑 Gemini API configured: ${!!startupKey} (ending in ${startupKey.slice(-6)})`);
+  } catch (error) {
+    console.log(`🔑 Gemini API configured: false (${error.message})`);
+  }
+
   console.log(`📧 Email configured: ${!!process.env.EMAIL_USER}`);
   console.log(`📂 Data file: ${DATA_FILE}`);
   console.log(`📁 Transcriptions folder: ${downloadsDir}`);
