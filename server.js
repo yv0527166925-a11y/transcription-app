@@ -798,20 +798,20 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
   }
 }
 
-// Function with fallback for transcription - 3 Flash Preview -> Pro Latest -> Flash Latest
+// Function with fallback for transcription - 3.1 Pro Preview -> Pro Latest -> Flash Latest
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
-  // First attempt: Gemini 3 Flash Preview
+  // First attempt: Gemini 3.1 Pro Preview
   try {
-    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3-flash-preview", startTime, 0);
+    const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-3.1-pro-preview", startTime, 0);
     if (!transcription || transcription.trim().length === 0) {
-      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3 Flash Preview');
+      throw new Error('🚨 FALLBACK: Empty transcription from Gemini 3.1 Pro Preview');
     }
-    console.log(`✅ Gemini 3 Flash Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
+    console.log(`✅ Gemini 3.1 Pro Preview transcribed chunk ${chunkIndex + 1} successfully (${transcription.length} chars)`);
     return transcription;
   } catch (error1) {
-    console.log(`⚠️ Gemini 3 Flash Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
+    console.log(`⚠️ Gemini 3.1 Pro Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
 
     // Second attempt: Fallback to Gemini Pro Latest
     try {
@@ -834,7 +834,7 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
         return transcription;
       } catch (flashError) {
         console.error(`❌ All 3 fallback attempts failed for chunk ${chunkIndex + 1}:`, flashError.message);
-        throw new Error(`All 3 attempts failed for chunk ${chunkIndex + 1}: 3 Flash Preview → Pro Latest → Flash Latest all failed`);
+        throw new Error(`All 3 attempts failed for chunk ${chunkIndex + 1}: 3.1 Pro Preview → Pro Latest → Flash Latest all failed`);
       }
     }
   }
@@ -966,14 +966,14 @@ ${contextPrompt}
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
 
-  // First attempt: Gemini 3 Flash Preview
+  // First attempt: Gemini 3.1 Pro Preview
   try {
     // 🔑 Log API key info before transcription
     const currentKey = getApiKey();
-    console.log(`🔑 transcribeAudioChunk (gemini-3-flash-preview) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
+    console.log(`🔑 transcribeAudioChunk (gemini-3.1-pro-preview) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 32768
@@ -1047,11 +1047,11 @@ ${contextPrompt}`;
       .trim();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`✅ Gemini 3 Flash Preview - Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
+    console.log(`✅ Gemini 3.1 Pro Preview - Chunk ${chunkIndex + 1} transcribed: ${transcription.length} characters in ${duration}s`);
     return transcription;
 
   } catch (error1) {
-    console.log(`⚠️ Gemini 3 Flash Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
+    console.log(`⚠️ Gemini 3.1 Pro Preview failed for chunk ${chunkIndex + 1}:`, error1.message);
 
     // Second attempt: Fallback to Gemini Pro Latest
     try {
@@ -1140,7 +1140,7 @@ ${contextPrompt}`;
     } catch (proError) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       console.error(`❌ All fallback attempts failed for chunk ${chunkIndex + 1} after ${duration}s:`, proError.message);
-      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: 3 Flash Preview and Pro Latest both failed`);
+      throw new Error(`All 2 attempts failed for chunk ${chunkIndex + 1}: 3.1 Pro Preview and Pro Latest both failed`);
     }
   }
 }
@@ -1270,13 +1270,13 @@ async function smartParagraphDivision(text) {
       return await smartParagraphDivisionChunked(text, MAX_CHARS);
     }
 
-    // First attempt: Gemini 3 Flash Preview
+    // First attempt: Gemini 3.1 Pro Preview
     // 🔑 Log API key info before paragraph division
     const currentKey = getApiKey();
-    console.log(`🔑 smartParagraphDivision (gemini-3-flash-preview): Using key ending in ${currentKey.slice(-6)}`);
+    console.log(`🔑 smartParagraphDivision (gemini-3.1-pro-preview): Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 500000
@@ -1420,18 +1420,18 @@ ${text}
     throw new Error('All retry attempts (fast + extended) failed');
 
   } catch (error1) {
-    console.log(`⚠️ Gemini 3 Flash Preview failed for paragraph division:`, error1.message);
+    console.log(`⚠️ Gemini 3.1 Pro Preview failed for paragraph division:`, error1.message);
 
-    // Second attempt: Retry with Gemini 3 Flash Preview
+    // Second attempt: Retry with Gemini 3.1 Pro Preview
     try {
-      console.log(`🔄 Retrying with Gemini 3 Flash Preview for paragraph division...`);
+      console.log(`🔄 Retrying with Gemini 3.1 Pro Preview for paragraph division...`);
 
       // 🔑 Log API key info before retry
       const retryKey = getApiKey();
-      console.log(`🔑 smartParagraphDivision RETRY (gemini-3-flash-preview): Using key ending in ${retryKey.slice(-6)}`);
+      console.log(`🔑 smartParagraphDivision RETRY (gemini-3.1-pro-preview): Using key ending in ${retryKey.slice(-6)}`);
 
       const retryModel = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-pro-preview",
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 500000
@@ -1494,7 +1494,7 @@ ${text}
       }
 
     } catch (error2) {
-      console.log(`⚠️ Gemini 3 Flash Preview retry also failed for paragraph division:`, error2.message);
+      console.log(`⚠️ Gemini 3.1 Pro Preview retry also failed for paragraph division:`, error2.message);
 
       // Third attempt: Final fallback to Gemini Pro Latest
     try {
@@ -1679,7 +1679,7 @@ async function smartParagraphDivisionSingle(text) {
   console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-pro-preview",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 500000
@@ -1764,7 +1764,7 @@ async function smartParagraphDivisionSingle(text) {
   console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
 
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-pro-preview",
     generationConfig: {
       temperature: 0.1,
       maxOutputTokens: 500000
@@ -2159,10 +2159,10 @@ async function directGeminiTranscription(filePath, filename, language, customIns
 
     // 🔑 Log API key info before direct transcription
     const currentKey = getApiKey();
-    console.log(`🔑 directGeminiTranscription (gemini-3-flash-preview): Using key ending in ${currentKey.slice(-6)}`);
+    console.log(`🔑 directGeminiTranscription (gemini-3.1-pro-preview): Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-pro-preview",
       generationConfig: {
         temperature: 0,
         maxOutputTokens: 65536
@@ -3559,7 +3559,7 @@ app.get('/test-gemini', async (req, res) => {
 
     // Test with a simple text generation
     console.log(`🔑 test-gemini endpoint: Using key ending in ${apiKey.slice(-6)}`);
-    const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
     const text = response.text();
