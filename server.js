@@ -26,11 +26,11 @@ const ChunkStatus = {
 
 // 🔥 NEW: Per-User Queue System - each user gets their own queue
 const userQueues = new Map(); // email -> PQueue instance
-const maxGlobalConcurrency = 3; // Server protection: max 3 concurrent transcriptions globally
+const maxGlobalConcurrency = 1; // Server protection: max 1 concurrent transcription globally - reduced for Render Free tier
 const maxUserConcurrency = 5; // Each user can have up to 5 tasks in their queue
 let currentGlobalActive = 0; // Track global active transcriptions
 
-// Global task wrapper that enforces the 3-task global limit
+// Global task wrapper that enforces the 1-task global limit
 async function executeWithGlobalThrottling(task, userEmail) {
   // Wait until global slot available
   while (currentGlobalActive >= maxGlobalConcurrency) {
@@ -335,8 +335,8 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 500 * 1024 * 1024, // 🔥 500MB per file
-    files: Infinity // 🔥 UNLIMITED: No limit on number of files
+    fileSize: 15 * 1024 * 1024, // 🔥 FREE TIER: 15MB per file (max ~15 minutes audio)
+    files: 1 // 🔥 FREE TIER: Max 1 file per upload - safer for free hosting
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /\.(mp3|mp4|wav|m4a|mov|avi|mkv|flac|aac|ogg)$/i;
@@ -5775,11 +5775,11 @@ const server = app.listen(PORT, () => {
   console.log('📧 Email monitoring disabled - not using email transcription service');
 });
 
-// Configure server timeouts for large file uploads
-server.timeout = 60 * 60 * 1000; // 60 minutes timeout for large file uploads
-server.keepAliveTimeout = 65000; // Keep-alive timeout
-server.headersTimeout = 66000; // Headers timeout
-console.log('⏰ Server timeouts configured: 60 min upload, 65s keep-alive');
+// Configure server timeouts for FREE TIER - shorter timeouts
+server.timeout = 10 * 60 * 1000; // 10 minutes timeout (FREE TIER limit)
+server.keepAliveTimeout = 30000; // Keep-alive timeout
+server.headersTimeout = 35000; // Headers timeout
+console.log('⏰ FREE TIER: Server timeouts configured: 10 min upload, 30s keep-alive');
 
 
 
