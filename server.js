@@ -1366,11 +1366,11 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   console.log(`🔍 Starting smart paragraph division for all languages, length=${merged.length}`);
   console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
   await new Promise(resolve => setTimeout(resolve, 3000));
-  console.log(`🎯 Starting smart paragraph division with Gemini...`);
+  console.log(`🎯 Starting smart paragraph division with ${language === 'gpt' ? 'OpenAI GPT' : 'Gemini'}...`);
 
   // 🔧 FIX: Protect against smart paragraph division failure
   try {
-    const improvedText = await smartParagraphDivision(merged);
+    const improvedText = await smartParagraphDivision(merged, language);
     if (improvedText && improvedText.trim().length > 0) {
       merged = improvedText;
       console.log(`✅ Smart paragraph division completed successfully: ${merged.length} chars`);
@@ -1388,14 +1388,78 @@ async function mergeTranscriptionChunks(chunks, language = 'Hebrew') {
   return merged;
 }
 
+// 🤖 OpenAI GPT Smart Paragraph Division Function
+async function smartParagraphDivisionWithOpenAI(text) {
+  try {
+    console.log(`🤖 Starting OpenAI GPT paragraph division (${text.length} chars)`);
+
+    // Create OpenAI client
+    const openai = createOpenAIClient();
+
+    const prompt = `אתה מומחה לעריכת טקסטים בעברית. המשימה שלך היא לחלק את הטקסט הבא לפסקאות הגיוניות ורצופות.
+
+חוקים חשובים:
+1. חלק את הטקסט לפסקאות הגיוניות לפי נושאים ותוכן
+2. כל פסקה צריכה להתחיל בשורה חדשה
+3. השתמש ברק שורה כפולה (\\n\\n) בין פסקאות
+4. שמור על כל המילים והתוכן המקורי - אל תוסיף או תמחק דבר
+5. תקן רק שגיאות כתיב ברורות
+6. שמור על סדר הטקסט המקורי
+
+טקסט לעיבוד:
+${text}
+
+החזר את הטקסט מחולק לפסקאות:`;
+
+    console.log(`🔑 OpenAI paragraph division: Using key ending in ${getOpenAIKey().slice(-6)}`);
+
+    // Call OpenAI GPT API for paragraph division
+    const response = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 4096
+    });
+
+    const improvedText = response.choices[0]?.message?.content || '';
+
+    if (!improvedText || improvedText.trim().length === 0) {
+      throw new Error('🚨 CRITICAL: OpenAI returned empty paragraph division');
+    }
+
+    // Basic validation - should be roughly same length
+    if (improvedText.length < text.length * 0.8) {
+      console.warn(`⚠️ OpenAI paragraph division result too short, using original`);
+      return text;
+    }
+
+    console.log(`✅ OpenAI GPT paragraph division completed: ${improvedText.length} characters`);
+    return improvedText.trim();
+
+  } catch (error) {
+    console.error(`❌ OpenAI GPT paragraph division failed:`, error.message);
+    console.log(`⚠️ Falling back to original text`);
+    return text; // Return original text if failed
+  }
+}
+
 // 🎯 NEW: Smart paragraph division with Gemini Flash Latest → Flash Latest → Flash Lite Latest fallback
-async function smartParagraphDivision(text) {
+async function smartParagraphDivision(text, language = null) {
+  // 🤖 Check if GPT paragraph division was requested
+  if (language === 'gpt') {
+    return await smartParagraphDivisionWithOpenAI(text);
+  }
   try {
     // Check if text is too long (over 7.5K chars) and split it - reduced for better concurrent processing
     const MAX_CHARS = 7500; // ~1500 words - reduced for better stability with concurrent requests
     if (text.length > MAX_CHARS) {
       console.log(`📏 Text too long (${text.length} chars), splitting into chunks...`);
-      return await smartParagraphDivisionChunked(text, MAX_CHARS);
+      return await smartParagraphDivisionChunked(text, MAX_CHARS, language);
     }
 
     // First attempt: Gemini Flash Latest
@@ -1707,7 +1771,7 @@ ${text}
 }
 
 // 🎯 NEW: Smart paragraph division for long texts (chunked processing)
-async function smartParagraphDivisionChunked(text, maxChars) {
+async function smartParagraphDivisionChunked(text, maxChars, language = null) {
   try {
     // Split text into chunks at sentence boundaries
     const chunks = splitTextIntoChunks(text, maxChars);
@@ -1725,7 +1789,7 @@ async function smartParagraphDivisionChunked(text, maxChars) {
       }
 
       // 🆕 Use the new fallback function instead of inline code
-      const processedChunk = await smartParagraphDivisionWithFlashFallback(chunks[i]);
+      const processedChunk = await smartParagraphDivisionWithFlashFallback(chunks[i], language);
       processedChunks.push(processedChunk);
       console.log(`✅ Chunk ${i + 1}/${chunks.length} processed (${processedChunk.length} chars)`);
     }
@@ -1767,7 +1831,11 @@ function splitTextIntoChunks(text, maxChars) {
 }
 
 // 🆕 NEW: Smart paragraph division with Flash Latest -> Flash Latest -> Flash Lite Latest fallback
-async function smartParagraphDivisionWithFlashFallback(text) {
+async function smartParagraphDivisionWithFlashFallback(text, language = null) {
+  // 🤖 Check if GPT paragraph division was requested
+  if (language === 'gpt') {
+    return await smartParagraphDivisionWithOpenAI(text);
+  }
   // First attempt: Gemini Flash Latest
   try {
     const processedText = await smartParagraphDivisionSingle(text);
@@ -2404,8 +2472,8 @@ async function directGeminiTranscription(filePath, filename, language, customIns
     console.log(`🔍 Starting smart paragraph division for all languages, length=${transcription.length}`);
     console.log(`⏱️ Waiting 3 seconds before smart paragraph division to avoid API rate limits...`);
     await new Promise(resolve => setTimeout(resolve, 3000));
-    console.log(`🎯 Starting smart paragraph division with Gemini...`);
-    transcription = await smartParagraphDivision(transcription);
+    console.log(`🎯 Starting smart paragraph division with ${language === 'gpt' ? 'OpenAI GPT' : 'Gemini'}...`);
+    transcription = await smartParagraphDivision(transcription, language);
 
     // Send progress update for completion
     if (transcriptionId) {
