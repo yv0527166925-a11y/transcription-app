@@ -1005,6 +1005,12 @@ async function transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename
 
   try {
     console.log(`🤖 Starting OpenAI GPT transcription for chunk ${chunkIndex + 1}/${totalChunks}`);
+    console.log(`🔍 OpenAI: Looking for chunk file: ${chunkPath}`);
+
+    // Check if file exists
+    if (!fs.existsSync(chunkPath)) {
+      throw new Error(`Audio chunk file not found: ${chunkPath}`);
+    }
 
     // Create OpenAI client
     const openai = createOpenAIClient();
@@ -1013,7 +1019,10 @@ async function transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename
     const audioData = fs.readFileSync(chunkPath);
 
     // Create a temporary file for OpenAI (it needs a file, not base64)
-    const tempFilePath = chunkPath.replace('.mp3', '_temp_openai.mp3');
+    // Handle both .wav and .mp3 extensions
+    const tempFilePath = chunkPath.includes('.wav')
+      ? chunkPath.replace('.wav', '_temp_openai.wav')
+      : chunkPath.replace('.mp3', '_temp_openai.mp3');
     fs.writeFileSync(tempFilePath, audioData);
 
     // Enhanced prompt based on context
