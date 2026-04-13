@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const OpenAI = require('openai'); // 🔥 NEW: For GPT transcription
 const nodemailer = require('nodemailer');
 const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const cors = require('cors');
@@ -149,6 +150,24 @@ function createGeminiClient() {
   const apiKey = getApiKey();
   const client = new GoogleGenerativeAI(apiKey);
   console.log(`🤖 Created new Gemini client with key ending in: ${apiKey.slice(-6)}`);
+  return client;
+}
+
+// 🔑 OpenAI Configuration and Client Creation
+function getOpenAIKey() {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) {
+    throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  return key;
+}
+
+function createOpenAIClient() {
+  const apiKey = getOpenAIKey();
+  const client = new OpenAI({
+    apiKey: apiKey,
+  });
+  console.log(`🤖 Created new OpenAI client with key ending in: ${apiKey.slice(-6)}`);
   return client;
 }
 
@@ -810,6 +829,11 @@ async function splitAudioIntoChunks(inputPath, chunkDurationMinutes = 8) {
 async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now();
 
+  // 🤖 Check if GPT transcription was requested
+  if (language === 'gpt') {
+    return await transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename, customInstructions);
+  }
+
   // First attempt: Gemini Flash Latest
   try {
     const transcription = await transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, "gemini-flash-latest", startTime, 0);
@@ -851,6 +875,10 @@ async function transcribeAudioChunkWithFlashFallback(chunkPath, chunkIndex, tota
 // Helper function to transcribe with a specific model
 async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, modelName, startTime, retryCount = 0) {
   try {
+    // 🤖 Check if GPT transcription was requested
+    if (language === 'gpt') {
+      return await transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename, customInstructions);
+    }
     // 🔑 Log API key info before transcription
     const currentKey = getApiKey();
     console.log(`🔑 transcribeWithModel(${modelName}) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
@@ -971,8 +999,91 @@ ${contextPrompt}
   }
 }
 
+// 🤖 OpenAI GPT Transcription Function
+async function transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename, customInstructions) {
+  const startTime = Date.now();
+
+  try {
+    console.log(`🤖 Starting OpenAI GPT transcription for chunk ${chunkIndex + 1}/${totalChunks}`);
+
+    // Create OpenAI client
+    const openai = createOpenAIClient();
+
+    // Read audio file
+    const audioData = fs.readFileSync(chunkPath);
+
+    // Create a temporary file for OpenAI (it needs a file, not base64)
+    const tempFilePath = chunkPath.replace('.mp3', '_temp_openai.mp3');
+    fs.writeFileSync(tempFilePath, audioData);
+
+    // Enhanced prompt based on context
+    let contextPrompt = '';
+    if (chunkIndex === 0) {
+      contextPrompt = 'זהו החלק הראשון של הקובץ - התחל מההתחלה המוחלטת.';
+    } else if (chunkIndex === totalChunks - 1) {
+      contextPrompt = 'זהו החלק האחרון של הקובץ - המשך עד הסוף המוחלט.';
+    } else {
+      contextPrompt = `זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
+    }
+
+    const prompt = `תמלל את קטע האודיו הזה לעברית תקנית וברורה.
+
+${contextPrompt}
+
+🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
+אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
+
+🔴 החזר אך ורק את התמלול עצמו.
+
+${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}` : ''}`;
+
+    console.log(`🔑 OpenAI transcription: Using key ending in ${getOpenAIKey().slice(-6)}`);
+
+    // Call OpenAI Whisper API
+    const response = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePath),
+      model: "whisper-1",
+      prompt: prompt,
+      language: "he", // Hebrew language code for Whisper
+      temperature: 0,
+    });
+
+    // Clean up temp file
+    try {
+      fs.unlinkSync(tempFilePath);
+    } catch (cleanupError) {
+      console.warn(`⚠️ Failed to cleanup temp file: ${tempFilePath}`, cleanupError.message);
+    }
+
+    const transcription = response.text || '';
+
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error('🚨 CRITICAL: OpenAI returned empty transcription');
+    }
+
+    // Apply Hebrew text fixes (same as Gemini)
+    const fixedTranscription = fixHebrewText(transcription);
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`✅ OpenAI GPT - Chunk ${chunkIndex + 1} transcribed: ${fixedTranscription.length} characters in ${duration}s`);
+    console.log(`📄 GPT Chunk ${chunkIndex + 1} preview: "${fixedTranscription.substring(0, 100)}..."`);
+
+    return fixedTranscription;
+
+  } catch (error) {
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.error(`❌ OpenAI GPT transcription failed for chunk ${chunkIndex + 1} after ${duration}s:`, error.message);
+    throw new Error(`OpenAI GPT transcription failed for chunk ${chunkIndex + 1}: ${error.message}`);
+  }
+}
+
 async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename, language, customInstructions, retryCount = 0) {
   const startTime = Date.now(); // Define startTime at the beginning to avoid undefined errors
+
+  // 🤖 Check if GPT transcription was requested
+  if (language === 'gpt') {
+    return await transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename, customInstructions);
+  }
 
   // First attempt: Gemini Flash Latest
   try {
