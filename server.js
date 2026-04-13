@@ -1035,14 +1035,17 @@ async function transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename
       contextPrompt = `זהו חלק ${chunkIndex + 1} מתוך ${totalChunks} - המשך את התמלול מהנקודה בה הקטע הקודם הסתיים.`;
     }
 
-    const prompt = `תמלל את קטע האודיו הזה לעברית תקנית וברורה.
+    const prompt = `תמלל את קטע האודיו הזה לעברית תקנית וברורה מימין לשמאל.
 
 ${contextPrompt}
 
-🚨 חשוב: אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
-אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף.
+🚨 חשוב:
+- אם מילים חוזרות על עצמן, רשום אותן מקסימום 5 פעמים ברציפות
+- אל תחזור על אותן מילים או ביטויים יותר מ-5 פעמים ברצף
+- כתוב את הטקסט העברי בכיוון מימין לשמאל (RTL)
+- השתמש בעברית תקנית עם ניקוד נכון
 
-🔴 החזר אך ורק את התמלול עצמו.
+🔴 החזר אך ורק את התמלול עצמו בעברית מימין לשמאל.
 
 ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}` : ''}`;
 
@@ -1071,7 +1074,7 @@ ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}`
     }
 
     // Apply Hebrew text fixes (same as Gemini)
-    const fixedTranscription = fixHebrewText(transcription);
+    const fixedTranscription = applyHebrewTextFixes(transcription);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(`✅ OpenAI GPT - Chunk ${chunkIndex + 1} transcribed: ${fixedTranscription.length} characters in ${duration}s`);
@@ -1396,7 +1399,7 @@ async function smartParagraphDivisionWithOpenAI(text) {
     // Create OpenAI client
     const openai = createOpenAIClient();
 
-    const prompt = `אתה מומחה לעריכת טקסטים בעברית. המשימה שלך היא לחלק את הטקסט הבא לפסקאות הגיוניות ורצופות.
+    const prompt = `אתה מומחה לעריכת טקסטים בעברית. המשימה שלך היא לחלק את הטקסט הבא לפסקאות הגיוניות ורצופות מימין לשמאל.
 
 חוקים חשובים:
 1. חלק את הטקסט לפסקאות הגיוניות לפי נושאים ותוכן
@@ -1405,11 +1408,13 @@ async function smartParagraphDivisionWithOpenAI(text) {
 4. שמור על כל המילים והתוכן המקורי - אל תוסיף או תמחק דבר
 5. תקן רק שגיאות כתיב ברורות
 6. שמור על סדר הטקסט המקורי
+7. כתוב את הטקסט העברי בכיוון מימין לשמאל (RTL)
+8. השתמש בעברית תקנית עם ניקוד נכון
 
 טקסט לעיבוד:
 ${text}
 
-החזר את הטקסט מחולק לפסקאות:`;
+החזר את הטקסט מחולק לפסקאות בעברית מימין לשמאל:`;
 
     console.log(`🔑 OpenAI paragraph division: Using key ending in ${getOpenAIKey().slice(-6)}`);
 
