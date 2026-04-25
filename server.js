@@ -134,9 +134,7 @@ function getApiKey() {
   const key = process.env.GEMINI_API_KEY;
   const keyExists = !!key;
   const keyLength = key ? key.length : 0;
-  const keyLast6 = key ? key.slice(-6) : 'N/A';
-
-  console.log(`🔑 API Key Info - Exists: ${keyExists}, Length: ${keyLength}, Last6: ${keyLast6}`);
+  // API key validation completed
 
   if (!key) {
     throw new Error('GEMINI_API_KEY not found in environment variables');
@@ -149,7 +147,7 @@ function getApiKey() {
 function createGeminiClient() {
   const apiKey = getApiKey();
   const client = new GoogleGenerativeAI(apiKey);
-  console.log(`🤖 Created new Gemini client with key ending in: ${apiKey.slice(-6)}`);
+  console.log(`🤖 Created new Gemini client`);
   return client;
 }
 
@@ -167,7 +165,7 @@ function createOpenAIClient() {
   const client = new OpenAI({
     apiKey: apiKey,
   });
-  console.log(`🤖 Created new OpenAI client with key ending in: ${apiKey.slice(-6)}`);
+  console.log(`🤖 Created new OpenAI client`);
   return client;
 }
 
@@ -879,9 +877,8 @@ async function transcribeWithModel(chunkPath, chunkIndex, totalChunks, filename,
     if (language === 'gpt') {
       return await transcribeWithOpenAI(chunkPath, chunkIndex, totalChunks, filename, customInstructions);
     }
-    // 🔑 Log API key info before transcription
+    // API key validation completed
     const currentKey = getApiKey();
-    console.log(`🔑 transcribeWithModel(${modelName}) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -1049,14 +1046,14 @@ ${contextPrompt}
 
 ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}` : ''}`;
 
-    console.log(`🔑 OpenAI transcription: Using key ending in ${getOpenAIKey().slice(-6)}`);
+    console.log(`🔑 OpenAI transcription starting`);
 
-    // Call OpenAI GPT-4o Transcribe API
+    // Call OpenAI GPT API
     const response = await openai.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
-      model: "gpt-4o-transcribe",
+      model: "gpt-5.5-thinking",
       prompt: prompt,
-      language: "he", // Hebrew language code for GPT-4o Transcribe
+      language: "he", // Hebrew language code for GPT
       temperature: 0,
     });
 
@@ -1099,9 +1096,8 @@ async function transcribeAudioChunk(chunkPath, chunkIndex, totalChunks, filename
 
   // First attempt: Gemini Flash Latest
   try {
-    // 🔑 Log API key info before transcription
+    // API key validation completed
     const currentKey = getApiKey();
-    console.log(`🔑 transcribeAudioChunk (gemini-flash-latest) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -1186,9 +1182,8 @@ ${contextPrompt}`;
 
     // Second attempt: Fallback to Gemini Flash Lite Latest
     try {
-      // 🔑 Log API key info before fallback transcription
+      // API key validation completed
       const currentKey = getApiKey();
-      console.log(`🔑 transcribeAudioChunk (gemini-flash-lite-latest) for chunk ${chunkIndex + 1}: Using key ending in ${currentKey.slice(-6)}`);
 
       const model = genAI.getGenerativeModel({
         model: "gemini-flash-lite-latest",
@@ -1416,11 +1411,11 @@ ${text}
 
 החזר את הטקסט מחולק לפסקאות בעברית מימין לשמאל:`;
 
-    console.log(`🔑 OpenAI paragraph division: Using key ending in ${getOpenAIKey().slice(-6)}`);
+    console.log(`🔑 OpenAI paragraph division starting`);
 
     // Call OpenAI GPT API for paragraph division
     const response = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-5.5-thinking",
       messages: [
         {
           role: "user",
@@ -1468,9 +1463,8 @@ async function smartParagraphDivision(text, language = null) {
     }
 
     // First attempt: Gemini Flash Latest
-    // 🔑 Log API key info before paragraph division
+    // API key validation completed
     const currentKey = getApiKey();
-    console.log(`🔑 smartParagraphDivision (gemini-flash-latest): Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -1623,9 +1617,8 @@ ${text}
     try {
       console.log(`🔄 Retrying with Gemini Flash Latest for paragraph division...`);
 
-      // 🔑 Log API key info before retry
+      // API key validation completed
       const retryKey = getApiKey();
-      console.log(`🔑 smartParagraphDivision RETRY (gemini-flash-latest): Using key ending in ${retryKey.slice(-6)}`);
 
       const retryModel = genAI.getGenerativeModel({
         model: "gemini-flash-latest",
@@ -1697,9 +1690,8 @@ ${text}
     try {
       console.log(`🔄 Trying Gemini Flash Lite Latest fallback for paragraph division...`);
 
-      // 🔑 Log API key info before fallback
+      // API key validation completed
       const fallbackKey = getApiKey();
-      console.log(`🔑 smartParagraphDivision FALLBACK (gemini-flash-lite-latest): Using key ending in ${fallbackKey.slice(-6)}`);
 
       const fallbackModel = genAI.getGenerativeModel({
         model: "gemini-flash-lite-latest",
@@ -1875,9 +1867,8 @@ async function smartParagraphDivisionWithFlashFallback(text, language = null) {
 
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
-  // 🔑 Log API key info before paragraph division single
+  // API key validation completed
   const currentKey = getApiKey();
-  console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
 
   const model = genAI.getGenerativeModel({
     model: "gemini-flash-latest",
@@ -1960,9 +1951,8 @@ ${text}
 
 // Single chunk processing (same as original but without chunking check)
 async function smartParagraphDivisionSingle(text) {
-  // 🔑 Log API key info before paragraph division single
+  // API key validation completed
   const currentKey = getApiKey();
-  console.log(`🔑 smartParagraphDivisionSingle: Using key ending in ${currentKey.slice(-6)}`);
 
   const model = genAI.getGenerativeModel({
     model: "gemini-flash-latest",
@@ -2358,9 +2348,8 @@ async function directGeminiTranscription(filePath, filename, language, customIns
       );
     }
 
-    // 🔑 Log API key info before direct transcription
+    // API key validation completed
     const currentKey = getApiKey();
-    console.log(`🔑 directGeminiTranscription (gemini-flash-latest): Using key ending in ${currentKey.slice(-6)}`);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-flash-latest",
@@ -3759,7 +3748,7 @@ app.get('/test-gemini', async (req, res) => {
     console.log('🔑 Testing Gemini API key...');
 
     // Test with a simple text generation
-    console.log(`🔑 test-gemini endpoint: Using key ending in ${apiKey.slice(-6)}`);
+    console.log(`🔑 test-gemini endpoint starting`);
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
     const result = await model.generateContent("Say hello in Hebrew");
     const response = await result.response;
@@ -4472,7 +4461,6 @@ app.post('/api/admin/delete-user', (req, res) => {
 app.post('/api/admin/reset-password', (req, res) => {
   try {
     console.log('🔑 Admin reset-password endpoint called');
-    console.log('🔑 Request body:', { ...req.body, newPassword: '[HIDDEN]' });
 
     const { adminEmail, userEmail, newPassword } = req.body;
 
@@ -4521,7 +4509,6 @@ app.post('/api/admin/reset-password', (req, res) => {
 
     // Log the action (without showing actual passwords)
     console.log(`🔑 Password reset successfully for: ${userEmail} by admin: ${adminEmail}`);
-    console.log(`🔑 Password changed from [${oldPassword.length} chars] to [${newPassword.length} chars]`);
 
     // Add audit log entry to user's history if it exists
     if (userToReset.history) {
@@ -5939,10 +5926,10 @@ const server = app.listen(PORT, () => {
 
   console.log(`🚀 Enhanced server running on port ${PORT}`);
 
-  // 🔑 Use centralized API key function for startup logging
+  // API key validation completed
   try {
     const startupKey = getApiKey();
-    console.log(`🔑 Gemini API configured: ${!!startupKey} (ending in ${startupKey.slice(-6)})`);
+    console.log(`🔑 Gemini API configured: ${!!startupKey}`);
   } catch (error) {
     console.log(`🔑 Gemini API configured: false (${error.message})`);
   }
