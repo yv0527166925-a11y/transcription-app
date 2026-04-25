@@ -1051,7 +1051,7 @@ ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}`
     // Call OpenAI GPT API
     const response = await openai.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
-      model: "gpt-5.5-thinking",
+      model: "gpt-5.5",
       prompt: prompt,
       language: "he", // Hebrew language code for GPT
       temperature: 0,
@@ -1415,7 +1415,7 @@ ${text}
 
     // Call OpenAI GPT API for paragraph division
     const response = await openai.chat.completions.create({
-      model: "gpt-5.5-thinking",
+      model: "gpt-5.5",
       messages: [
         {
           role: "user",
