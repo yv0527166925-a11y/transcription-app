@@ -1051,12 +1051,12 @@ ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}`
 
     console.log(`🔑 OpenAI transcription: Using key ending in ${getOpenAIKey().slice(-6)}`);
 
-    // Call OpenAI Whisper API
+    // Call OpenAI GPT-4o Transcribe API
     const response = await openai.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       prompt: prompt,
-      language: "he", // Hebrew language code for Whisper
+      language: "he", // Hebrew language code for GPT-4o Transcribe
       temperature: 0,
     });
 
