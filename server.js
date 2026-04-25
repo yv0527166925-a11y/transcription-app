@@ -1048,10 +1048,10 @@ ${customInstructions ? `\n🎯 הוראות נוספות: ${customInstructions}`
 
     console.log(`🔑 OpenAI transcription starting`);
 
-    // Call OpenAI GPT API
+    // Call OpenAI GPT API with Diarization
     const response = await openai.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
-      model: "gpt-5.5",
+      model: "gpt-4o-transcribe-diarize",
       prompt: prompt,
       language: "he", // Hebrew language code for GPT
       temperature: 0,
