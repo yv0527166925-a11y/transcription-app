@@ -407,8 +407,8 @@ const defaultUsers = [
   {
     id: 1,
     name: 'מנהל המערכת',
-    email: 'timlul.h@gmail.com',
-    password: 'S3cur3P@ssw0rd_Adm!n25', // הסיסמה החזקה שקבענו
+    email: 'yv0527166925@gmail.com',
+    password: '12345678',
     isAdmin: true,
     remainingMinutes: 1000,
     totalTranscribed: 0,
