@@ -8,8 +8,8 @@ const axios = require('axios');
 // יצירת instance של שירות טרנזילה
 const tranzilaService = new TranzilaService();
 
-// נתיבי קבצים - משתמש באותה הגדרה כמו בשרת הראשי
-const PERSISTENT_PATH = process.env.NODE_ENV === 'production' ? '/mnt/data' : path.join(__dirname, '..');
+// נתיבי קבצים - משתמש באותה הגדרה כמו בשרת הראשי (אין דיסק קבוע בתוכנית החינמית)
+const PERSISTENT_PATH = path.join(__dirname, '..');
 const usersFilePath = path.join(PERSISTENT_PATH, 'users_data.json');
 const transactionsFilePath = path.join(PERSISTENT_PATH, 'transactions_data.json');
 

@@ -365,8 +365,10 @@ const upload = multer({
   }
 });
 
-// Data persistence - Persistent Disk Configuration
-const PERSISTENT_PATH = process.env.NODE_ENV === 'production' ? '/mnt/data' : __dirname;
+// אחסון נתונים - בתוכנית החינמית אין דיסק קבוע, אז האחסון נמצא
+// בתוך תיקיית האפליקציה (נמחק בכל פריסה/הפעלה מחדש, וזה בסדר
+// לקבצי תמלול זמניים ומטמון נתוני JSON).
+const PERSISTENT_PATH = __dirname;
 const DATA_FILE = path.join(PERSISTENT_PATH, 'users_data.json');
 const TRANSCRIPTIONS_DIR = path.join(PERSISTENT_PATH, 'transcriptions');
 const BACKUPS_DIR = path.join(PERSISTENT_PATH, 'backups');
