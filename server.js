@@ -3385,7 +3385,8 @@ function finalizeTranscriptionCompletion(transcriptionId) {
     filesProcessed: totalFiles,
     totalFiles: totalFiles,
     timestamp: new Date().toISOString(),
-    isCompleted: true
+    isCompleted: true,
+    downloadUrls: transcriptionData.completedDownloadUrls || []
   };
 
   // שידור סופי מיידי
@@ -3677,6 +3678,15 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
 
         await addTranscriptionToHistory(userEmail, failedData);
         console.log(`📝 Added failed to MongoDB history: ${failedData.originalName}`);
+      }
+
+      // שמירת קישורי הורדה ב-activeTranscriptions לשידור ב-SSE
+      const activeData = activeTranscriptions.get(transcriptionId);
+      if (activeData) {
+        activeData.completedDownloadUrls = transcriptions.map(t => ({
+          filename: cleanFilename(t.filename),
+          downloadUrl: `/api/download/${t.downloadFilename}`
+        }));
       }
 
       // 🔥 FORCE FINAL COMPLETION - נעילת הסטטוס הסופי מיד אחרי המייל

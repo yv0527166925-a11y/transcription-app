@@ -3618,9 +3618,24 @@
                             // Show actual progress, don't force to 100%
                             updateProgress(data.progress);
 
+                            // הורדה אוטומטית של קבצי Word
+                            if (data.downloadUrls && data.downloadUrls.length > 0) {
+                                data.downloadUrls.forEach((item, idx) => {
+                                    setTimeout(() => {
+                                        const link = document.createElement('a');
+                                        link.href = item.downloadUrl;
+                                        link.download = item.filename + '.docx';
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                        console.log('📥 Auto-downloading:', item.filename);
+                                    }, 500 + idx * 1500);
+                                });
+                            }
+
                             // Show completion status without spinner
                             setTimeout(() => {
-                                showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
+                                showStatus(`✅ <strong>התמלול הושלם! הקובץ מורד אוטומטית.</strong>`, 'success');
                                 document.getElementById('progressBar').style.display = 'none';
 
                                 // Reset submit button
