@@ -524,6 +524,16 @@ function saveUsersData() {
 // Load users on startup
 let users = loadUsersData();
 
+// In-memory file store for completed transcriptions (avoids ephemeral disk issues on Render free tier)
+// Files are stored here temporarily until downloaded, then cleaned up after 30 minutes
+const inMemoryFiles = new Map(); // uuid -> { buffer, filename, createdAt }
+setInterval(() => {
+  const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+  for (const [uuid, entry] of inMemoryFiles.entries()) {
+    if (entry.createdAt < thirtyMinutesAgo) inMemoryFiles.delete(uuid);
+  }
+}, 5 * 60 * 1000);
+
 // Ensure downloads directory exists (use persistent storage)
 const downloadsDir = path.join(PERSISTENT_PATH, 'transcriptions');
 if (!fs.existsSync(downloadsDir)) {
@@ -3682,19 +3692,17 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       // שמירת קישורי הורדה ב-activeTranscriptions לשידור ב-SSE
-      // שולחים את הקובץ כ-base64 ישירות ב-SSE כדי לא להסתמך על הדיסק האפמרלי של Render
+      // שמירה בזיכרון עם UUID - לא תלוי בדיסק האפמרלי של Render
       const activeData = activeTranscriptions.get(transcriptionId);
       if (activeData) {
         activeData.completedDownloadUrls = transcriptions.map(t => {
-          const entry = {
-            filename: cleanFilename(t.filename),
-            downloadUrl: `/api/download/${t.downloadFilename}`
+          const uuid = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const cleanName = cleanFilename(t.filename);
+          inMemoryFiles.set(uuid, { buffer: t.wordDoc, filename: cleanName, createdAt: Date.now() });
+          return {
+            filename: cleanName,
+            downloadUrl: `/api/download-buffer/${uuid}`
           };
-          // צרף base64 של הקובץ כדי שהדפדפן יוכל להוריד אותו ישירות
-          if (t.wordDoc) {
-            entry.base64 = t.wordDoc.toString('base64');
-          }
-          return entry;
         });
       }
 
@@ -3844,6 +3852,18 @@ print(f"Python version: {sys.version}")
 });
 
 // 🔧 NEW: Download endpoint for transcribed files
+// Download from in-memory store (no disk dependency)
+app.get('/api/download-buffer/:uuid', (req, res) => {
+  const entry = inMemoryFiles.get(req.params.uuid);
+  if (!entry) {
+    return res.status(404).json({ success: false, error: 'הקובץ כבר לא זמין. נסה לתמלל שוב.' });
+  }
+  res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(entry.filename + '.docx')}`);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.send(entry.buffer);
+  inMemoryFiles.delete(req.params.uuid); // cleanup after download
+});
+
 app.get('/api/download/:filename', (req, res) => {
   try {
     const filename = req.params.filename;

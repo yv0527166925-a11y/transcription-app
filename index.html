@@ -3620,21 +3620,11 @@
 
                             // הורדה אוטומטית של קבצי Word + הצגת כפתורי הורדה
                             if (data.downloadUrls && data.downloadUrls.length > 0) {
-                                // בנה blob URLs מ-base64 (לא תלוי בקבצים על השרת)
-                                const downloadItems = data.downloadUrls.map(item => {
-                                    if (item.base64) {
-                                        const bytes = Uint8Array.from(atob(item.base64), c => c.charCodeAt(0));
-                                        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-                                        return { filename: item.filename, url: URL.createObjectURL(blob) };
-                                    }
-                                    return { filename: item.filename, url: item.downloadUrl };
-                                });
-
                                 // הורדה אוטומטית
-                                downloadItems.forEach((item, idx) => {
+                                data.downloadUrls.forEach((item, idx) => {
                                     setTimeout(() => {
                                         const link = document.createElement('a');
-                                        link.href = item.url;
+                                        link.href = item.downloadUrl;
                                         link.download = item.filename + '.docx';
                                         document.body.appendChild(link);
                                         link.click();
@@ -3643,12 +3633,11 @@
                                     }, 500 + idx * 1500);
                                 });
 
-                                // בניית כפתורי הורדה ידנית (גיבוי לאוטומטי)
-                                const btnsHtml = downloadItems.map(item =>
-                                    `<a href="${item.url}" download="${item.filename}.docx" style="display:inline-block;margin:6px 4px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">📥 הורד: ${item.filename}</a>`
+                                // כפתורי הורדה ידנית
+                                const btnsHtml = data.downloadUrls.map(item =>
+                                    `<a href="${item.downloadUrl}" download="${item.filename}.docx" style="display:inline-block;margin:6px 4px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">📥 הורד: ${item.filename}</a>`
                                 ).join('');
 
-                                // Show completion status with download buttons
                                 setTimeout(() => {
                                     showStatus(`✅ <strong>התמלול הושלם!</strong><br><div style="margin-top:10px">${btnsHtml}</div><br><small style="color:#555">אם ההורדה לא התחילה אוטומטית, לחץ על הכפתור למעלה</small>`, 'success');
                                     document.getElementById('progressBar').style.display = 'none';
