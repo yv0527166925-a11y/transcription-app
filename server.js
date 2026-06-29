@@ -3191,15 +3191,16 @@ async function sendTranscriptionEmail(userEmail, transcriptions, failedTranscrip
   try {
     console.log(`📧 Preparing enhanced email for: ${userEmail}`);
     console.log(`📊 Successful: ${transcriptions.length}, Failed: ${failedTranscriptions.length}`);
-    
-const attachments = transcriptions.map(trans => {
-  const cleanName = cleanFilename(trans.filename);
-  return {
-    filename: `${cleanName}.docx`,
-    content: trans.wordDoc,
-    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  };
-});
+
+    const attachments = transcriptions.map(trans => {
+      const cleanName = cleanFilename(trans.filename);
+      return {
+        filename: `${cleanName}.docx`,
+        content: trans.wordDoc.toString('base64'),
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        disposition: 'attachment'
+      };
+    });
 
     const successList = transcriptions.map(t => {
       const cleanName = cleanFilename(t.filename);
@@ -3301,17 +3302,18 @@ const attachments = transcriptions.map(trans => {
         </div>
           `;
 
-    // Send email using Gmail/nodemailer
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    // Send email using Resend (HTTP API - works on Render free tier)
+    const { Resend } = require('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
+    await resend.emails.send({
+      from: 'תמלול <onboarding@resend.dev>',
       to: userEmail,
       subject: `✅ תמלול מלא הושלם - ${transcriptions.length} קבצי Word מצורפים`,
       html: htmlContent,
       attachments: attachments
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`✅ Gmail email sent successfully to: ${userEmail}`);
+    });
+    console.log(`✅ Resend email sent successfully to: ${userEmail}`);
 
   } catch (error) {
     console.error('❌ Email sending error:', error.message);
@@ -3692,17 +3694,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       // שמירת קישורי הורדה ב-activeTranscriptions לשידור ב-SSE
-      // שמירה בזיכרון עם UUID - לא תלוי בדיסק האפמרלי של Render
+      // שולחים base64 ישירות בתוך ה-SSE - הדפדפן מוריד מהזיכרון שלו, לא תלוי בשרת
       const activeData = activeTranscriptions.get(transcriptionId);
       if (activeData) {
         activeData.completedDownloadUrls = transcriptions.map(t => {
-          const uuid = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
           const cleanName = cleanFilename(t.filename);
+          const entry = { filename: cleanName, downloadUrl: null };
+          if (t.wordDoc) {
+            entry.base64 = t.wordDoc.toString('base64');
+          }
+          // גם שמור בזיכרון כגיבוי אם ה-SSE כבר לא פעיל
+          const uuid = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
           inMemoryFiles.set(uuid, { buffer: t.wordDoc, filename: cleanName, createdAt: Date.now() });
-          return {
-            filename: cleanName,
-            downloadUrl: `/api/download-buffer/${uuid}`
-          };
+          entry.downloadUrl = `/api/download-buffer/${uuid}`;
+          return entry;
         });
       }
 
