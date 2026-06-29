@@ -3682,12 +3682,20 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       // שמירת קישורי הורדה ב-activeTranscriptions לשידור ב-SSE
+      // שולחים את הקובץ כ-base64 ישירות ב-SSE כדי לא להסתמך על הדיסק האפמרלי של Render
       const activeData = activeTranscriptions.get(transcriptionId);
       if (activeData) {
-        activeData.completedDownloadUrls = transcriptions.map(t => ({
-          filename: cleanFilename(t.filename),
-          downloadUrl: `/api/download/${t.downloadFilename}`
-        }));
+        activeData.completedDownloadUrls = transcriptions.map(t => {
+          const entry = {
+            filename: cleanFilename(t.filename),
+            downloadUrl: `/api/download/${t.downloadFilename}`
+          };
+          // צרף base64 של הקובץ כדי שהדפדפן יוכל להוריד אותו ישירות
+          if (t.wordDoc) {
+            entry.base64 = t.wordDoc.toString('base64');
+          }
+          return entry;
+        });
       }
 
       // 🔥 FORCE FINAL COMPLETION - נעילת הסטטוס הסופי מיד אחרי המייל
