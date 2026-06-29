@@ -3618,8 +3618,9 @@
                             // Show actual progress, don't force to 100%
                             updateProgress(data.progress);
 
-                            // הורדה אוטומטית של קבצי Word
+                            // הורדה אוטומטית של קבצי Word + הצגת כפתורי הורדה
                             if (data.downloadUrls && data.downloadUrls.length > 0) {
+                                // הורדה אוטומטית
                                 data.downloadUrls.forEach((item, idx) => {
                                     setTimeout(() => {
                                         const link = document.createElement('a');
@@ -3631,18 +3632,30 @@
                                         console.log('📥 Auto-downloading:', item.filename);
                                     }, 500 + idx * 1500);
                                 });
+
+                                // בניית כפתורי הורדה ידנית (גיבוי לאוטומטי)
+                                const btnsHtml = data.downloadUrls.map(item =>
+                                    `<a href="${item.downloadUrl}" download="${item.filename}.docx" class="download-btn-manual" style="display:inline-block;margin:6px 4px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">📥 הורד: ${item.filename}</a>`
+                                ).join('');
+
+                                // Show completion status with download buttons
+                                setTimeout(() => {
+                                    showStatus(`✅ <strong>התמלול הושלם!</strong><br><div style="margin-top:10px">${btnsHtml}</div><br><small style="color:#555">אם ההורדה לא התחילה אוטומטית, לחץ על הכפתור למעלה</small>`, 'success');
+                                    document.getElementById('progressBar').style.display = 'none';
+                                    const submitBtn = document.getElementById('submitBtn');
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'התחל תמלול';
+                                }, 500);
+                            } else {
+                                // Show completion status without spinner
+                                setTimeout(() => {
+                                    showStatus(`✅ <strong>התמלול הושלם! הקובץ מורד אוטומטית.</strong>`, 'success');
+                                    document.getElementById('progressBar').style.display = 'none';
+                                    const submitBtn = document.getElementById('submitBtn');
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'התחל תמלול';
+                                }, 500);
                             }
-
-                            // Show completion status without spinner
-                            setTimeout(() => {
-                                showStatus(`✅ <strong>התמלול הושלם! הקובץ מורד אוטומטית.</strong>`, 'success');
-                                document.getElementById('progressBar').style.display = 'none';
-
-                                // Reset submit button
-                                const submitBtn = document.getElementById('submitBtn');
-                                submitBtn.disabled = false;
-                                submitBtn.textContent = 'התחל תמלול';
-                            }, 500);
 
                             // Close SSE connection after showing completion
                             setTimeout(() => {
@@ -3714,7 +3727,7 @@
 
                                 // Show completion status without spinner
                                 setTimeout(() => {
-                                    showStatus(`✅ <strong>${progressData.progress.stage}</strong>`, 'success');
+                                    showStatus(`✅ <strong>${progressData.progress.stage}</strong><br><small>הקובץ מורד אוטומטית. אם לא הורד — עבור ל<a href="#" onclick="showSection('history')">היסטוריה</a> להורדה ידנית.</small>`, 'success');
                                     document.getElementById('progressBar').style.display = 'none';
 
                                     // Reset submit button
@@ -3735,7 +3748,7 @@
                             // Show completion with 100% to ensure visual completion
                             updateProgress(100);
                             setTimeout(() => {
-                                showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong>`, 'success');
+                                showStatus(`✅ <strong>התמלול הושלם בהצלחה!</strong><br><small>הקובץ מורד אוטומטית. אם לא הורד — עבור ל<a href="#" onclick="showSection('history')">היסטוריה</a> להורדה ידנית.</small>`, 'success');
                                 document.getElementById('progressBar').style.display = 'none';
 
                                 // Reset submit button
