@@ -3024,7 +3024,8 @@ async function createWordDocumentPython(transcription, filename, duration, langu
 
     // קריאה לסקריפט Python עם נתיב לקובץ הנתונים
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', ['generate_word_doc.py', tempDataPath], {
+      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+      const pythonProcess = spawn(pythonCmd, ['generate_word_doc.py', tempDataPath], {
         cwd: __dirname,
         stdio: ['pipe', 'pipe', 'pipe']
       });
@@ -3791,7 +3792,8 @@ app.get('/test-python', async (req, res) => {
   try {
     const { spawn } = require('child_process');
 
-    const pythonProcess = spawn('python', ['-c', `
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const pythonProcess = spawn(pythonCmd, ['-c', `
 import sys
 from docx import Document
 print("Python and python-docx are working!")
