@@ -3694,20 +3694,14 @@ async function processTranscriptionAsync(files, userEmail, language, estimatedMi
       }
 
       // שמירת קישורי הורדה ב-activeTranscriptions לשידור ב-SSE
-      // שולחים base64 ישירות בתוך ה-SSE - הדפדפן מוריד מהזיכרון שלו, לא תלוי בשרת
+      // הקובץ נשלח במייל - כאן רק שומרים גיבוי בזיכרון למקרה שהמשתמש רוצה להוריד מהאתר
       const activeData = activeTranscriptions.get(transcriptionId);
       if (activeData) {
         activeData.completedDownloadUrls = transcriptions.map(t => {
           const cleanName = cleanFilename(t.filename);
-          const entry = { filename: cleanName, downloadUrl: null };
-          if (t.wordDoc) {
-            entry.base64 = t.wordDoc.toString('base64');
-          }
-          // גם שמור בזיכרון כגיבוי אם ה-SSE כבר לא פעיל
           const uuid = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
           inMemoryFiles.set(uuid, { buffer: t.wordDoc, filename: cleanName, createdAt: Date.now() });
-          entry.downloadUrl = `/api/download-buffer/${uuid}`;
-          return entry;
+          return { filename: cleanName, downloadUrl: `/api/download-buffer/${uuid}` };
         });
       }
 

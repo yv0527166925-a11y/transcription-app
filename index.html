@@ -3618,43 +3618,13 @@
                             // Show actual progress, don't force to 100%
                             updateProgress(data.progress);
 
-                            // הורדה אוטומטית של קבצי Word + הצגת כפתורי הורדה
-                            if (data.downloadUrls && data.downloadUrls.length > 0) {
-                                // הורדה אוטומטית
-                                data.downloadUrls.forEach((item, idx) => {
-                                    setTimeout(() => {
-                                        const link = document.createElement('a');
-                                        link.href = item.downloadUrl;
-                                        link.download = item.filename + '.docx';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                        console.log('📥 Auto-downloading:', item.filename);
-                                    }, 500 + idx * 1500);
-                                });
-
-                                // כפתורי הורדה ידנית
-                                const btnsHtml = data.downloadUrls.map(item =>
-                                    `<a href="${item.downloadUrl}" download="${item.filename}.docx" style="display:inline-block;margin:6px 4px;padding:10px 18px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;">📥 הורד: ${item.filename}</a>`
-                                ).join('');
-
-                                setTimeout(() => {
-                                    showStatus(`✅ <strong>התמלול הושלם!</strong><br><div style="margin-top:10px">${btnsHtml}</div><br><small style="color:#555">אם ההורדה לא התחילה אוטומטית, לחץ על הכפתור למעלה</small>`, 'success');
-                                    document.getElementById('progressBar').style.display = 'none';
-                                    const submitBtn = document.getElementById('submitBtn');
-                                    submitBtn.disabled = false;
-                                    submitBtn.textContent = 'התחל תמלול';
-                                }, 500);
-                            } else {
-                                // Show completion status without spinner
-                                setTimeout(() => {
-                                    showStatus(`✅ <strong>התמלול הושלם! הקובץ מורד אוטומטית.</strong>`, 'success');
-                                    document.getElementById('progressBar').style.display = 'none';
-                                    const submitBtn = document.getElementById('submitBtn');
-                                    submitBtn.disabled = false;
-                                    submitBtn.textContent = 'התחל תמלול';
-                                }, 500);
-                            }
+                            setTimeout(() => {
+                                showStatus(`✅ <strong>התמלול הושלם! הקובץ נשלח למייל שלך.</strong>`, 'success');
+                                document.getElementById('progressBar').style.display = 'none';
+                                const submitBtn = document.getElementById('submitBtn');
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = 'התחל תמלול';
+                            }, 500);
 
                             // Close SSE connection after showing completion
                             setTimeout(() => {
