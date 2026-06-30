@@ -1537,7 +1537,7 @@ ${text}
 
         // Create timeout promise
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+          setTimeout(() => reject(new Error('Smart division timeout after 1.5 minutes')), 90 * 1000)
         );
 
         // Create generation promise
@@ -1568,62 +1568,15 @@ ${text}
           throw attemptError; // Final attempt failed, throw error
         }
 
-        // Longer delays for better rate limiting: 15s, 30s, 50s, 60s, 70s
-        const waitTimes = [15000, 30000, 50000, 60000, 70000];
-        const waitTime = waitTimes[attempt - 1] || 70000;
+        const waitTimes = [5000, 10000];
+        const waitTime = waitTimes[attempt - 1] || 10000;
         console.log(`⏳ Waiting ${waitTime / 1000} seconds before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
 
-    // If initial fast retries failed, try longer retries (5 minutes between attempts for 30 minutes total)
-    console.log('🔄 Initial retries failed, starting extended retry phase with 5-minute intervals...');
-
-    for (let longAttempt = 1; longAttempt <= 6; longAttempt++) {
-      try {
-        console.log(`🔄 Extended attempt ${longAttempt}/6 for smart division (5-minute intervals)...`);
-
-        // Create timeout promise
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
-        );
-
-        // Create generation promise
-        const generatePromise = model.generateContent(prompt);
-
-        // Race between generation and timeout
-        result = await Promise.race([generatePromise, timeoutPromise]);
-
-        console.log(`✅ Smart division API call successful on extended attempt ${longAttempt}`);
-
-        const response = await result.response;
-        let dividedText = response.text().trim();
-
-        console.log(`✅ Smart division completed: ${dividedText.length} characters`);
-
-        // וידוא שיש חלוקה לפסקאות
-        const paragraphCount = dividedText.split('\\n\\n').length;
-        console.log(`📊 Created ${paragraphCount} smart paragraphs`);
-
-        return dividedText;
-
-      } catch (longAttemptError) {
-        console.error(`❌ Extended attempt ${longAttempt} failed:`, longAttemptError.message);
-
-        if (longAttempt === 6) {
-          console.log(`🔍 All extended attempts failed, throwing final error...`);
-          throw longAttemptError; // Final extended attempt failed
-        }
-
-        // Wait 5 minutes between extended attempts
-        const longWaitTime = 5 * 60 * 1000; // 5 minutes
-        console.log(`⏳ Waiting ${longWaitTime / 1000} seconds (5 minutes) before next extended retry...`);
-        await new Promise(resolve => setTimeout(resolve, longWaitTime));
-      }
-    }
-
-    // If we get here, all attempts (fast + extended) failed
-    throw new Error('All retry attempts (fast + extended) failed');
+    // If we get here, all fast attempts failed
+    throw new Error('All retry attempts failed');
 
   } catch (error1) {
     console.log(`⚠️ Gemini Flash Latest failed for paragraph division:`, error1.message);
@@ -1672,7 +1625,7 @@ ${text}
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+            setTimeout(() => reject(new Error('Smart division timeout after 1.5 minutes')), 90 * 1000)
           );
 
           const generatePromise = retryModel.generateContent(prompt);
@@ -1683,8 +1636,8 @@ ${text}
         } catch (attemptError) {
           console.error(`❌ Flash Latest retry attempt ${attempt} failed:`, attemptError.message);
           if (attempt === 3) throw attemptError;
-          console.log(`⏳ Waiting 1 minute before next Flash Latest retry...`);
-          await new Promise(resolve => setTimeout(resolve, 60000));
+          console.log(`⏳ Waiting 20 seconds before next Flash Latest retry...`);
+          await new Promise(resolve => setTimeout(resolve, 20000));
         }
       }
 
@@ -1758,8 +1711,8 @@ ${text}
         } catch (attemptError) {
           console.error(`❌ Fallback attempt ${attempt} failed:`, attemptError.message);
           if (attempt === 2) throw attemptError;
-          console.log(`⏳ Waiting 30 seconds before fallback retry...`);
-          await new Promise(resolve => setTimeout(resolve, 30000));
+          console.log(`⏳ Waiting 20 seconds before fallback retry...`);
+          await new Promise(resolve => setTimeout(resolve, 20000));
         }
       }
 
@@ -1796,8 +1749,8 @@ async function smartParagraphDivisionChunked(text, maxChars, language = null) {
 
       // Add delay between chunks to avoid rate limiting
       if (i > 0) {
-        console.log('⏱️ Waiting 5 seconds between chunks...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log('⏱️ Waiting 2 seconds between chunks...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       // 🆕 Use the new fallback function instead of inline code
@@ -1938,7 +1891,7 @@ ${text}
       console.log(`🔍 DEBUG: About to call model.generateContent...`);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+        setTimeout(() => reject(new Error('Smart division timeout after 1.5 minutes')), 90 * 1000)
       );
 
       const generatePromise = model.generateContent(prompt);
@@ -2023,7 +1976,7 @@ ${text}
       console.log(`🔍 DEBUG: About to call model.generateContent...`);
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Smart division timeout after 3 minutes')), 3 * 60 * 1000)
+        setTimeout(() => reject(new Error('Smart division timeout after 1.5 minutes')), 90 * 1000)
       );
 
       const generatePromise = model.generateContent(prompt);
@@ -2043,9 +1996,8 @@ ${text}
       console.error(`❌ Chunk attempt ${attempt} failed:`, attemptError.message);
       if (attempt === 2) throw attemptError;
 
-      // Longer delays for better rate limiting: 15s, 30s, 50s, 60s, 70s
-      const waitTimes = [15000, 30000, 50000, 60000, 70000];
-      const waitTime = waitTimes[attempt - 1] || 70000;
+      const waitTimes = [5000, 10000];
+      const waitTime = waitTimes[attempt - 1] || 10000;
       console.log(`⏳ Waiting ${waitTime / 1000} seconds before retry...`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
@@ -2549,9 +2501,9 @@ async function chunkedGeminiTranscription(filePath, filename, language, duration
           try {
             if (retryCount > 0) {
               console.log(`🔄 Retry ${retryCount}/${maxRetries} for chunk ${i + 1}`);
-              // Exponential backoff: 5s, 15s, 30s, 45s, 60s
-              const backoffDelays = [5000, 15000, 30000, 45000, 60000];
-              const backoffDelay = backoffDelays[retryCount - 1] || 60000;
+              // Exponential backoff: 5s, 10s
+              const backoffDelays = [5000, 10000];
+              const backoffDelay = backoffDelays[retryCount - 1] || 10000;
               console.log(`⏳ Waiting ${backoffDelay/1000}s before retry...`);
               await new Promise(resolve => setTimeout(resolve, backoffDelay));
             }
